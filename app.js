@@ -20,12 +20,6 @@ const openings = [
   { id: "door-bathroom-hall", type: "door", x1: 540, y1: 390, x2: 600, y2: 390 },
   { id: "door-bedroom-right", type: "door", x1: 580, y1: 160, x2: 580, y2: 200 },
   { id: "door-cellar", type: "door", x1: 200, y1: 200, x2: 240, y2: 200 },
-const rooms = [
-  { id: "living", name: "Living Room", x: 40, y: 40, width: 260, height: 160 },
-  { id: "kitchen", name: "Kitchen", x: 320, y: 40, width: 220, height: 160 },
-  { id: "bedroom", name: "Bedroom", x: 40, y: 220, width: 220, height: 160 },
-  { id: "bathroom", name: "Bathroom", x: 280, y: 220, width: 140, height: 160 },
-  { id: "office", name: "Office", x: 440, y: 220, width: 200, height: 160 },
 ];
 
 const initialFeatures = [
@@ -378,8 +372,6 @@ const handleAddComment = (event) => {
   const bounds = elements.floorplan.getBoundingClientRect();
   const x = ((event.clientX - bounds.left) / bounds.width) * floorplanSize.width;
   const y = ((event.clientY - bounds.top) / bounds.height) * floorplanSize.height;
-  const x = ((event.clientX - bounds.left) / bounds.width) * 700;
-  const y = ((event.clientY - bounds.top) / bounds.height) * 420;
 
   const room = rooms.find((item) => item.id === state.activeRoomId);
   const withinRoom =
