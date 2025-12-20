@@ -69,7 +69,7 @@ body {
 
 .floorplan-wrapper {
   margin: 1.2rem 0;
-  border: 2px dashed #cbd5f5;
+  border: 2px solid #cbd5f5;
   border-radius: 0.8rem;
   padding: 1rem;
   background: #f8fafc;
@@ -80,21 +80,39 @@ svg {
   height: auto;
 }
 
+.outer-wall {
+  fill: none;
+  stroke: #111827;
+  stroke-width: 6;
+}
+
 .room {
-  fill: #c7d2fe;
-  stroke: #6366f1;
+  fill: #ffffff;
+  stroke: #1f2937;
   stroke-width: 2;
   cursor: pointer;
   transition: fill 0.2s ease;
 }
 
 .room:hover {
-  fill: #a5b4fc;
+  fill: #fef3c7;
 }
 
 .room.active {
-  fill: #fbbf24;
+  fill: #fde68a;
   stroke: #b45309;
+}
+
+.room-label {
+  fill: #111827;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.wall-line {
+  stroke: transparent;
+  stroke-width: 10;
+  pointer-events: stroke;
 }
 
 .comment-marker {
@@ -110,11 +128,11 @@ svg {
 }
 
 .door-marker {
-  stroke: #ef4444;
+  stroke: #92400e;
 }
 
 .window-marker {
-  stroke: #22c55e;
+  stroke: #2563eb;
 }
 
 .floorplan-actions {
@@ -141,11 +159,11 @@ svg {
 }
 
 .legend-swatch.door {
-  background: #ef4444;
+  background: #92400e;
 }
 
 .legend-swatch.window {
-  background: #22c55e;
+  background: #2563eb;
 }
 
 .sidebar {
@@ -163,6 +181,12 @@ svg {
 
 .panel h3 {
   margin-top: 0;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .form-row {
@@ -202,8 +226,7 @@ button {
 }
 
 .checklist,
-.comments,
-.feature-list {
+.comments {
   list-style: none;
   padding: 0;
   margin: 0.8rem 0 0;
@@ -212,8 +235,7 @@ button {
 }
 
 .checklist li,
-.comments li,
-.feature-list li {
+.comments li {
   background: #f8fafc;
   padding: 0.7rem;
   border-radius: 0.6rem;
@@ -283,7 +305,65 @@ button {
   cursor: pointer;
 }
 
-.developer-view {
+.three-d-scene {
+  margin-top: 1rem;
+  perspective: 600px;
+  display: none;
+}
+
+#three-d-panel.open .three-d-scene {
+  display: flex;
+  justify-content: center;
+}
+
+.three-d-box {
+  position: relative;
+  width: 140px;
+  height: 100px;
+  transform-style: preserve-3d;
+  transform: rotateX(20deg) rotateY(-25deg);
+}
+
+.three-d-box .face {
+  position: absolute;
+  background: rgba(147, 197, 253, 0.6);
+  border: 2px solid #1d4ed8;
+}
+
+.three-d-box .front {
+  width: 140px;
+  height: 100px;
+  transform: translateZ(40px);
+}
+
+.three-d-box .back {
+  width: 140px;
+  height: 100px;
+  transform: rotateY(180deg) translateZ(40px);
+}
+
+.three-d-box .right {
+  width: 80px;
+  height: 100px;
+  transform: rotateY(90deg) translateZ(60px);
+  transform-origin: right;
+}
+
+.three-d-box .left {
+  width: 80px;
+  height: 100px;
+  transform: rotateY(-90deg) translateZ(60px);
+  transform-origin: left;
+}
+
+.three-d-box .top {
+  width: 140px;
+  height: 80px;
+  transform: rotateX(90deg) translateZ(60px);
+  transform-origin: top;
+}
+
+.architect-view {
   padding: 2rem;
   background: #ffffff;
   margin: 0 2rem 2rem;
@@ -291,64 +371,35 @@ button {
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
 }
 
-.feature-form {
-  display: flex;
-  gap: 0.6rem;
-  flex-wrap: wrap;
+.architect-panel {
+  margin-top: 1rem;
+  background: #f8fafc;
+  padding: 1rem;
+  border-radius: 0.8rem;
+  border: 1px solid #e2e8f0;
 }
 
-.feature-form input {
-  flex: 1 1 240px;
-  padding: 0.7rem;
+.measurement-form {
+  display: grid;
+  gap: 0.8rem;
+  max-width: 320px;
+}
+
+.measurement-form label {
+  display: grid;
+  gap: 0.4rem;
+  font-weight: 600;
+}
+
+.measurement-form input {
+  padding: 0.6rem;
   border-radius: 0.6rem;
   border: 1px solid #cbd5f5;
 }
 
-.feature-columns {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 1.5rem;
-  margin-top: 1.5rem;
-}
-
-.status-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.2rem 0.6rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.status-not-started {
-  background: #fee2e2;
-  color: #991b1b;
-}
-
-.status-in-progress {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.status-complete {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.feature-actions {
-  margin-top: 0.4rem;
-  display: flex;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-}
-
-.edit-input {
-  width: 100%;
-  margin-top: 0.5rem;
-  padding: 0.5rem;
-  border-radius: 0.5rem;
-  border: 1px solid #cbd5f5;
+.measurement-form input:disabled {
+  background: #e5e7eb;
+  color: #6b7280;
 }
 
 .app-footer {

@@ -1,58 +1,124 @@
 const floorplanSize = { width: 800, height: 520 };
 
 const rooms = [
-  { id: "bedroom-left", name: "Bedroom", x: 40, y: 40, width: 220, height: 140 },
-  { id: "living", name: "Living Room", x: 280, y: 40, width: 280, height: 140 },
-  { id: "bedroom-right", name: "Bedroom", x: 580, y: 40, width: 180, height: 220 },
-  { id: "cellar", name: "Cellar", x: 40, y: 200, width: 200, height: 220 },
-  { id: "kitchen", name: "Kitchen", x: 260, y: 200, width: 200, height: 180 },
-  { id: "bathroom", name: "Bathroom", x: 480, y: 200, width: 180, height: 180 },
-  { id: "hallway", name: "Hallway", x: 300, y: 390, width: 220, height: 90 },
-  { id: "storage", name: "Storage Cabinet", x: 280, y: 450, width: 120, height: 50 },
+  { id: "bedroom-left", name: "Schlafzimmer", x: 40, y: 40, width: 220, height: 140 },
+  { id: "living", name: "Wohnzimmer", x: 260, y: 40, width: 280, height: 140 },
+  { id: "bedroom-right", name: "Schlafzimmer", x: 560, y: 40, width: 200, height: 220 },
+  { id: "cellar", name: "Keller", x: 40, y: 200, width: 200, height: 220 },
+  { id: "kitchen", name: "Küche", x: 260, y: 200, width: 200, height: 180 },
+  { id: "bathroom", name: "Bad", x: 480, y: 200, width: 180, height: 180 },
+  { id: "hallway", name: "Flur", x: 300, y: 390, width: 220, height: 90 },
+  { id: "storage", name: "Abstellschrank", x: 300, y: 450, width: 140, height: 50 },
 ];
 
 const openings = [
-  { id: "window-left", type: "window", x1: 80, y1: 30, x2: 200, y2: 30 },
-  { id: "window-living", type: "window", x1: 360, y1: 30, x2: 520, y2: 30 },
-  { id: "window-right", type: "window", x1: 620, y1: 30, x2: 740, y2: 30 },
-  { id: "door-living-hall", type: "door", x1: 360, y1: 190, x2: 440, y2: 190 },
-  { id: "door-kitchen-hall", type: "door", x1: 330, y1: 390, x2: 390, y2: 390 },
-  { id: "door-bathroom-hall", type: "door", x1: 540, y1: 390, x2: 600, y2: 390 },
-  { id: "door-bedroom-right", type: "door", x1: 580, y1: 160, x2: 580, y2: 200 },
-  { id: "door-cellar", type: "door", x1: 200, y1: 200, x2: 240, y2: 200 },
+  {
+    id: "window-left",
+    type: "window",
+    roomId: "bedroom-left",
+    label: "Fenster Schlafzimmer links",
+    x1: 80,
+    y1: 30,
+    x2: 200,
+    y2: 30,
+  },
+  {
+    id: "window-living",
+    type: "window",
+    roomId: "living",
+    label: "Fenster Wohnzimmer",
+    x1: 320,
+    y1: 30,
+    x2: 480,
+    y2: 30,
+  },
+  {
+    id: "window-right",
+    type: "window",
+    roomId: "bedroom-right",
+    label: "Fenster Schlafzimmer rechts",
+    x1: 600,
+    y1: 30,
+    x2: 720,
+    y2: 30,
+  },
+  {
+    id: "door-living-hall",
+    type: "door",
+    roomId: "living",
+    label: "Tür Wohnzimmer → Flur",
+    x1: 360,
+    y1: 190,
+    x2: 440,
+    y2: 190,
+  },
+  {
+    id: "door-kitchen-hall",
+    type: "door",
+    roomId: "kitchen",
+    label: "Tür Küche → Flur",
+    x1: 330,
+    y1: 390,
+    x2: 390,
+    y2: 390,
+  },
+  {
+    id: "door-bathroom-hall",
+    type: "door",
+    roomId: "bathroom",
+    label: "Tür Bad → Flur",
+    x1: 540,
+    y1: 390,
+    x2: 600,
+    y2: 390,
+  },
+  {
+    id: "door-bedroom-right",
+    type: "door",
+    roomId: "bedroom-right",
+    label: "Tür Schlafzimmer rechts",
+    x1: 560,
+    y1: 170,
+    x2: 560,
+    y2: 200,
+  },
+  {
+    id: "door-cellar",
+    type: "door",
+    roomId: "cellar",
+    label: "Tür Keller",
+    x1: 200,
+    y1: 200,
+    x2: 240,
+    y2: 200,
+  },
 ];
 
-const initialFeatures = [
-  {
-    id: "feature-1",
-    text: "Integrate ChatGPT image creation + room image stacks (upload, generate, edit, browse gallery).",
-    status: "not-started",
-  },
-  {
-    id: "feature-2",
-    text: "Support multiple user logins with collaboration notes tied to specific spots in a room.",
-    status: "not-started",
-  },
-  {
-    id: "feature-3",
-    text: "Convert room actions into a checklist for materials and builders.",
-    status: "in-progress",
-  },
-];
+const defaultMeasurements = {
+  "bedroom-left": { width: 3600, length: 2800, height: 2800 },
+  living: { width: 5200, length: 3000, height: 2800 },
+  "bedroom-right": { width: 3200, length: 4200, height: 2800 },
+  cellar: { width: 3000, length: 4000, height: 2800 },
+  kitchen: { width: 3200, length: 3500, height: 2800 },
+  bathroom: { width: 2800, length: 3200, height: 2800 },
+  hallway: { width: 4200, length: 1800, height: 2800 },
+  storage: { width: 1600, length: 900, height: 2800 },
+};
 
 const users = [
-  { id: "user-1", name: "Avery" },
-  { id: "user-2", name: "Pat" },
-  { id: "user-3", name: "Sam" },
+  { id: "user-1", name: "Wolfgang" },
+  { id: "user-2", name: "Konstantin" },
 ];
 
 const state = {
   activeRoomId: null,
   isAddingComment: false,
+  isArchitectMode: false,
   activeUserId: users[0].id,
   roomData: {},
-  features: [],
-  updateRequests: [],
+  roomMeasurements: {},
+  selectedElement: null,
+  show3d: false,
 };
 
 const elements = {
@@ -68,29 +134,20 @@ const elements = {
   clearSelectionBtn: document.getElementById("clear-selection"),
   uploadImageInput: document.getElementById("upload-image"),
   generateImageBtn: document.getElementById("generate-image"),
-  toggleDev: document.getElementById("toggle-dev"),
-  developerView: document.getElementById("developer-view"),
-  featureForm: document.getElementById("feature-form"),
-  featureInput: document.getElementById("feature-input"),
-  featureStatus: document.getElementById("feature-status"),
-  featureList: document.getElementById("feature-list"),
-  updateRequests: document.getElementById("update-requests"),
+  toggleArchitect: document.getElementById("toggle-architect"),
+  architectView: document.getElementById("architect-view"),
+  architectTitle: document.getElementById("architect-title"),
+  measurementForm: document.getElementById("measurement-form"),
+  measurementWidth: document.getElementById("measure-width"),
+  measurementLength: document.getElementById("measure-length"),
+  measurementHeight: document.getElementById("measure-height"),
   activeUserSelect: document.getElementById("active-user"),
+  threeDPanel: document.getElementById("three-d-panel"),
+  threeDButton: document.getElementById("toggle-3d"),
+  threeDLabel: document.getElementById("three-d-label"),
 };
 
 const storageKey = "house-builder-state";
-
-const statusLabels = {
-  "not-started": "Not started",
-  "in-progress": "In progress",
-  complete: "Complete",
-};
-
-const statusClass = {
-  "not-started": "status-not-started",
-  "in-progress": "status-in-progress",
-  complete: "status-complete",
-};
 
 const defaultRoomData = () => ({
   checklist: [],
@@ -101,8 +158,7 @@ const defaultRoomData = () => ({
 const saveState = () => {
   const payload = {
     roomData: state.roomData,
-    features: state.features,
-    updateRequests: state.updateRequests,
+    roomMeasurements: state.roomMeasurements,
     activeUserId: state.activeUserId,
   };
   localStorage.setItem(storageKey, JSON.stringify(payload));
@@ -111,17 +167,16 @@ const saveState = () => {
 const loadState = () => {
   const raw = localStorage.getItem(storageKey);
   if (!raw) {
-    state.features = initialFeatures;
+    state.roomMeasurements = { ...defaultMeasurements };
     return;
   }
   try {
     const parsed = JSON.parse(raw);
     state.roomData = parsed.roomData || {};
-    state.features = parsed.features || initialFeatures;
-    state.updateRequests = parsed.updateRequests || [];
+    state.roomMeasurements = parsed.roomMeasurements || { ...defaultMeasurements };
     state.activeUserId = parsed.activeUserId || users[0].id;
   } catch (error) {
-    state.features = initialFeatures;
+    state.roomMeasurements = { ...defaultMeasurements };
   }
 };
 
@@ -148,26 +203,65 @@ const renderUsers = () => {
 const renderFloorplan = () => {
   elements.floorplan.innerHTML = "";
 
+  const outline = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+  outline.setAttribute("x", 20);
+  outline.setAttribute("y", 20);
+  outline.setAttribute("width", 760);
+  outline.setAttribute("height", 480);
+  outline.setAttribute("class", "outer-wall");
+  elements.floorplan.appendChild(outline);
+
   rooms.forEach((room) => {
     const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
     rect.setAttribute("x", room.x);
     rect.setAttribute("y", room.y);
     rect.setAttribute("width", room.width);
     rect.setAttribute("height", room.height);
-    rect.setAttribute("rx", 12);
     rect.setAttribute("class", `room${state.activeRoomId === room.id ? " active" : ""}`);
     rect.dataset.roomId = room.id;
 
     const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    label.setAttribute("x", room.x + 16);
-    label.setAttribute("y", room.y + 32);
-    label.setAttribute("fill", "#1f2937");
-    label.setAttribute("font-size", "16");
-    label.setAttribute("font-weight", "600");
+    label.setAttribute("x", room.x + 12);
+    label.setAttribute("y", room.y + 28);
+    label.setAttribute("class", "room-label");
     label.textContent = room.name;
 
     elements.floorplan.appendChild(rect);
     elements.floorplan.appendChild(label);
+  });
+
+  rooms.forEach((room) => {
+    const wallSegments = [
+      { x1: room.x, y1: room.y, x2: room.x + room.width, y2: room.y, position: "oben" },
+      {
+        x1: room.x + room.width,
+        y1: room.y,
+        x2: room.x + room.width,
+        y2: room.y + room.height,
+        position: "rechts",
+      },
+      {
+        x1: room.x,
+        y1: room.y + room.height,
+        x2: room.x + room.width,
+        y2: room.y + room.height,
+        position: "unten",
+      },
+      { x1: room.x, y1: room.y, x2: room.x, y2: room.y + room.height, position: "links" },
+    ];
+
+    wallSegments.forEach((wall) => {
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("x1", wall.x1);
+      line.setAttribute("y1", wall.y1);
+      line.setAttribute("x2", wall.x2);
+      line.setAttribute("y2", wall.y2);
+      line.setAttribute("class", "wall-line");
+      line.dataset.roomId = room.id;
+      line.dataset.elementType = "wall";
+      line.dataset.elementLabel = `${room.name} – Wand ${wall.position}`;
+      elements.floorplan.appendChild(line);
+    });
   });
 
   openings.forEach((opening) => {
@@ -177,6 +271,9 @@ const renderFloorplan = () => {
     line.setAttribute("x2", opening.x2);
     line.setAttribute("y2", opening.y2);
     line.setAttribute("class", opening.type === "door" ? "door-marker" : "window-marker");
+    line.dataset.roomId = opening.roomId;
+    line.dataset.elementType = opening.type;
+    line.dataset.elementLabel = opening.label;
     elements.floorplan.appendChild(line);
   });
 
@@ -196,11 +293,12 @@ const renderFloorplan = () => {
 
 const renderRoomPanel = () => {
   if (!state.activeRoomId) {
-    elements.roomTitle.textContent = "Select a room";
-    elements.roomSubtitle.textContent = "Pick a room on the floor plan to see details.";
+    elements.roomTitle.textContent = "Bitte wählen Sie einen Raum";
+    elements.roomSubtitle.textContent = "Klicken Sie auf einen Raum im Grundriss, um Details zu sehen.";
     elements.checklist.innerHTML = "";
     elements.comments.innerHTML = "";
     elements.imageGallery.innerHTML = "";
+    elements.threeDPanel.hidden = true;
     return;
   }
 
@@ -208,7 +306,11 @@ const renderRoomPanel = () => {
   const roomData = ensureRoomData(state.activeRoomId);
 
   elements.roomTitle.textContent = room.name;
-  elements.roomSubtitle.textContent = "Edit tasks, view photos, or leave notes for collaborators.";
+  elements.roomSubtitle.textContent = "Aufgaben bearbeiten, Fotos ansehen oder Notizen hinterlassen.";
+  elements.threeDLabel.textContent = `3D-Ansicht für ${room.name}`;
+  elements.threeDPanel.hidden = false;
+  elements.threeDPanel.classList.toggle("open", state.show3d);
+  elements.threeDButton.textContent = state.show3d ? "Schließen" : "Öffnen";
 
   renderChecklist(roomData);
   renderComments(roomData);
@@ -223,7 +325,7 @@ const renderChecklist = (roomData) => {
     text.textContent = item;
 
     const removeBtn = document.createElement("button");
-    removeBtn.textContent = "Remove";
+    removeBtn.textContent = "Entfernen";
     removeBtn.addEventListener("click", () => {
       roomData.checklist.splice(index, 1);
       saveState();
@@ -241,7 +343,7 @@ const renderComments = (roomData) => {
   roomData.comments.forEach((comment) => {
     const li = document.createElement("li");
     const user = users.find((item) => item.id === comment.userId);
-    li.textContent = `${user ? user.name : "Unknown"}: ${comment.text}`;
+    li.textContent = `${user ? user.name : "Unbekannt"}: ${comment.text}`;
     elements.comments.appendChild(li);
   });
 };
@@ -267,101 +369,38 @@ const renderImages = (roomData) => {
   });
 };
 
-const renderFeatures = () => {
-  elements.featureList.innerHTML = "";
-  state.features.forEach((feature) => {
-    const li = document.createElement("li");
-    const text = document.createElement("div");
-    text.textContent = feature.text;
+const renderArchitectPanel = () => {
+  if (!state.isArchitectMode || !state.selectedElement) {
+    elements.architectTitle.textContent = "Element wählen";
+    elements.measurementForm.hidden = true;
+    return;
+  }
 
-    const chip = document.createElement("span");
-    chip.className = `status-chip ${statusClass[feature.status]}`;
-    chip.textContent = statusLabels[feature.status];
-
-    const actions = document.createElement("div");
-    actions.className = "feature-actions";
-
-    const editBtn = document.createElement("button");
-    editBtn.textContent = "Edit";
-    editBtn.addEventListener("click", () => {
-      const input = document.createElement("input");
-      input.className = "edit-input";
-      input.placeholder = "Describe the update or change";
-
-      const saveBtn = document.createElement("button");
-      saveBtn.textContent = "Send update";
-      saveBtn.className = "primary";
-
-      saveBtn.addEventListener("click", () => {
-        if (!input.value.trim()) {
-          return;
-        }
-        state.updateRequests.unshift({
-          id: `update-${Date.now()}`,
-          featureId: feature.id,
-          text: input.value.trim(),
-          timestamp: new Date().toLocaleString(),
-        });
-        input.remove();
-        saveBtn.remove();
-        saveState();
-        renderUpdateRequests();
-      });
-
-      actions.appendChild(input);
-      actions.appendChild(saveBtn);
-      editBtn.disabled = true;
-    });
-
-    const statusSelect = document.createElement("select");
-    ["not-started", "in-progress", "complete"].forEach((status) => {
-      const option = document.createElement("option");
-      option.value = status;
-      option.textContent = statusLabels[status];
-      if (status === feature.status) {
-        option.selected = true;
-      }
-      statusSelect.appendChild(option);
-    });
-
-    statusSelect.addEventListener("change", (event) => {
-      feature.status = event.target.value;
-      saveState();
-      renderFeatures();
-    });
-
-    actions.appendChild(editBtn);
-    actions.appendChild(statusSelect);
-
-    li.appendChild(text);
-    li.appendChild(chip);
-    li.appendChild(actions);
-    elements.featureList.appendChild(li);
-  });
-};
-
-const renderUpdateRequests = () => {
-  elements.updateRequests.innerHTML = "";
-  state.updateRequests.forEach((request) => {
-    const li = document.createElement("li");
-    const title = document.createElement("div");
-    title.textContent = request.text;
-
-    const meta = document.createElement("small");
-    meta.textContent = `For feature ${request.featureId} • ${request.timestamp}`;
-    meta.style.color = "#6b7280";
-
-    li.appendChild(title);
-    li.appendChild(meta);
-    elements.updateRequests.appendChild(li);
-  });
+  const { roomId, label } = state.selectedElement;
+  const measurement = state.roomMeasurements[roomId];
+  elements.architectTitle.textContent = label;
+  elements.measurementForm.hidden = false;
+  elements.measurementWidth.value = measurement.width;
+  elements.measurementLength.value = measurement.length;
+  elements.measurementHeight.value = measurement.height;
 };
 
 const selectRoom = (roomId) => {
   state.activeRoomId = roomId;
   state.isAddingComment = false;
+  state.show3d = false;
   renderFloorplan();
   renderRoomPanel();
+};
+
+const selectArchitectElement = (target) => {
+  const roomId = target.dataset.roomId;
+  const label = target.dataset.elementLabel || "Element";
+  if (!roomId) {
+    return;
+  }
+  state.selectedElement = { roomId, label };
+  renderArchitectPanel();
 };
 
 const handleAddComment = (event) => {
@@ -381,7 +420,7 @@ const handleAddComment = (event) => {
     return;
   }
 
-  const commentText = window.prompt("What should this comment say?");
+  const commentText = window.prompt("Wie lautet der Kommentar?");
   if (!commentText) {
     return;
   }
@@ -421,7 +460,7 @@ const handleGenerateImage = () => {
   if (!state.activeRoomId) {
     return;
   }
-  const promptText = window.prompt("Describe the image you want to generate.");
+  const promptText = window.prompt("Beschreiben Sie das Bild, das erzeugt werden soll.");
   if (!promptText) {
     return;
   }
@@ -429,7 +468,7 @@ const handleGenerateImage = () => {
   const roomData = ensureRoomData(state.activeRoomId);
   roomData.images.unshift({
     id: `img-${Date.now()}`,
-    label: `ChatGPT request: ${promptText}`,
+    label: `ChatGPT-Anfrage: ${promptText}`,
   });
   saveState();
   renderImages(roomData);
@@ -458,30 +497,39 @@ const handleUploadImage = (event) => {
   reader.readAsDataURL(file);
 };
 
-const handleFeatureSubmit = (event) => {
+const handleMeasurementSubmit = (event) => {
   event.preventDefault();
-  const text = elements.featureInput.value.trim();
-  if (!text) {
+  if (!state.selectedElement) {
     return;
   }
-  state.features.unshift({
-    id: `feature-${Date.now()}`,
-    text,
-    status: elements.featureStatus.value,
-  });
-  elements.featureInput.value = "";
-  elements.featureStatus.value = "not-started";
+  const roomId = state.selectedElement.roomId;
+  state.roomMeasurements[roomId] = {
+    width: Number(elements.measurementWidth.value) || 0,
+    length: Number(elements.measurementLength.value) || 0,
+    height: state.roomMeasurements[roomId].height,
+  };
   saveState();
-  renderFeatures();
 };
 
 const bindEvents = () => {
   elements.floorplan.addEventListener("click", (event) => {
     const target = event.target;
+    if (state.isArchitectMode) {
+      if (
+        target.classList.contains("wall-line") ||
+        target.classList.contains("door-marker") ||
+        target.classList.contains("window-marker")
+      ) {
+        selectArchitectElement(target);
+        return;
+      }
+    }
+
     if (state.isAddingComment) {
       handleAddComment(event);
       return;
     }
+
     if (target.classList.contains("room")) {
       selectRoom(target.dataset.roomId);
     }
@@ -498,16 +546,26 @@ const bindEvents = () => {
   elements.checklistForm.addEventListener("submit", handleChecklistSubmit);
   elements.generateImageBtn.addEventListener("click", handleGenerateImage);
   elements.uploadImageInput.addEventListener("change", handleUploadImage);
-  elements.toggleDev.addEventListener("change", (event) => {
-    elements.developerView.hidden = !event.target.checked;
-  });
 
-  elements.featureForm.addEventListener("submit", handleFeatureSubmit);
+  elements.toggleArchitect.addEventListener("change", (event) => {
+    state.isArchitectMode = event.target.checked;
+    elements.architectView.hidden = !state.isArchitectMode;
+    state.selectedElement = null;
+    renderArchitectPanel();
+  });
 
   elements.activeUserSelect.addEventListener("change", (event) => {
     state.activeUserId = event.target.value;
     saveState();
   });
+
+  elements.threeDButton.addEventListener("click", () => {
+    state.show3d = !state.show3d;
+    elements.threeDPanel.classList.toggle("open", state.show3d);
+    elements.threeDButton.textContent = state.show3d ? "Schließen" : "Öffnen";
+  });
+
+  elements.measurementForm.addEventListener("submit", handleMeasurementSubmit);
 };
 
 const init = () => {
@@ -515,8 +573,7 @@ const init = () => {
   renderUsers();
   renderFloorplan();
   renderRoomPanel();
-  renderFeatures();
-  renderUpdateRequests();
+  renderArchitectPanel();
   bindEvents();
 };
 

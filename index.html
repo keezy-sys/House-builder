@@ -1,113 +1,128 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>House Builder Planner</title>
+  <title>Hausplaner</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header class="app-header">
     <div>
-      <h1>House Builder Planner</h1>
-      <p class="subtitle">Simple floor plan + checklists for a renovation you can trust.</p>
+      <h1>Hausplaner</h1>
+      <p class="subtitle">Einfacher Grundriss, klare Checklisten und gute Zusammenarbeit.</p>
     </div>
     <div class="header-actions">
       <label class="toggle">
-        <input type="checkbox" id="toggle-dev" />
-        <span>Developer View</span>
+        <input type="checkbox" id="toggle-architect" />
+        <span>Architekt-Ansicht</span>
       </label>
       <div class="user-select">
-        <label for="active-user">Active user</label>
+        <label for="active-user">Aktiver Nutzer</label>
         <select id="active-user"></select>
       </div>
     </div>
   </header>
 
   <main class="app">
-    <section class="floorplan" aria-label="Floor plan">
+    <section class="floorplan" aria-label="Grundriss">
       <div class="floorplan-header">
-        <h2>2D Floor Plan</h2>
-        <p>Click a room to focus it. Use the buttons below to add notes and images.</p>
+        <h2>2D-Grundriss</h2>
+        <p>Bewegen Sie die Maus über einen Raum, um ihn hervorzuheben.</p>
       </div>
       <div class="floorplan-wrapper">
         <svg id="floorplan" viewBox="0 0 800 520" role="img" aria-labelledby="floorplan-title">
-          <title id="floorplan-title">Interactive floor plan</title>
+          <title id="floorplan-title">Interaktiver Grundriss</title>
         </svg>
       </div>
       <div class="legend">
-        <span><span class="legend-swatch door"></span> Door</span>
-        <span><span class="legend-swatch window"></span> Window</span>
+        <span><span class="legend-swatch door"></span> Tür</span>
+        <span><span class="legend-swatch window"></span> Fenster</span>
       </div>
       <div class="floorplan-actions">
-        <button id="add-comment" class="primary">Add comment to room</button>
-        <button id="clear-selection">Clear selection</button>
+        <button id="add-comment" class="primary">Kommentar hinzufügen</button>
+        <button id="clear-selection">Auswahl löschen</button>
       </div>
     </section>
 
-    <aside class="sidebar" aria-label="Room details">
+    <aside class="sidebar" aria-label="Raumdetails">
       <section class="panel" id="room-panel">
-        <h2 id="room-title">Select a room</h2>
-        <p id="room-subtitle">Pick a room on the floor plan to see details.</p>
+        <h2 id="room-title">Bitte wählen Sie einen Raum</h2>
+        <p id="room-subtitle">Klicken Sie auf einen Raum im Grundriss, um Details zu sehen.</p>
+      </section>
+
+      <section class="panel" id="three-d-panel" hidden>
+        <div class="panel-header">
+          <h3>3D-Ansicht</h3>
+          <button id="toggle-3d">Öffnen</button>
+        </div>
+        <p id="three-d-label" class="helper">3D-Ansicht für den Raum</p>
+        <div class="three-d-scene">
+          <div class="three-d-box">
+            <div class="face front"></div>
+            <div class="face back"></div>
+            <div class="face right"></div>
+            <div class="face left"></div>
+            <div class="face top"></div>
+          </div>
+        </div>
       </section>
 
       <section class="panel">
-        <h3>Checklist</h3>
+        <h3>Checkliste</h3>
         <ul id="checklist" class="checklist"></ul>
         <form id="checklist-form" class="form-row">
-          <input type="text" id="checklist-input" placeholder="Add a material or task" />
-          <button type="submit" class="primary">Add</button>
+          <input type="text" id="checklist-input" placeholder="Material oder Aufgabe hinzufügen" />
+          <button type="submit" class="primary">Hinzufügen</button>
         </form>
       </section>
 
       <section class="panel">
-        <h3>Room images</h3>
+        <h3>Raumbilder</h3>
         <div id="image-gallery" class="image-gallery"></div>
         <div class="button-row">
-          <button id="generate-image" class="primary">Generate with ChatGPT</button>
+          <button id="generate-image" class="primary">Mit ChatGPT erzeugen</button>
           <label class="upload-btn">
-            Upload photo
+            Foto hochladen
             <input type="file" id="upload-image" accept="image/*" />
           </label>
         </div>
-        <p class="helper">Tip: add multiple angles to build an image stack for this room.</p>
+        <p class="helper">Tipp: mehrere Blickwinkel pro Raum speichern.</p>
       </section>
 
       <section class="panel">
-        <h3>Comments</h3>
+        <h3>Kommentare</h3>
         <ul id="comments" class="comments"></ul>
       </section>
     </aside>
   </main>
 
-  <section id="developer-view" class="developer-view" hidden>
-    <h2>Developer Feature List</h2>
-    <p>Add ideas in plain language. Update completed items to send a change request.</p>
+  <section id="architect-view" class="architect-view" hidden>
+    <h2>Architekt-Ansicht</h2>
+    <p>Wählen Sie eine Wand, Tür oder ein Fenster im Grundriss, um Maße anzupassen.</p>
 
-    <form id="feature-form" class="feature-form">
-      <input type="text" id="feature-input" placeholder="Describe a new feature" required />
-      <select id="feature-status">
-        <option value="not-started">Not started</option>
-        <option value="in-progress">In progress</option>
-        <option value="complete">Complete</option>
-      </select>
-      <button type="submit" class="primary">Add feature</button>
-    </form>
-
-    <div class="feature-columns">
-      <div>
-        <h3>Feature list</h3>
-        <ul id="feature-list" class="feature-list"></ul>
-      </div>
-      <div>
-        <h3>Update requests</h3>
-        <ul id="update-requests" class="feature-list"></ul>
-      </div>
+    <div class="architect-panel">
+      <h3 id="architect-title">Element wählen</h3>
+      <form id="measurement-form" class="measurement-form" hidden>
+        <label>
+          Breite (mm)
+          <input type="number" id="measure-width" min="0" required />
+        </label>
+        <label>
+          Länge (mm)
+          <input type="number" id="measure-length" min="0" required />
+        </label>
+        <label>
+          Höhe (mm)
+          <input type="number" id="measure-height" disabled />
+        </label>
+        <button type="submit" class="primary">Speichern</button>
+      </form>
     </div>
   </section>
 
   <footer class="app-footer">
-    <p>Built for easy use: big buttons, clear steps, and one room at a time.</p>
+    <p>Große Schaltflächen, klare Sprache und ein Raum nach dem anderen.</p>
   </footer>
 
   <script src="app.js"></script>
