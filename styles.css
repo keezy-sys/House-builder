@@ -103,10 +103,49 @@ svg {
   stroke-width: 1;
 }
 
+.door-marker,
+.window-marker {
+  stroke-linecap: round;
+  stroke-width: 6;
+}
+
+.door-marker {
+  stroke: #ef4444;
+}
+
+.window-marker {
+  stroke: #22c55e;
+}
+
 .floorplan-actions {
   display: flex;
   gap: 0.8rem;
   flex-wrap: wrap;
+}
+
+.legend {
+  display: flex;
+  gap: 1.2rem;
+  align-items: center;
+  margin-bottom: 1rem;
+  color: #4b5563;
+  font-weight: 600;
+}
+
+.legend-swatch {
+  display: inline-block;
+  width: 24px;
+  height: 6px;
+  border-radius: 999px;
+  margin-right: 0.4rem;
+}
+
+.legend-swatch.door {
+  background: #ef4444;
+}
+
+.legend-swatch.window {
+  background: #22c55e;
 }
 
 .sidebar {

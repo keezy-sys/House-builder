@@ -1,3 +1,25 @@
+const floorplanSize = { width: 800, height: 520 };
+
+const rooms = [
+  { id: "bedroom-left", name: "Bedroom", x: 40, y: 40, width: 220, height: 140 },
+  { id: "living", name: "Living Room", x: 280, y: 40, width: 280, height: 140 },
+  { id: "bedroom-right", name: "Bedroom", x: 580, y: 40, width: 180, height: 220 },
+  { id: "cellar", name: "Cellar", x: 40, y: 200, width: 200, height: 220 },
+  { id: "kitchen", name: "Kitchen", x: 260, y: 200, width: 200, height: 180 },
+  { id: "bathroom", name: "Bathroom", x: 480, y: 200, width: 180, height: 180 },
+  { id: "hallway", name: "Hallway", x: 300, y: 390, width: 220, height: 90 },
+  { id: "storage", name: "Storage Cabinet", x: 280, y: 450, width: 120, height: 50 },
+];
+
+const openings = [
+  { id: "window-left", type: "window", x1: 80, y1: 30, x2: 200, y2: 30 },
+  { id: "window-living", type: "window", x1: 360, y1: 30, x2: 520, y2: 30 },
+  { id: "window-right", type: "window", x1: 620, y1: 30, x2: 740, y2: 30 },
+  { id: "door-living-hall", type: "door", x1: 360, y1: 190, x2: 440, y2: 190 },
+  { id: "door-kitchen-hall", type: "door", x1: 330, y1: 390, x2: 390, y2: 390 },
+  { id: "door-bathroom-hall", type: "door", x1: 540, y1: 390, x2: 600, y2: 390 },
+  { id: "door-bedroom-right", type: "door", x1: 580, y1: 160, x2: 580, y2: 200 },
+  { id: "door-cellar", type: "door", x1: 200, y1: 200, x2: 240, y2: 200 },
 const rooms = [
   { id: "living", name: "Living Room", x: 40, y: 40, width: 260, height: 160 },
   { id: "kitchen", name: "Kitchen", x: 320, y: 40, width: 220, height: 160 },
@@ -152,6 +174,16 @@ const renderFloorplan = () => {
 
     elements.floorplan.appendChild(rect);
     elements.floorplan.appendChild(label);
+  });
+
+  openings.forEach((opening) => {
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("x1", opening.x1);
+    line.setAttribute("y1", opening.y1);
+    line.setAttribute("x2", opening.x2);
+    line.setAttribute("y2", opening.y2);
+    line.setAttribute("class", opening.type === "door" ? "door-marker" : "window-marker");
+    elements.floorplan.appendChild(line);
   });
 
   rooms.forEach((room) => {
@@ -344,6 +376,8 @@ const handleAddComment = (event) => {
   }
 
   const bounds = elements.floorplan.getBoundingClientRect();
+  const x = ((event.clientX - bounds.left) / bounds.width) * floorplanSize.width;
+  const y = ((event.clientY - bounds.top) / bounds.height) * floorplanSize.height;
   const x = ((event.clientX - bounds.left) / bounds.width) * 700;
   const y = ((event.clientY - bounds.top) / bounds.height) * 420;
 
