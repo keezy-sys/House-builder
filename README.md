@@ -35,8 +35,9 @@ create policy "house_state update" on public.house_state
 3. **Supabase Zugangsdaten setzen**
    - `config.js` ausfüllen (`SUPABASE_URL` und `SUPABASE_ANON_KEY`).
 
-4. **Auth konfigurieren (optional schneller)**
-   - In Supabase unter Auth → Settings ggf. „Email confirmations“ deaktivieren.
+4. **Auth konfigurieren**
+   - In Supabase unter Auth → URL Configuration „Site URL“ und Redirect URLs (lokal + Netlify) setzen.
+   - Wenn Email confirmations aktiv sind: SMTP/E-Mail Provider konfigurieren (sonst keine Bestätigungs-Mail) oder Email confirmations deaktivieren.
 
 5. **Netlify deployen**
    - Build command: leer

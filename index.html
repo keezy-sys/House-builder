@@ -93,8 +93,29 @@
     <main class="app">
       <section class="floorplan" aria-label="Grundriss">
         <div class="floorplan-header">
-          <h2>2D-Grundriss</h2>
-          <p>Bewegen Sie die Maus über einen Raum, um ihn hervorzuheben.</p>
+          <div class="floorplan-copy">
+            <h2>2D-Grundriss</h2>
+            <p>Bewegen Sie die Maus über einen Raum, um ihn hervorzuheben.</p>
+          </div>
+          <div class="floor-switch" aria-label="Etage auswählen">
+            <span class="floor-switch__label">Etage</span>
+            <div class="floor-switch__control">
+              <span>EG</span>
+              <input
+                type="range"
+                id="floor-toggle"
+                min="0"
+                max="1"
+                step="1"
+                value="0"
+                aria-label="Etage wechseln"
+              />
+              <span>OG</span>
+            </div>
+            <span id="floor-label" class="floor-switch__value"
+              >Erdgeschoss</span
+            >
+          </div>
         </div>
         <div class="floorplan-wrapper">
           <svg
@@ -192,19 +213,41 @@
         <h3 id="architect-title">Element wählen</h3>
         <form id="measurement-form" class="measurement-form" hidden>
           <label>
-            Breite (mm)
-            <input type="number" id="measure-width" min="0" required />
+            <span id="measure-axis-label">X-Position der Wand (mm)</span>
+            <div class="measurement-row">
+              <input type="range" id="measure-axis" min="0" max="10000" />
+              <input
+                type="number"
+                id="measure-axis-number"
+                min="0"
+                max="10000"
+                step="20"
+                required
+              />
+            </div>
           </label>
           <label>
-            Länge (mm)
-            <input type="number" id="measure-length" min="0" required />
+            <span id="measure-span-label">Y-Länge der Wand (mm)</span>
+            <div class="measurement-row">
+              <input type="range" id="measure-span" min="0" max="10000" />
+              <input
+                type="number"
+                id="measure-span-number"
+                min="0"
+                max="10000"
+                step="20"
+                required
+              />
+            </div>
           </label>
-          <label>
-            Höhe (mm)
-            <input type="number" id="measure-height" disabled />
+          <label class="measurement-toggle">
+            <input type="checkbox" id="measure-lock" checked />
+            Wände gekoppelt
           </label>
-          <button type="submit" class="primary">Speichern</button>
+          <p class="helper">Wandhöhe fix: 2800 mm.</p>
+          <button type="submit" class="primary">Übernehmen</button>
         </form>
+        <p id="architect-help" class="helper"></p>
       </div>
     </section>
 
