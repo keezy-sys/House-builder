@@ -1,8 +1,13 @@
 :root {
   color-scheme: light;
-  font-family: "Segoe UI", Tahoma, sans-serif;
+  font-family: "Nunito Sans", "Segoe UI", Tahoma, sans-serif;
   background: #f4f6f8;
   color: #1d2733;
+  --wall: #1f2937;
+  --wall-light: #9ca3af;
+  --door: #b45309;
+  --window: #2563eb;
+  --highlight: #fef3c7;
 }
 
 * {
@@ -57,7 +62,7 @@ body {
 }
 
 .floorplan {
-  background: #ffffff;
+  background: linear-gradient(135deg, #ffffff 0%, #f6f8fb 100%);
   padding: 1.5rem;
   border-radius: 1rem;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
@@ -72,7 +77,22 @@ body {
   border: 2px solid #cbd5f5;
   border-radius: 0.8rem;
   padding: 1rem;
-  background: #f8fafc;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgba(148, 163, 184, 0.08),
+      rgba(148, 163, 184, 0.08) 1px,
+      transparent 1px,
+      transparent 16px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(148, 163, 184, 0.08),
+      rgba(148, 163, 184, 0.08) 1px,
+      transparent 1px,
+      transparent 16px
+    ),
+    #f8fafc;
 }
 
 svg {
@@ -81,37 +101,43 @@ svg {
 }
 
 .outer-wall {
-  fill: none;
-  stroke: #111827;
-  stroke-width: 6;
+  fill: #ffffff;
+  stroke: var(--wall);
+  stroke-width: 10;
+  stroke-linejoin: bevel;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.06));
 }
 
-.room {
-  fill: #ffffff;
-  stroke: #1f2937;
-  stroke-width: 2;
+.interior-wall {
+  stroke: var(--wall);
+  stroke-width: 8;
+  stroke-linecap: square;
+}
+
+.room-hit {
+  fill: transparent;
   cursor: pointer;
   transition: fill 0.2s ease;
 }
 
-.room:hover {
-  fill: #fef3c7;
+.room-hit:hover {
+  fill: rgba(255, 196, 82, 0.18);
 }
 
-.room.active {
-  fill: #fde68a;
-  stroke: #b45309;
+.room-hit.active {
+  fill: rgba(253, 224, 71, 0.32);
 }
 
 .room-label {
   fill: #111827;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
+  pointer-events: none;
 }
 
 .wall-line {
   stroke: transparent;
-  stroke-width: 10;
+  stroke-width: 14;
   pointer-events: stroke;
 }
 
@@ -128,11 +154,11 @@ svg {
 }
 
 .door-marker {
-  stroke: #92400e;
+  stroke: var(--door);
 }
 
 .window-marker {
-  stroke: #2563eb;
+  stroke: var(--window);
 }
 
 .floorplan-actions {
@@ -158,12 +184,16 @@ svg {
   margin-right: 0.4rem;
 }
 
+.legend-swatch.wall {
+  background: var(--wall);
+}
+
 .legend-swatch.door {
-  background: #92400e;
+  background: var(--door);
 }
 
 .legend-swatch.window {
-  background: #2563eb;
+  background: var(--window);
 }
 
 .sidebar {
@@ -307,7 +337,7 @@ button {
 
 .three-d-scene {
   margin-top: 1rem;
-  perspective: 600px;
+  perspective: 640px;
   display: none;
 }
 
@@ -318,48 +348,55 @@ button {
 
 .three-d-box {
   position: relative;
-  width: 140px;
-  height: 100px;
+  width: var(--box-width, 160px);
+  height: var(--box-height, 90px);
   transform-style: preserve-3d;
-  transform: rotateX(20deg) rotateY(-25deg);
+  transform: rotateX(18deg) rotateY(-28deg);
+  transition:
+    width 0.2s ease,
+    height 0.2s ease;
 }
 
 .three-d-box .face {
   position: absolute;
-  background: rgba(147, 197, 253, 0.6);
+  background: linear-gradient(
+    180deg,
+    rgba(147, 197, 253, 0.65),
+    rgba(59, 130, 246, 0.4)
+  );
   border: 2px solid #1d4ed8;
 }
 
 .three-d-box .front {
-  width: 140px;
-  height: 100px;
-  transform: translateZ(40px);
+  width: 100%;
+  height: 100%;
+  transform: translateZ(var(--box-depth, 60px));
 }
 
 .three-d-box .back {
-  width: 140px;
-  height: 100px;
-  transform: rotateY(180deg) translateZ(40px);
+  width: 100%;
+  height: 100%;
+  transform: rotateY(180deg) translateZ(var(--box-depth, 60px));
 }
 
 .three-d-box .right {
-  width: 80px;
-  height: 100px;
-  transform: rotateY(90deg) translateZ(60px);
+  width: var(--box-depth, 60px);
+  height: 100%;
+  transform: rotateY(90deg) translateZ(calc(var(--box-width, 160px) - 1px));
   transform-origin: right;
 }
 
 .three-d-box .left {
-  width: 80px;
-  height: 100px;
-  transform: rotateY(-90deg) translateZ(60px);
+  width: var(--box-depth, 60px);
+  height: 100%;
+  transform: rotateY(-90deg) translateZ(1px);
   transform-origin: left;
 }
 
 .three-d-box .top {
-  width: 140px;
-  height: 80px;
-  transform: rotateX(90deg) translateZ(60px);
+  width: 100%;
+  height: var(--box-depth, 60px);
+  transform: rotateX(90deg) translateZ(1px);
   transform-origin: top;
 }
 
