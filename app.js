@@ -631,11 +631,12 @@ const handleSetApiKey = () => {
     "Bitte OpenAI API-Schlüssel eingeben (wird lokal gespeichert).",
   );
   if (key === null) return;
-  writeApiKey(key.trim());
+  const trimmedKey = key.trim();
+  writeApiKey(trimmedKey);
   setImageStatus(
-    key.trim()
-      ? "API-Schlüssel gespeichert. Bilder werden über OpenAI erzeugt."
-      : "Kein API-Schlüssel gesetzt. Es wird ein Platzhalter-Bild genutzt.",
+    trimmedKey
+      ? "API-Schlüssel gespeichert. Bilder werden über den lokalen Dienst erzeugt."
+      : "Kein API-Schlüssel gespeichert. Falls der Server keinen Schlüssel kennt, wird ein Platzhalter genutzt.",
   );
 };
 
@@ -654,45 +655,48 @@ const generateImageWithOpenAI = async (promptText, roomData) => {
     renderImages(roomData);
   };
 
-  if (!apiKey) {
+  if (window.location.protocol === "file:") {
     pushImage(buildPlaceholderImage(promptText || "Idee ohne Beschreibung"));
     setImageStatus(
-      "Kein API-Schlüssel gesetzt – Platzhalter-Bild verwendet.",
+      "Bildgenerierung benötigt einen lokalen Server. Bitte über npm run serve öffnen.",
       true,
     );
     return;
   }
 
   try {
-    setImageStatus("Bild wird von OpenAI erzeugt …");
+    setImageStatus("Bild wird erzeugt …");
     elements.generateImageBtn.disabled = true;
 
-    const response = await fetch(
-      "https://api.openai.com/v1/images/generations",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: "gpt-image-1",
-          prompt: promptText,
-          size: "1024x1024",
-        }),
+    const response = await fetch("/api/image", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
-    );
+      body: JSON.stringify({
+        prompt: promptText,
+        apiKey,
+      }),
+    });
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+    let data = {};
+    try {
+      data = await response.json();
+    } catch {
+      data = {};
     }
 
-    const data = await response.json();
-    const b64 = data?.data?.[0]?.b64_json;
-    const imageUrl = b64 ? `data:image/png;base64,${b64}` : null;
+    if (!response.ok) {
+      const error = new Error(data?.error || `HTTP ${response.status}`);
+      error.code = data?.code;
+      throw error;
+    }
 
+    const imageUrl = data?.imageUrl;
     if (!imageUrl) {
-      throw new Error("Kein Bild zurückgegeben");
+      const error = new Error("Kein Bild zurückgegeben");
+      error.code = "missing_image_data";
+      throw error;
     }
 
     pushImage(imageUrl);
@@ -701,9 +705,16 @@ const generateImageWithOpenAI = async (promptText, roomData) => {
     console.error("Bildgenerierung fehlgeschlagen:", error);
     pushImage(buildPlaceholderImage(promptText || "Idee ohne Beschreibung"));
     const networkBlocked = isLikelyNetworkBlock(error);
-    const message = networkBlocked
-      ? "Netzwerk blockiert – HTTPS zu api.openai.com ist gesperrt. Zugriff erlauben und erneut versuchen."
-      : "Bildgenerierung fehlgeschlagen – Platzhalter gespeichert. API-Schlüssel prüfen?";
+    const message =
+      error?.code === "missing_api_key"
+        ? "Kein API-Schlüssel gefunden – im Dialog speichern oder OPENAI_API_KEY am Server setzen."
+        : error?.code === "openai_network_error"
+        ? "Netzwerk blockiert – HTTPS zu api.openai.com ist gesperrt. Zugriff erlauben und erneut versuchen."
+        : networkBlocked
+        ? "Lokaler Bilddienst nicht erreichbar. App über npm run serve starten."
+        : error?.code === "openai_error"
+        ? `OpenAI-Fehler: ${error.message}`
+        : "Bildgenerierung fehlgeschlagen – Platzhalter gespeichert. API-Schlüssel prüfen?";
     setImageStatus(message, true);
   } finally {
     elements.generateImageBtn.disabled = false;

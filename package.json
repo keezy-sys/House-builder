@@ -7,7 +7,7 @@
     "lint:css": "stylelint styles.css",
     "lint:html": "html-validate index.html",
     "format:check": "prettier --check .",
-    "serve": "npx serve . -l 3000",
+    "serve": "node server.mjs",
     "test:e2e": "PLAYWRIGHT_BROWSERS_PATH=./.pw-browsers node scripts/run-e2e.mjs",
     "test": "npm run lint:js && npm run lint:css && npm run lint:html && npm run format:check && npm run test:e2e"
   },
