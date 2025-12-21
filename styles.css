@@ -1,13 +1,14 @@
 :root {
   color-scheme: light;
   font-family: "Nunito Sans", "Segoe UI", Tahoma, sans-serif;
-  background: #f4f6f8;
+  background: #f6f7f9;
   color: #1d2733;
-  --wall: #1f2937;
-  --wall-light: #9ca3af;
-  --door: #b45309;
+  --wall: #0f172a;
+  --wall-light: #cbd5e1;
+  --door: #8b5a2b;
   --window: #2563eb;
   --highlight: #fef3c7;
+  --architect-accent: #f59e0b;
 }
 
 * {
@@ -62,7 +63,7 @@ body {
 }
 
 .floorplan {
-  background: linear-gradient(135deg, #ffffff 0%, #f6f8fb 100%);
+  background: radial-gradient(circle at 22% 18%, #ffffff, #f7f9fb);
   padding: 1.5rem;
   border-radius: 1rem;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
@@ -74,7 +75,7 @@ body {
 
 .floorplan-wrapper {
   margin: 1.2rem 0;
-  border: 2px solid #cbd5f5;
+  border: 2px solid #d7def2;
   border-radius: 0.8rem;
   padding: 1rem;
   background:
@@ -83,14 +84,14 @@ body {
       rgba(148, 163, 184, 0.08),
       rgba(148, 163, 184, 0.08) 1px,
       transparent 1px,
-      transparent 16px
+      transparent 18px
     ),
     repeating-linear-gradient(
       90deg,
       rgba(148, 163, 184, 0.08),
       rgba(148, 163, 184, 0.08) 1px,
       transparent 1px,
-      transparent 16px
+      transparent 18px
     ),
     #f8fafc;
 }
@@ -103,35 +104,43 @@ svg {
 .outer-wall {
   fill: #ffffff;
   stroke: var(--wall);
-  stroke-width: 10;
-  stroke-linejoin: bevel;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.06));
+  stroke-width: 12;
+  stroke-linejoin: miter;
+  stroke-linecap: square;
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.06));
 }
 
 .interior-wall {
   stroke: var(--wall);
-  stroke-width: 8;
-  stroke-linecap: square;
+  stroke-width: 7;
+  stroke-linecap: butt;
+  stroke-linejoin: miter;
 }
 
 .room-hit {
-  fill: transparent;
+  fill: #fdfdf9;
+  stroke: #e5e7eb;
+  stroke-width: 1.4;
   cursor: pointer;
-  transition: fill 0.2s ease;
+  transition:
+    fill 0.2s ease,
+    stroke 0.2s ease;
 }
 
 .room-hit:hover {
-  fill: rgba(255, 196, 82, 0.18);
+  fill: rgba(231, 234, 240, 0.6);
+  stroke: #cbd5e1;
 }
 
 .room-hit.active {
-  fill: rgba(253, 224, 71, 0.32);
+  fill: rgba(253, 224, 71, 0.28);
 }
 
 .room-label {
-  fill: #111827;
-  font-size: 14px;
+  fill: #0f172a;
+  font-size: 13px;
   font-weight: 700;
+  letter-spacing: 0.02em;
   pointer-events: none;
 }
 
@@ -159,6 +168,31 @@ svg {
 
 .window-marker {
   stroke: var(--window);
+}
+
+.architect-mode .architect-hit {
+  cursor: crosshair;
+  transition:
+    stroke 0.12s ease,
+    stroke-width 0.12s ease,
+    stroke-opacity 0.12s ease;
+}
+
+.architect-mode .wall-line.hovered,
+.architect-mode .interior-wall.hovered {
+  stroke: var(--architect-accent);
+  stroke-width: 14;
+  stroke-opacity: 0.9;
+}
+
+.architect-mode .door-marker.hovered {
+  stroke: var(--architect-accent);
+  stroke-width: 10;
+}
+
+.architect-mode .window-marker.hovered {
+  stroke: #0ea5e9;
+  stroke-width: 10;
 }
 
 .floorplan-actions {

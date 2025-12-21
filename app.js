@@ -264,7 +264,7 @@ const renderFloorplan = () => {
     line.setAttribute("y1", wall.y1);
     line.setAttribute("x2", wall.x2);
     line.setAttribute("y2", wall.y2);
-    line.setAttribute("class", "interior-wall");
+    line.setAttribute("class", "interior-wall architect-hit");
     line.dataset.elementType = "wall";
     line.dataset.elementLabel = `Innenwand ${index + 1}`;
     elements.floorplan.appendChild(line);
@@ -336,7 +336,7 @@ const renderFloorplan = () => {
       line.setAttribute("y1", wall.y1);
       line.setAttribute("x2", wall.x2);
       line.setAttribute("y2", wall.y2);
-      line.setAttribute("class", "wall-line");
+      line.setAttribute("class", "wall-line architect-hit");
       line.dataset.roomId = room.id;
       line.dataset.elementType = "wall";
       line.dataset.elementLabel = `${room.name} – Wand ${wall.position}`;
@@ -352,7 +352,7 @@ const renderFloorplan = () => {
     line.setAttribute("y2", opening.y2);
     line.setAttribute(
       "class",
-      opening.type === "door" ? "door-marker" : "window-marker",
+      `${opening.type === "door" ? "door-marker" : "window-marker"} architect-hit`,
     );
     line.dataset.roomId = opening.roomId;
     line.dataset.elementType = opening.type;
@@ -488,6 +488,21 @@ const update3DBox = (roomId) => {
   box.style.setProperty("--box-width", `${widthScale}px`);
   box.style.setProperty("--box-height", `${lengthScale}px`);
   box.style.setProperty("--box-depth", `${depth}px`);
+};
+
+const clearHoverState = () => {
+  elements.floorplan
+    .querySelectorAll(".architect-hit.hovered")
+    .forEach((el) => el.classList.remove("hovered"));
+};
+
+const setArchitectMode = (isOn) => {
+  state.isArchitectMode = isOn;
+  elements.architectView.hidden = !isOn;
+  state.selectedElement = null;
+  document.body.classList.toggle("architect-mode", isOn);
+  clearHoverState();
+  renderArchitectPanel();
 };
 
 const selectRoom = (roomId) => {
@@ -651,11 +666,7 @@ const bindEvents = () => {
   elements.floorplan.addEventListener("click", (event) => {
     const target = event.target;
     if (state.isArchitectMode) {
-      if (
-        target.classList.contains("wall-line") ||
-        target.classList.contains("door-marker") ||
-        target.classList.contains("window-marker")
-      ) {
+      if (target.classList.contains("architect-hit")) {
         selectArchitectElement(target);
         return;
       }
@@ -668,6 +679,23 @@ const bindEvents = () => {
 
     if (target.classList.contains("room-hit")) {
       selectRoom(target.dataset.roomId);
+    }
+  });
+
+  elements.floorplan.addEventListener("mouseover", (event) => {
+    if (!state.isArchitectMode) return;
+    const target = event.target;
+    if (target.classList.contains("architect-hit")) {
+      clearHoverState();
+      target.classList.add("hovered");
+    }
+  });
+
+  elements.floorplan.addEventListener("mouseout", (event) => {
+    if (!state.isArchitectMode) return;
+    const target = event.target;
+    if (target.classList.contains("architect-hit")) {
+      target.classList.remove("hovered");
     }
   });
 
@@ -692,10 +720,7 @@ const bindEvents = () => {
   elements.uploadImageInput.addEventListener("change", handleUploadImage);
 
   elements.toggleArchitect.addEventListener("change", (event) => {
-    state.isArchitectMode = event.target.checked;
-    elements.architectView.hidden = !state.isArchitectMode;
-    state.selectedElement = null;
-    renderArchitectPanel();
+    setArchitectMode(event.target.checked);
   });
 
   elements.activeUserSelect.addEventListener("change", (event) => {
@@ -718,6 +743,7 @@ const init = () => {
   renderFloorplan();
   renderRoomPanel();
   renderArchitectPanel();
+  setArchitectMode(state.isArchitectMode);
   bindEvents();
 };
 

@@ -1,0 +1,17 @@
+node_modules
+.pw-browsers
+.pw-user-data
+playwright-report
+test-results
+dist
+
+# Playwright
+.pw-browsers/
+playwright-report/
+test-results/
+
+# Node
+node_modules/
+
+# macOS
+.DS_Store
