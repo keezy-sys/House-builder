@@ -174,9 +174,12 @@ const elements = {
   threeDPanel: document.getElementById("three-d-panel"),
   threeDButton: document.getElementById("toggle-3d"),
   threeDLabel: document.getElementById("three-d-label"),
+  setApiKeyBtn: document.getElementById("set-api-key"),
+  imageStatus: document.getElementById("image-status"),
 };
 
 const storageKey = "house-builder-state";
+const apiKeyStorageKey = "house-builder-image-api-key";
 
 const defaultRoomData = () => ({
   checklist: [],
@@ -595,6 +598,107 @@ const handleChecklistSubmit = (event) => {
   renderChecklist(roomData);
 };
 
+const buildPlaceholderImage = (text) =>
+  `data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' width='320' height='200'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%' stop-color='%23e2e8f0'/><stop offset='100%' stop-color='%23f8fafc'/></linearGradient></defs><rect width='320' height='200' fill='url(%23g)'/><text x='50%' y='50%' fill='%234b5563' font-family='Arial' font-size='14' text-anchor='middle' dominant-baseline='middle'>${text
+      .slice(0, 36)
+      .replace(/</g, "")}</text></svg>`,
+  )}`;
+
+const readApiKey = () => localStorage.getItem(apiKeyStorageKey) || "";
+const writeApiKey = (value) =>
+  localStorage.setItem(apiKeyStorageKey, value || "");
+
+const setImageStatus = (text, isError = false) => {
+  if (!elements.imageStatus) return;
+  elements.imageStatus.textContent = text;
+  elements.imageStatus.classList.toggle("status-line", true);
+  elements.imageStatus.classList.toggle("error", isError);
+};
+
+const handleSetApiKey = () => {
+  const key = window.prompt(
+    "Bitte OpenAI API-Schlüssel eingeben (wird lokal gespeichert).",
+  );
+  if (key === null) return;
+  writeApiKey(key.trim());
+  setImageStatus(
+    key.trim()
+      ? "API-Schlüssel gespeichert. Bilder werden über OpenAI erzeugt."
+      : "Kein API-Schlüssel gesetzt. Es wird ein Platzhalter-Bild genutzt.",
+  );
+};
+
+const generateImageWithOpenAI = async (promptText, roomData) => {
+  const apiKey = readApiKey();
+  const requestId = `img-${Date.now()}`;
+  const label = `ChatGPT-Anfrage: ${promptText}`;
+
+  const pushImage = (url) => {
+    roomData.images.unshift({
+      id: requestId,
+      label,
+      url,
+    });
+    saveState();
+    renderImages(roomData);
+  };
+
+  if (!apiKey) {
+    pushImage(buildPlaceholderImage(promptText || "Idee ohne Beschreibung"));
+    setImageStatus(
+      "Kein API-Schlüssel gesetzt – Platzhalter-Bild verwendet.",
+      true,
+    );
+    return;
+  }
+
+  try {
+    setImageStatus("Bild wird von OpenAI erzeugt …");
+    elements.generateImageBtn.disabled = true;
+
+    const response = await fetch(
+      "https://api.openai.com/v1/images/generations",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-image-1",
+          prompt: promptText,
+          size: "1024x1024",
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    const b64 = data?.data?.[0]?.b64_json;
+    const imageUrl = b64 ? `data:image/png;base64,${b64}` : null;
+
+    if (!imageUrl) {
+      throw new Error("Kein Bild zurückgegeben");
+    }
+
+    pushImage(imageUrl);
+    setImageStatus("Bild wurde erzeugt.");
+  } catch (error) {
+    console.error("Bildgenerierung fehlgeschlagen:", error);
+    pushImage(buildPlaceholderImage(promptText || "Idee ohne Beschreibung"));
+    setImageStatus(
+      "Bildgenerierung fehlgeschlagen – Platzhalter gespeichert. API-Schlüssel prüfen?",
+      true,
+    );
+  } finally {
+    elements.generateImageBtn.disabled = false;
+  }
+};
+
 const handleGenerateImage = () => {
   if (
     !requireActiveRoom(
@@ -608,17 +712,7 @@ const handleGenerateImage = () => {
     "Idee ohne Beschreibung";
 
   const roomData = ensureRoomData(state.activeRoomId);
-  roomData.images.unshift({
-    id: `img-${Date.now()}`,
-    label: `ChatGPT-Anfrage: ${promptText}`,
-    url: `data:image/svg+xml,${encodeURIComponent(
-      `<svg xmlns='http://www.w3.org/2000/svg' width='320' height='200'><rect width='320' height='200' fill='%23e5e7eb'/><text x='50%' y='50%' fill='%234b5563' font-family='Arial' font-size='16' text-anchor='middle' dominant-baseline='middle'>${promptText
-        .slice(0, 28)
-        .replace(/</g, "")}</text></svg>`,
-    )}`,
-  });
-  saveState();
-  renderImages(roomData);
+  generateImageWithOpenAI(promptText, roomData);
 };
 
 const handleUploadImage = (event) => {
@@ -718,6 +812,7 @@ const bindEvents = () => {
   elements.checklistForm.addEventListener("submit", handleChecklistSubmit);
   elements.generateImageBtn.addEventListener("click", handleGenerateImage);
   elements.uploadImageInput.addEventListener("change", handleUploadImage);
+  elements.setApiKeyBtn?.addEventListener("click", handleSetApiKey);
 
   elements.toggleArchitect.addEventListener("change", (event) => {
     setArchitectMode(event.target.checked);

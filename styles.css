@@ -170,6 +170,14 @@ svg {
   stroke: var(--window);
 }
 
+.status-line {
+  margin: 0.4rem 0;
+}
+
+.status-line.error {
+  color: #b91c1c;
+}
+
 .architect-mode .architect-hit {
   cursor: crosshair;
   transition:
@@ -330,6 +338,8 @@ button {
   overflow: hidden;
   text-align: center;
   font-size: 0.8rem;
+  display: flex;
+  flex-direction: column;
 }
 
 .image-card img {
@@ -337,6 +347,7 @@ button {
   height: 90px;
   object-fit: cover;
   display: block;
+  background: linear-gradient(135deg, #e2e8f0, #f8fafc);
 }
 
 .helper {

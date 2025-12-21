@@ -8,7 +8,7 @@ const repoRoot = path.resolve(__dirname);
 const baseURL = process.env.BASE_URL || "http://127.0.0.1:4173";
 
 export default defineConfig({
-  testDir: "tests:",
+  testDir: "tests",
   use: {
     headless: true,
     browserName: "chromium",
