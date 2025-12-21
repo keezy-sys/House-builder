@@ -1,3 +1,5 @@
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
 const floorplanSize = { width: 800, height: 520 };
 
 const rooms = [
@@ -134,16 +136,48 @@ const defaultMeasurements = {
   storage: { width: 1800, length: 1800, height: 2800 },
 };
 
-const users = [
-  { id: "user-1", name: "Wolfgang" },
-  { id: "user-2", name: "Konstantin" },
-];
+const SHARED_STATE_TABLE = "house_state";
+const SHARED_STATE_ID = "default";
+const SAVE_DEBOUNCE_MS = 800;
+
+const isPlaceholder = (value) =>
+  !value || value.includes("YOUR_") || value.includes("your_");
+
+const supabaseUrl = window.__SUPABASE_URL__ || "";
+const supabaseAnonKey = window.__SUPABASE_ANON_KEY__ || "";
+const supabaseConfigured =
+  !isPlaceholder(supabaseUrl) && !isPlaceholder(supabaseAnonKey);
+const supabase = supabaseConfigured
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+    })
+  : null;
+
+const authState = {
+  session: null,
+  user: null,
+  displayName: "",
+};
+
+const syncState = {
+  saveTimer: null,
+  lastSavedAt: 0,
+  applyingRemote: false,
+  subscription: null,
+};
+
+const isLocalHost = ["localhost", "127.0.0.1"].includes(
+  window.location.hostname,
+);
 
 const state = {
   activeRoomId: null,
   isAddingComment: false,
   isArchitectMode: false,
-  activeUserId: users[0].id,
   roomData: {},
   roomMeasurements: {},
   selectedElement: null,
@@ -170,12 +204,18 @@ const elements = {
   measurementWidth: document.getElementById("measure-width"),
   measurementLength: document.getElementById("measure-length"),
   measurementHeight: document.getElementById("measure-height"),
-  activeUserSelect: document.getElementById("active-user"),
   threeDPanel: document.getElementById("three-d-panel"),
   threeDButton: document.getElementById("toggle-3d"),
   threeDLabel: document.getElementById("three-d-label"),
   setApiKeyBtn: document.getElementById("set-api-key"),
   imageStatus: document.getElementById("image-status"),
+  authScreen: document.getElementById("auth-screen"),
+  loginForm: document.getElementById("login-form"),
+  signupForm: document.getElementById("signup-form"),
+  authError: document.getElementById("auth-error"),
+  authInfo: document.getElementById("auth-info"),
+  authUserName: document.getElementById("auth-user-name"),
+  signOutBtn: document.getElementById("sign-out"),
 };
 
 const storageKey = "house-builder-state";
@@ -187,36 +227,48 @@ const defaultRoomData = () => ({
   comments: [],
 });
 
-const saveState = () => {
-  const payload = {
-    roomData: state.roomData,
-    roomMeasurements: state.roomMeasurements,
-    activeUserId: state.activeUserId,
-  };
-  localStorage.setItem(storageKey, JSON.stringify(payload));
+const buildStatePayload = () => ({
+  roomData: state.roomData,
+  roomMeasurements: state.roomMeasurements,
+});
+
+const saveStateLocal = () => {
+  localStorage.setItem(storageKey, JSON.stringify(buildStatePayload()));
 };
 
-const loadState = () => {
+const loadStateLocal = () => {
   const raw = localStorage.getItem(storageKey);
   if (!raw) {
-    state.roomMeasurements = { ...defaultMeasurements };
-    ensureMeasurements();
-    return;
+    return null;
   }
   try {
-    const parsed = JSON.parse(raw);
-    state.roomData = parsed.roomData || {};
-    state.roomMeasurements = parsed.roomMeasurements || {
-      ...defaultMeasurements,
-    };
-    const knownUserIds = users.map((u) => u.id);
-    state.activeUserId = knownUserIds.includes(parsed.activeUserId)
-      ? parsed.activeUserId
-      : users[0].id;
-  } catch (error) {
-    state.roomMeasurements = { ...defaultMeasurements };
+    return JSON.parse(raw);
+  } catch {
+    return null;
   }
+};
+
+const applyStatePayload = (payload) => {
+  state.roomData = payload?.roomData || {};
+  state.roomMeasurements = payload?.roomMeasurements || {
+    ...defaultMeasurements,
+  };
   ensureMeasurements();
+};
+
+const hydrateStateFromLocal = () => {
+  const localPayload = loadStateLocal();
+  if (localPayload) {
+    applyStatePayload(localPayload);
+    return;
+  }
+  state.roomMeasurements = { ...defaultMeasurements };
+  ensureMeasurements();
+};
+
+const saveState = () => {
+  saveStateLocal();
+  queueRemoteSave();
 };
 
 const ensureRoomData = (roomId) => {
@@ -234,17 +286,263 @@ const ensureMeasurements = () => {
   });
 };
 
-const renderUsers = () => {
-  elements.activeUserSelect.innerHTML = "";
-  users.forEach((user) => {
-    const option = document.createElement("option");
-    option.value = user.id;
-    option.textContent = user.name;
-    if (user.id === state.activeUserId) {
-      option.selected = true;
-    }
-    elements.activeUserSelect.appendChild(option);
+const getDisplayName = (user) =>
+  user?.user_metadata?.name || user?.email || "Unbekannt";
+
+const setAuthMessage = (message, isError = true) => {
+  if (!elements.authError) return;
+  elements.authError.textContent = message || "";
+  elements.authError.classList.toggle("error", Boolean(message && isError));
+};
+
+const setAuthFormsEnabled = (isEnabled) => {
+  [elements.loginForm, elements.signupForm].forEach((form) => {
+    if (!form) return;
+    form.querySelectorAll("input, button").forEach((input) => {
+      input.disabled = !isEnabled;
+    });
   });
+};
+
+const setAuthScreenVisible = (isVisible) => {
+  if (!elements.authScreen) return;
+  elements.authScreen.hidden = !isVisible;
+  document.body.classList.toggle("auth-locked", isVisible);
+};
+
+const updateAuthUI = () => {
+  const isAuthed = Boolean(authState.user);
+  setAuthScreenVisible(!isAuthed);
+  if (elements.authInfo) {
+    elements.authInfo.hidden = !isAuthed;
+  }
+  if (elements.authUserName) {
+    elements.authUserName.textContent = isAuthed
+      ? authState.displayName
+      : "";
+  }
+};
+
+const refreshUI = () => {
+  renderFloorplan();
+  renderRoomPanel();
+  renderArchitectPanel();
+};
+
+const getInitialPayload = () =>
+  loadStateLocal() || {
+    roomData: {},
+    roomMeasurements: { ...defaultMeasurements },
+  };
+
+const loadRemoteState = async () => {
+  if (!supabase || !authState.user) return;
+  const { data, error } = await supabase
+    .from(SHARED_STATE_TABLE)
+    .select("data, updated_at")
+    .eq("id", SHARED_STATE_ID)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Supabase Laden fehlgeschlagen:", error);
+    const fallback = getInitialPayload();
+    applyStatePayload(fallback);
+    saveStateLocal();
+    refreshUI();
+    return;
+  }
+
+  if (data?.data) {
+    applyStatePayload(data.data);
+    saveStateLocal();
+    refreshUI();
+    return;
+  }
+
+  const initial = getInitialPayload();
+  const { error: insertError } = await supabase
+    .from(SHARED_STATE_TABLE)
+    .upsert({
+      id: SHARED_STATE_ID,
+      data: initial,
+      updated_at: new Date().toISOString(),
+    });
+
+  if (insertError) {
+    console.error("Supabase Initialisierung fehlgeschlagen:", insertError);
+  }
+  applyStatePayload(initial);
+  saveStateLocal();
+  refreshUI();
+};
+
+const queueRemoteSave = () => {
+  if (!supabase || !authState.user || syncState.applyingRemote) return;
+  window.clearTimeout(syncState.saveTimer);
+  syncState.saveTimer = window.setTimeout(() => {
+    void pushStateToSupabase();
+  }, SAVE_DEBOUNCE_MS);
+};
+
+const pushStateToSupabase = async () => {
+  if (!supabase || !authState.user) return;
+  const payload = buildStatePayload();
+  const timestamp = new Date().toISOString();
+  syncState.lastSavedAt = Date.now();
+
+  const { error } = await supabase.from(SHARED_STATE_TABLE).upsert({
+    id: SHARED_STATE_ID,
+    data: payload,
+    updated_at: timestamp,
+  });
+
+  if (error) {
+    console.error("Supabase Speichern fehlgeschlagen:", error);
+  }
+};
+
+const clearStateSubscription = () => {
+  if (!supabase || !syncState.subscription) return;
+  supabase.removeChannel(syncState.subscription);
+  syncState.subscription = null;
+};
+
+const subscribeToStateChanges = () => {
+  if (!supabase) return;
+  clearStateSubscription();
+  syncState.subscription = supabase
+    .channel("house_state")
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: SHARED_STATE_TABLE,
+        filter: `id=eq.${SHARED_STATE_ID}`,
+      },
+      (payload) => {
+        const remotePayload = payload?.new?.data;
+        if (!remotePayload) return;
+        const updatedAt = payload?.new?.updated_at;
+        const updatedTimestamp = updatedAt
+          ? new Date(updatedAt).getTime()
+          : 0;
+        if (updatedTimestamp && updatedTimestamp <= syncState.lastSavedAt + 1500)
+          return;
+
+        syncState.applyingRemote = true;
+        applyStatePayload(remotePayload);
+        saveStateLocal();
+        refreshUI();
+        syncState.applyingRemote = false;
+      },
+    )
+    .subscribe();
+};
+
+const handleSessionChange = async (session) => {
+  const previousUserId = authState.user?.id;
+  authState.session = session;
+  authState.user = session?.user ?? null;
+  authState.displayName = authState.user
+    ? getDisplayName(authState.user)
+    : "";
+  updateAuthUI();
+  if (authState.user) {
+    setAuthMessage("", false);
+  }
+
+  if (!authState.user) {
+    clearStateSubscription();
+    return;
+  }
+
+  if (authState.user.id !== previousUserId) {
+    await loadRemoteState();
+    subscribeToStateChanges();
+  }
+};
+
+const initAuth = async () => {
+  if (!supabaseConfigured) {
+    setAuthFormsEnabled(false);
+    setAuthScreenVisible(true);
+    setAuthMessage(
+      "Supabase ist nicht konfiguriert. Bitte config.js ausfüllen.",
+    );
+    return;
+  }
+
+  setAuthFormsEnabled(true);
+  const { data, error } = await supabase.auth.getSession();
+  if (error) {
+    console.error("Supabase Sessionfehler:", error);
+    setAuthMessage("Anmeldung fehlgeschlagen. Bitte erneut versuchen.");
+  }
+  await handleSessionChange(data?.session ?? null);
+  supabase.auth.onAuthStateChange((event, session) => {
+    void handleSessionChange(session);
+  });
+};
+
+const handleLogin = async (event) => {
+  event.preventDefault();
+  if (!supabase) return;
+  const formData = new FormData(event.target);
+  const email = String(formData.get("email") || "").trim();
+  const password = String(formData.get("password") || "").trim();
+  if (!email || !password) {
+    setAuthMessage("Bitte E-Mail und Passwort eingeben.");
+    return;
+  }
+  const { error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+  if (error) {
+    setAuthMessage(error.message);
+    return;
+  }
+  setAuthMessage("");
+  event.target.reset();
+};
+
+const handleSignup = async (event) => {
+  event.preventDefault();
+  if (!supabase) return;
+  const formData = new FormData(event.target);
+  const name = String(formData.get("name") || "").trim();
+  const email = String(formData.get("email") || "").trim();
+  const password = String(formData.get("password") || "").trim();
+  if (!name || !email || !password) {
+    setAuthMessage("Bitte Name, E-Mail und Passwort eingeben.");
+    return;
+  }
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: { name },
+    },
+  });
+  if (error) {
+    setAuthMessage(error.message);
+    return;
+  }
+  if (!data.session) {
+    setAuthMessage(
+      "Konto angelegt. Bitte E-Mail bestätigen und anschließend anmelden.",
+      false,
+    );
+  } else {
+    setAuthMessage("", false);
+  }
+  event.target.reset();
+};
+
+const handleSignOut = async () => {
+  if (!supabase) return;
+  await supabase.auth.signOut();
 };
 
 const renderFloorplan = () => {
@@ -434,8 +732,8 @@ const renderComments = (roomData) => {
   elements.comments.innerHTML = "";
   roomData.comments.forEach((comment) => {
     const li = document.createElement("li");
-    const user = users.find((item) => item.id === comment.userId);
-    li.textContent = `${user ? user.name : "Unbekannt"}: ${comment.text}`;
+    const author = comment.userName || comment.userEmail || "Unbekannt";
+    li.textContent = `${author}: ${comment.text}`;
     elements.comments.appendChild(li);
   });
 };
@@ -558,10 +856,18 @@ const handleAddComment = (event) => {
     return;
   }
 
+  if (!authState.user) {
+    window.alert("Bitte anmelden, um Kommentare zu speichern.");
+    return;
+  }
+
+  const userName = getDisplayName(authState.user);
   const roomData = ensureRoomData(state.activeRoomId);
   roomData.comments.unshift({
     id: `comment-${Date.now()}`,
-    userId: state.activeUserId,
+    userId: authState.user.id,
+    userName,
+    userEmail: authState.user.email || "",
     text: commentText,
     x,
     y,
@@ -627,6 +933,13 @@ const isLikelyNetworkBlock = (error) => {
 };
 
 const handleSetApiKey = () => {
+  if (!isLocalHost) {
+    setImageStatus(
+      "API-Schlüssel wird serverseitig verwaltet. Bitte in Netlify setzen.",
+      true,
+    );
+    return;
+  }
   const key = window.prompt(
     "Bitte OpenAI API-Schlüssel eingeben (wird lokal gespeichert).",
   );
@@ -635,8 +948,8 @@ const handleSetApiKey = () => {
   writeApiKey(trimmedKey);
   setImageStatus(
     trimmedKey
-      ? "API-Schlüssel gespeichert. Bilder werden über den lokalen Dienst erzeugt."
-      : "Kein API-Schlüssel gespeichert. Falls der Server keinen Schlüssel kennt, wird ein Platzhalter genutzt.",
+      ? "API-Schlüssel gespeichert. Bilder werden lokal erzeugt."
+      : "Kein API-Schlüssel gespeichert. Server-KEY fehlt.",
   );
 };
 
@@ -668,15 +981,19 @@ const generateImageWithOpenAI = async (promptText, roomData) => {
     setImageStatus("Bild wird erzeugt …");
     elements.generateImageBtn.disabled = true;
 
+    const requestBody = {
+      prompt: promptText,
+    };
+    if (isLocalHost && apiKey) {
+      requestBody.apiKey = apiKey;
+    }
+
     const response = await fetch("/api/image", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        prompt: promptText,
-        apiKey,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     let data = {};
@@ -835,14 +1152,12 @@ const bindEvents = () => {
   elements.generateImageBtn.addEventListener("click", handleGenerateImage);
   elements.uploadImageInput.addEventListener("change", handleUploadImage);
   elements.setApiKeyBtn?.addEventListener("click", handleSetApiKey);
+  elements.loginForm?.addEventListener("submit", handleLogin);
+  elements.signupForm?.addEventListener("submit", handleSignup);
+  elements.signOutBtn?.addEventListener("click", handleSignOut);
 
   elements.toggleArchitect.addEventListener("change", (event) => {
     setArchitectMode(event.target.checked);
-  });
-
-  elements.activeUserSelect.addEventListener("change", (event) => {
-    state.activeUserId = event.target.value;
-    saveState();
   });
 
   elements.threeDButton.addEventListener("click", () => {
@@ -855,13 +1170,19 @@ const bindEvents = () => {
 };
 
 const init = () => {
-  loadState();
-  renderUsers();
+  hydrateStateFromLocal();
   renderFloorplan();
   renderRoomPanel();
   renderArchitectPanel();
   setArchitectMode(state.isArchitectMode);
+  if (elements.setApiKeyBtn) {
+    elements.setApiKeyBtn.hidden = !isLocalHost;
+  }
+  if (supabaseConfigured) {
+    setAuthScreenVisible(true);
+  }
   bindEvents();
+  void initAuth();
 };
 
 init();

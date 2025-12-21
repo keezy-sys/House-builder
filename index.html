@@ -7,6 +7,67 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <div id="auth-screen" class="auth-screen" hidden>
+      <div class="auth-card">
+        <h2>Willkommen zurück</h2>
+        <p class="helper">
+          Bitte anmelden, um den Hausplan gemeinsam zu bearbeiten.
+        </p>
+        <div class="auth-forms">
+          <form id="login-form" class="auth-form">
+            <h3>Anmelden</h3>
+            <label>
+              E-Mail
+              <input
+                type="email"
+                name="email"
+                required
+                autocomplete="email"
+              />
+            </label>
+            <label>
+              Passwort
+              <input
+                type="password"
+                name="password"
+                required
+                autocomplete="current-password"
+              />
+            </label>
+            <button class="primary" type="submit">Anmelden</button>
+          </form>
+          <div class="auth-divider"><span>oder</span></div>
+          <form id="signup-form" class="auth-form">
+            <h3>Neues Konto</h3>
+            <label>
+              Name
+              <input type="text" name="name" required autocomplete="name" />
+            </label>
+            <label>
+              E-Mail
+              <input
+                type="email"
+                name="email"
+                required
+                autocomplete="email"
+              />
+            </label>
+            <label>
+              Passwort
+              <input
+                type="password"
+                name="password"
+                required
+                autocomplete="new-password"
+              />
+            </label>
+            <button type="submit">Konto anlegen</button>
+          </form>
+        </div>
+        <p id="auth-error" class="helper" role="alert"></p>
+      </div>
+    </div>
+
     <header class="app-header">
       <div>
         <h1>Hausplaner</h1>
@@ -19,9 +80,12 @@
           <input type="checkbox" id="toggle-architect" />
           <span>Architekt-Ansicht</span>
         </label>
-        <div class="user-select">
-          <label for="active-user">Aktiver Nutzer</label>
-          <select id="active-user"></select>
+        <div class="auth-info" id="auth-info" hidden>
+          <div class="auth-user">
+            <span class="auth-label">Angemeldet als</span>
+            <span id="auth-user-name"></span>
+          </div>
+          <button id="sign-out" type="button">Abmelden</button>
         </div>
       </div>
     </header>
@@ -148,6 +212,7 @@
       <p>Große Schaltflächen, klare Sprache und ein Raum nach dem anderen.</p>
     </footer>
 
-    <script src="app.js"></script>
+    <script src="config.js"></script>
+    <script type="module" src="app.js"></script>
   </body>
 </html>
