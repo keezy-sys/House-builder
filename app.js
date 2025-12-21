@@ -616,6 +616,16 @@ const setImageStatus = (text, isError = false) => {
   elements.imageStatus.classList.toggle("error", isError);
 };
 
+const isLikelyNetworkBlock = (error) => {
+  const message = error?.message || "";
+  return (
+    message.includes("Failed to fetch") ||
+    message.includes("NetworkError") ||
+    message.includes("ERR_BLOCKED") ||
+    message.includes("TypeError: Network request failed")
+  );
+};
+
 const handleSetApiKey = () => {
   const key = window.prompt(
     "Bitte OpenAI API-Schlüssel eingeben (wird lokal gespeichert).",
@@ -690,10 +700,11 @@ const generateImageWithOpenAI = async (promptText, roomData) => {
   } catch (error) {
     console.error("Bildgenerierung fehlgeschlagen:", error);
     pushImage(buildPlaceholderImage(promptText || "Idee ohne Beschreibung"));
-    setImageStatus(
-      "Bildgenerierung fehlgeschlagen – Platzhalter gespeichert. API-Schlüssel prüfen?",
-      true,
-    );
+    const networkBlocked = isLikelyNetworkBlock(error);
+    const message = networkBlocked
+      ? "Netzwerk blockiert – HTTPS zu api.openai.com ist gesperrt. Zugriff erlauben und erneut versuchen."
+      : "Bildgenerierung fehlgeschlagen – Platzhalter gespeichert. API-Schlüssel prüfen?";
+    setImageStatus(message, true);
   } finally {
     elements.generateImageBtn.disabled = false;
   }
