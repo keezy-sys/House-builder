@@ -5,8 +5,11 @@
   color: #1d2733;
   --wall: #0f172a;
   --wall-light: #cbd5e1;
-  --door: #8b5a2b;
-  --window: #2563eb;
+  --door: #334155;
+  --window: #475569;
+  --opening-ink: #1f2937;
+  --opening-ink-soft: #475569;
+  --opening-ink-light: rgba(15, 23, 42, 0.35);
   --highlight: #fef3c7;
   --architect-accent: #f59e0b;
 }
@@ -347,18 +350,45 @@ svg {
   stroke-width: 1;
 }
 
-.door-marker,
-.window-marker {
+.opening-group .opening-hit {
+  stroke: transparent;
+  stroke-width: 20;
+  pointer-events: stroke;
+}
+
+.opening-group .door-frame {
+  stroke: var(--opening-ink-soft);
+  stroke-width: 2.4;
   stroke-linecap: round;
-  stroke-width: 6;
 }
 
-.door-marker {
-  stroke: var(--door);
+.opening-group .door-leaf {
+  stroke: var(--opening-ink);
+  stroke-width: 2.4;
+  stroke-linecap: round;
 }
 
-.window-marker {
-  stroke: var(--window);
+.opening-group .door-arc {
+  stroke: var(--opening-ink-light);
+  stroke-width: 1.6;
+  stroke-dasharray: 4 4;
+  fill: none;
+}
+
+.opening-group .door-hinge {
+  fill: var(--opening-ink);
+}
+
+.opening-group .window-line {
+  stroke: var(--opening-ink-soft);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.opening-group .window-cross {
+  stroke: var(--opening-ink-light);
+  stroke-width: 1.4;
+  stroke-linecap: round;
 }
 
 .status-line {
@@ -385,7 +415,7 @@ svg {
   cursor: grabbing;
 }
 
-.architect-mode .architect-hit.selected {
+.architect-mode .wall-line.selected {
   stroke: var(--architect-accent);
   stroke-width: 12;
   stroke-opacity: 1;
@@ -398,18 +428,23 @@ svg {
   stroke-opacity: 0.9;
 }
 
-.architect-mode .door-marker.hovered {
+.architect-mode .opening-group.hovered .door-leaf,
+.architect-mode .opening-group.selected .door-leaf,
+.architect-mode .opening-group.hovered .window-line,
+.architect-mode .opening-group.selected .window-line {
   stroke: var(--architect-accent);
-  stroke-width: 10;
 }
 
-.architect-mode .window-marker.hovered {
-  stroke: #0ea5e9;
-  stroke-width: 10;
+.architect-mode .opening-group.hovered .door-arc,
+.architect-mode .opening-group.selected .door-arc,
+.architect-mode .opening-group.hovered .window-cross,
+.architect-mode .opening-group.selected .window-cross {
+  stroke: var(--architect-accent);
 }
 
-.architect-mode .window-marker.selected {
-  stroke: #0ea5e9;
+.architect-mode .opening-group.hovered .opening-hit,
+.architect-mode .opening-group.selected .opening-hit {
+  stroke: rgba(245, 158, 11, 0.35);
 }
 
 .floorplan-actions {
@@ -427,24 +462,47 @@ svg {
   font-weight: 600;
 }
 
-.legend-swatch {
-  display: inline-block;
-  width: 24px;
-  height: 6px;
-  border-radius: 999px;
-  margin-right: 0.4rem;
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
-.legend-swatch.wall {
-  background: var(--wall);
+.legend-icon {
+  width: 30px;
+  height: 18px;
 }
 
-.legend-swatch.door {
-  background: var(--door);
+.legend-icon .legend-wall {
+  stroke: var(--wall);
+  stroke-width: 4;
+  stroke-linecap: round;
 }
 
-.legend-swatch.window {
-  background: var(--window);
+.legend-icon .legend-door-frame,
+.legend-icon .legend-window-line {
+  stroke: var(--opening-ink-soft);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.legend-icon .legend-door-leaf {
+  stroke: var(--opening-ink);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.legend-icon .legend-door-arc {
+  stroke: var(--opening-ink-light);
+  stroke-width: 1.4;
+  stroke-dasharray: 3 3;
+  fill: none;
+}
+
+.legend-icon .legend-window-cross {
+  stroke: var(--opening-ink-light);
+  stroke-width: 1.2;
+  stroke-linecap: round;
 }
 
 .sidebar {

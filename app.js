@@ -4,9 +4,18 @@ const floorplanSize = { width: 800, height: 520 };
 const floorBounds = { x: 50, y: 50, width: 680, height: 400 };
 const MM_PER_PX = 20;
 const WALL_HEIGHT_MM = 2800;
+const DEFAULT_DOOR_HEIGHT_MM = 2100;
+const DEFAULT_WINDOW_HEIGHT_MM = 1400;
+const MIN_DOOR_HEIGHT_MM = 1800;
+const MIN_WINDOW_HEIGHT_MM = 600;
+const MAX_OPENING_HEIGHT_MM = WALL_HEIGHT_MM;
+const OPENING_HEIGHT_STEP_MM = 10;
 const MIN_ROOM_SIZE_PX = 60;
 const MIN_OPENING_SIZE_PX = 30;
 const DRAG_THRESHOLD_PX = 4;
+const OPENING_INSET_PX = 8;
+const WINDOW_GAP_PX = 4;
+const SVG_NS = "http://www.w3.org/2000/svg";
 const DEFAULT_FLOORPLAN_HINT =
   "Bewegen Sie die Maus über einen Raum, um ihn hervorzuheben.";
 
@@ -31,6 +40,24 @@ const LEGACY_UPPER_LAYOUT = [
   { id: "upper-hallway", x: 280, y: 360, width: 330, height: 90 },
   { id: "upper-storage", x: 610, y: 360, width: 120, height: 90 },
 ];
+
+const getDefaultOpeningHeightMm = (type) =>
+  type === "door" ? DEFAULT_DOOR_HEIGHT_MM : DEFAULT_WINDOW_HEIGHT_MM;
+
+const getOpeningHeightBoundsMm = (type) => {
+  if (type === "door") {
+    return { min: MIN_DOOR_HEIGHT_MM, max: MAX_OPENING_HEIGHT_MM };
+  }
+  return { min: MIN_WINDOW_HEIGHT_MM, max: MAX_OPENING_HEIGHT_MM };
+};
+
+const applyOpeningDefaults = (openings) =>
+  openings.map((opening) => ({
+    ...opening,
+    heightMm: Number.isFinite(opening.heightMm)
+      ? opening.heightMm
+      : getDefaultOpeningHeightMm(opening.type),
+  }));
 
 const buildDefaultFloorPlans = () => ({
   ground: {
@@ -102,7 +129,7 @@ const buildDefaultFloorPlans = () => ({
         height: 90,
       },
     ],
-    openings: [
+    openings: applyOpeningDefaults([
       {
         id: "ground-window-left",
         type: "window",
@@ -183,7 +210,7 @@ const buildDefaultFloorPlans = () => ({
         x2: 280,
         y2: 260,
       },
-    ],
+    ]),
   },
   upper: {
     id: "upper",
@@ -254,7 +281,7 @@ const buildDefaultFloorPlans = () => ({
         height: 140,
       },
     ],
-    openings: [
+    openings: applyOpeningDefaults([
       {
         id: "upper-window-living",
         type: "window",
@@ -365,7 +392,7 @@ const buildDefaultFloorPlans = () => ({
         x2: 680,
         y2: 40,
       },
-    ],
+    ]),
   },
 });
 
@@ -462,6 +489,10 @@ const elements = {
   measurementSpan: document.getElementById("measure-span"),
   measurementSpanNumber: document.getElementById("measure-span-number"),
   measurementSpanLabel: document.getElementById("measure-span-label"),
+  measurementHeight: document.getElementById("measure-height"),
+  measurementHeightNumber: document.getElementById("measure-height-number"),
+  measurementHeightLabel: document.getElementById("measure-height-label"),
+  measurementHeightRow: document.getElementById("measure-height-row"),
   measurementLock: document.getElementById("measure-lock"),
   measurementLockRow: document.getElementById("measure-lock-row"),
   measurementNote: document.getElementById("measure-note"),
@@ -511,7 +542,9 @@ const loadStateLocal = () => {
 
 const applyStatePayload = (payload) => {
   state.roomData = migrateRoomData(payload?.roomData);
-  state.floorPlans = cloneFloorPlans(loadFloorPlans(payload?.floorPlans));
+  state.floorPlans = normalizeOpenings(
+    cloneFloorPlans(loadFloorPlans(payload?.floorPlans)),
+  );
   ensureRoomDataForFloors();
 };
 
@@ -571,6 +604,18 @@ const loadFloorPlans = (payloadFloorPlans) => {
   if (isLegacyUpperLayout(floorPlans.upper)) {
     floorPlans.upper = fallback.upper;
   }
+  return floorPlans;
+};
+
+const normalizeOpenings = (floorPlans) => {
+  Object.values(floorPlans || {}).forEach((floor) => {
+    if (!floor || !Array.isArray(floor.openings)) return;
+    floor.openings.forEach((opening) => {
+      if (!Number.isFinite(opening.heightMm)) {
+        opening.heightMm = getDefaultOpeningHeightMm(opening.type);
+      }
+    });
+  });
   return floorPlans;
 };
 
@@ -727,6 +772,95 @@ const getOpeningWallSide = (opening, room) => {
   return null;
 };
 
+const getRoomWalls = (room) => {
+  if (!room) return [];
+  return [
+    {
+      side: "top",
+      axis: "x",
+      position: room.y,
+      spanStart: room.x,
+      spanEnd: room.x + room.width,
+      normal: { x: 0, y: 1 },
+    },
+    {
+      side: "bottom",
+      axis: "x",
+      position: room.y + room.height,
+      spanStart: room.x,
+      spanEnd: room.x + room.width,
+      normal: { x: 0, y: -1 },
+    },
+    {
+      side: "left",
+      axis: "y",
+      position: room.x,
+      spanStart: room.y,
+      spanEnd: room.y + room.height,
+      normal: { x: 1, y: 0 },
+    },
+    {
+      side: "right",
+      axis: "y",
+      position: room.x + room.width,
+      spanStart: room.y,
+      spanEnd: room.y + room.height,
+      normal: { x: -1, y: 0 },
+    },
+  ];
+};
+
+const getWallDataForSide = (room, side) =>
+  getRoomWalls(room).find((wall) => wall.side === side) || null;
+
+const getClosestWallForPoint = (room, point, minSpan) => {
+  const walls = getRoomWalls(room);
+  if (!walls.length) return null;
+  const viableWalls = walls.filter(
+    (wall) => wall.spanEnd - wall.spanStart >= minSpan,
+  );
+  const candidates = viableWalls.length ? viableWalls : walls;
+  let best = candidates[0];
+  let bestDistance = Number.POSITIVE_INFINITY;
+  candidates.forEach((wall) => {
+    let distance = 0;
+    if (wall.axis === "x") {
+      const clamped = clamp(point.x, wall.spanStart, wall.spanEnd);
+      const dx = point.x - clamped;
+      const dy = point.y - wall.position;
+      distance = dx * dx + dy * dy;
+    } else {
+      const clamped = clamp(point.y, wall.spanStart, wall.spanEnd);
+      const dx = point.x - wall.position;
+      const dy = point.y - clamped;
+      distance = dx * dx + dy * dy;
+    }
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = wall;
+    }
+  });
+  return best;
+};
+
+const getOpeningCenterPoint = (opening, meta) => {
+  if (meta.axis === "x") {
+    return { x: meta.position, y: opening.y1 };
+  }
+  return { x: opening.x1, y: meta.position };
+};
+
+const resolveOpeningWallSide = (opening, room, meta) => {
+  const wallSide = getOpeningWallSide(opening, room);
+  if (wallSide) return wallSide;
+  const closest = getClosestWallForPoint(
+    room,
+    getOpeningCenterPoint(opening, meta),
+    meta.length,
+  );
+  return closest?.side || null;
+};
+
 const getOpeningBoundsForWall = (room, wallSide, axis) => {
   if (!room || !wallSide) {
     return axis === "x"
@@ -747,15 +881,19 @@ const getOpeningPositionBounds = (bounds, length) => {
   };
 };
 
-const updateOpeningGeometry = (opening, axis, center, length) => {
+const setOpeningOnWall = (opening, axis, wallPosition, center, length) => {
   const half = length / 2;
   if (axis === "x") {
     opening.x1 = center - half;
     opening.x2 = center + half;
+    opening.y1 = wallPosition;
+    opening.y2 = wallPosition;
     return;
   }
   opening.y1 = center - half;
   opening.y2 = center + half;
+  opening.x1 = wallPosition;
+  opening.x2 = wallPosition;
 };
 
 const getWallSelectionData = (selection) => {
@@ -780,19 +918,23 @@ const getOpeningSelectionData = (selection) => {
   if (!opening) return null;
   const room = floor.rooms.find((item) => item.id === opening.roomId);
   const meta = getOpeningMeta(opening);
-  const wallSide = getOpeningWallSide(opening, room);
+  const wallSide = resolveOpeningWallSide(opening, room, meta);
   const bounds = getOpeningBoundsForWall(room, wallSide, meta.axis);
   const span = Math.max(0, bounds.end - bounds.start);
   const minLength = Math.min(MIN_OPENING_SIZE_PX, span);
   const maxLength = Math.max(minLength, span);
   const clampedLength = clamp(meta.length, minLength, maxLength);
   const positionBounds = getOpeningPositionBounds(bounds, clampedLength);
+  if (!Number.isFinite(opening.heightMm)) {
+    opening.heightMm = getDefaultOpeningHeightMm(opening.type);
+  }
   return {
     floor,
     room,
     opening,
     meta: { ...meta, length: clampedLength },
     bounds,
+    wallSide,
     minLength,
     maxLength,
     positionBounds,
@@ -934,6 +1076,12 @@ const formatAuthError = (error) => {
   }
   if (normalized.includes("email not confirmed")) {
     return "Bitte E-Mail bestätigen, bevor du dich anmeldest.";
+  }
+  if (
+    (normalized.includes("signup") || normalized.includes("signups")) &&
+    (normalized.includes("disabled") || normalized.includes("not allowed"))
+  ) {
+    return "Registrierung ist deaktiviert. Bitte Admin kontaktieren.";
   }
   if (normalized.includes("redirect") && normalized.includes("not allowed")) {
     return "Redirect-URL nicht erlaubt. In Supabase Auth → URL Configuration diese Domain erlauben.";
@@ -1192,6 +1340,161 @@ const handleSignOut = async () => {
   await supabase.auth.signOut();
 };
 
+const createSvgElement = (tag) => document.createElementNS(SVG_NS, tag);
+
+const createSvgLine = ({ x1, y1, x2, y2 }, className) => {
+  const line = createSvgElement("line");
+  line.setAttribute("x1", x1);
+  line.setAttribute("y1", y1);
+  line.setAttribute("x2", x2);
+  line.setAttribute("y2", y2);
+  if (className) {
+    line.setAttribute("class", className);
+  }
+  return line;
+};
+
+const createSvgPath = (d, className) => {
+  const path = createSvgElement("path");
+  path.setAttribute("d", d);
+  if (className) {
+    path.setAttribute("class", className);
+  }
+  return path;
+};
+
+const createSvgCircle = (cx, cy, r, className) => {
+  const circle = createSvgElement("circle");
+  circle.setAttribute("cx", cx);
+  circle.setAttribute("cy", cy);
+  circle.setAttribute("r", r);
+  if (className) {
+    circle.setAttribute("class", className);
+  }
+  return circle;
+};
+
+const getOpeningRenderData = (opening, room) => {
+  const meta = getOpeningMeta(opening);
+  const wallSide = resolveOpeningWallSide(opening, room, meta);
+  const wallData = wallSide ? getWallDataForSide(room, wallSide) : null;
+  const axis = meta.axis;
+  const start = axis === "x"
+    ? Math.min(opening.x1, opening.x2)
+    : Math.min(opening.y1, opening.y2);
+  const end = axis === "x"
+    ? Math.max(opening.x1, opening.x2)
+    : Math.max(opening.y1, opening.y2);
+  const position = axis === "x" ? opening.y1 : opening.x1;
+  const normal = wallData?.normal || (axis === "x" ? { x: 0, y: 1 } : { x: 1, y: 0 });
+  const wallDir = axis === "x" ? { x: 1, y: 0 } : { x: 0, y: 1 };
+  const length = Math.max(meta.length, 1);
+  return { axis, start, end, position, normal, wallDir, length };
+};
+
+const getOffsetLineCoords = (data, offset) => {
+  const offsetX = data.normal.x * offset;
+  const offsetY = data.normal.y * offset;
+  if (data.axis === "x") {
+    return {
+      x1: data.start + offsetX,
+      y1: data.position + offsetY,
+      x2: data.end + offsetX,
+      y2: data.position + offsetY,
+    };
+  }
+  return {
+    x1: data.position + offsetX,
+    y1: data.start + offsetY,
+    x2: data.position + offsetX,
+    y2: data.end + offsetY,
+  };
+};
+
+const appendDoorSymbol = (group, data) => {
+  const frameCoords = getOffsetLineCoords(data, OPENING_INSET_PX);
+  group.appendChild(createSvgLine(frameCoords, "door-frame"));
+
+  const hinge =
+    data.axis === "x"
+      ? { x: data.start, y: data.position }
+      : { x: data.position, y: data.start };
+  const leafEnd = {
+    x: hinge.x + data.normal.x * data.length,
+    y: hinge.y + data.normal.y * data.length,
+  };
+  const wallEnd = {
+    x: hinge.x + data.wallDir.x * data.length,
+    y: hinge.y + data.wallDir.y * data.length,
+  };
+  const sweep = data.wallDir.x * data.normal.y - data.wallDir.y * data.normal.x > 0 ? 1 : 0;
+
+  const arcPath = `M ${wallEnd.x} ${wallEnd.y} A ${data.length} ${data.length} 0 0 ${sweep} ${leafEnd.x} ${leafEnd.y}`;
+  group.appendChild(createSvgPath(arcPath, "door-arc"));
+  group.appendChild(
+    createSvgLine(
+      { x1: hinge.x, y1: hinge.y, x2: leafEnd.x, y2: leafEnd.y },
+      "door-leaf",
+    ),
+  );
+  group.appendChild(createSvgCircle(hinge.x, hinge.y, 2.2, "door-hinge"));
+};
+
+const appendWindowSymbol = (group, data) => {
+  const outerCoords = getOffsetLineCoords(data, OPENING_INSET_PX);
+  const innerCoords = getOffsetLineCoords(
+    data,
+    OPENING_INSET_PX + WINDOW_GAP_PX,
+  );
+  group.appendChild(createSvgLine(outerCoords, "window-line"));
+  group.appendChild(createSvgLine(innerCoords, "window-line"));
+
+  const center = (data.start + data.end) / 2;
+  if (data.axis === "x") {
+    const y1 = data.position + data.normal.y * OPENING_INSET_PX;
+    const y2 = data.position + data.normal.y * (OPENING_INSET_PX + WINDOW_GAP_PX);
+    group.appendChild(
+      createSvgLine({ x1: center, y1, x2: center, y2 }, "window-cross"),
+    );
+  } else {
+    const x1 = data.position + data.normal.x * OPENING_INSET_PX;
+    const x2 = data.position + data.normal.x * (OPENING_INSET_PX + WINDOW_GAP_PX);
+    group.appendChild(
+      createSvgLine({ x1, y1: center, x2, y2: center }, "window-cross"),
+    );
+  }
+};
+
+const createOpeningGroup = (opening, room, floorId, isSelected) => {
+  const group = createSvgElement("g");
+  group.setAttribute(
+    "class",
+    `opening-group ${opening.type}-opening architect-hit${
+      isSelected ? " selected" : ""
+    }`,
+  );
+  group.dataset.roomId = opening.roomId;
+  group.dataset.floorId = floorId;
+  group.dataset.elementType = opening.type;
+  group.dataset.elementLabel = opening.label;
+  group.dataset.openingId = opening.id;
+
+  group.appendChild(
+    createSvgLine(
+      { x1: opening.x1, y1: opening.y1, x2: opening.x2, y2: opening.y2 },
+      "opening-hit",
+    ),
+  );
+
+  const renderData = getOpeningRenderData(opening, room);
+  if (opening.type === "door") {
+    appendDoorSymbol(group, renderData);
+  } else {
+    appendWindowSymbol(group, renderData);
+  }
+  return group;
+};
+
 const renderFloorplan = () => {
   elements.floorplan.innerHTML = "";
   const floor = getActiveFloor();
@@ -1307,24 +1610,13 @@ const renderFloorplan = () => {
   });
 
   floor.openings.forEach((opening) => {
-    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    line.setAttribute("x1", opening.x1);
-    line.setAttribute("y1", opening.y1);
-    line.setAttribute("x2", opening.x2);
-    line.setAttribute("y2", opening.y2);
     const isSelected =
       state.selectedElement?.openingId === opening.id &&
       state.selectedElement?.floorId === floor.id;
-    line.setAttribute(
-      "class",
-      `${opening.type === "door" ? "door-marker" : "window-marker"} architect-hit${isSelected ? " selected" : ""}`,
+    const room = floor.rooms.find((item) => item.id === opening.roomId) || null;
+    elements.floorplan.appendChild(
+      createOpeningGroup(opening, room, floor.id, isSelected),
     );
-    line.dataset.roomId = opening.roomId;
-    line.dataset.floorId = floor.id;
-    line.dataset.elementType = opening.type;
-    line.dataset.elementLabel = opening.label;
-    line.dataset.openingId = opening.id;
-    elements.floorplan.appendChild(line);
   });
 
   floor.rooms.forEach((room) => {
@@ -1440,7 +1732,7 @@ const renderArchitectPanel = () => {
     elements.architectTitle.textContent = "Element wählen";
     if (elements.architectHelp) {
       elements.architectHelp.textContent =
-        "Wand oder Tür im Grundriss ziehen, um zu starten.";
+        "Wand, Tür oder Fenster im Grundriss ziehen, um zu starten.";
     }
     elements.measurementForm.hidden = true;
     return;
@@ -1492,6 +1784,9 @@ const renderArchitectPanel = () => {
     }
     if (elements.measurementLockRow) {
       elements.measurementLockRow.hidden = false;
+    }
+    if (elements.measurementHeightRow) {
+      elements.measurementHeightRow.hidden = true;
     }
     if (elements.measurementNote) {
       elements.measurementNote.hidden = false;
@@ -1546,6 +1841,8 @@ const renderArchitectPanel = () => {
       : "Mitte der Öffnung (Y, mm)";
   const spanLabel =
     elementType === "door" ? "Türbreite (mm)" : "Fensterbreite (mm)";
+  const heightLabel =
+    elementType === "door" ? "Türhöhe (mm)" : "Fensterhöhe (mm)";
 
   const positionMinMm = toMm(positionBounds.min);
   const positionMaxMm = toMm(positionBounds.max);
@@ -1554,6 +1851,13 @@ const renderArchitectPanel = () => {
   const lengthMinMm = toMm(minLength);
   const lengthMaxMm = toMm(maxLength);
   const lengthMm = toMm(meta.length);
+  const heightBounds = getOpeningHeightBoundsMm(elementType);
+  const heightMm = clamp(
+    openingData.opening.heightMm,
+    heightBounds.min,
+    heightBounds.max,
+  );
+  openingData.opening.heightMm = heightMm;
 
   if (elements.measurementAxisLabel) {
     elements.measurementAxisLabel.textContent = axisLabel;
@@ -1561,15 +1865,21 @@ const renderArchitectPanel = () => {
   if (elements.measurementSpanLabel) {
     elements.measurementSpanLabel.textContent = spanLabel;
   }
+  if (elements.measurementHeightLabel) {
+    elements.measurementHeightLabel.textContent = heightLabel;
+  }
   if (elements.measurementLockRow) {
     elements.measurementLockRow.hidden = true;
+  }
+  if (elements.measurementHeightRow) {
+    elements.measurementHeightRow.hidden = false;
   }
   if (elements.measurementNote) {
     elements.measurementNote.hidden = true;
   }
   if (elements.architectHelp) {
     elements.architectHelp.textContent =
-      "Öffnung entlang der Wand ziehen oder Werte direkt eingeben. Änderungen erscheinen sofort.";
+      "Öffnung frei ziehen – sie rastet an der nächsten Wand ein. Werte direkt eingeben, Änderungen erscheinen sofort.";
   }
 
   elements.measurementAxis.min = positionMinMm;
@@ -1595,6 +1905,22 @@ const renderArchitectPanel = () => {
   elements.measurementSpanNumber.step = MM_PER_PX;
   elements.measurementSpanNumber.value = lengthMm;
   elements.measurementSpanNumber.disabled = false;
+
+  if (elements.measurementHeight) {
+    elements.measurementHeight.min = heightBounds.min;
+    elements.measurementHeight.max = heightBounds.max;
+    elements.measurementHeight.step = OPENING_HEIGHT_STEP_MM;
+    elements.measurementHeight.value = heightMm;
+    elements.measurementHeight.disabled = false;
+  }
+
+  if (elements.measurementHeightNumber) {
+    elements.measurementHeightNumber.min = heightBounds.min;
+    elements.measurementHeightNumber.max = heightBounds.max;
+    elements.measurementHeightNumber.step = OPENING_HEIGHT_STEP_MM;
+    elements.measurementHeightNumber.value = heightMm;
+    elements.measurementHeightNumber.disabled = false;
+  }
 
   elements.measurementForm.hidden = false;
 };
@@ -1661,7 +1987,7 @@ const setArchitectMode = (isOn) => {
   renderFloorplan();
   if (elements.floorplanHint) {
     elements.floorplanHint.textContent = isOn
-      ? "Architekt-Ansicht: Wände und Türen im Grundriss ziehen."
+      ? "Architekt-Ansicht: Wände, Türen und Fenster im Grundriss ziehen."
       : DEFAULT_FLOORPLAN_HINT;
   }
   renderArchitectPanel();
@@ -1705,12 +2031,14 @@ const selectRoom = (roomId) => {
 };
 
 const selectArchitectElement = (target) => {
-  const roomId = target.dataset.roomId;
-  const label = target.dataset.elementLabel || "Element";
-  const elementType = target.dataset.elementType || "element";
-  const wallSide = target.dataset.wallSide || null;
-  const floorId = target.dataset.floorId || state.activeFloorId;
-  const openingId = target.dataset.openingId || null;
+  const hitTarget = target?.closest?.(".architect-hit") || target;
+  if (!hitTarget) return;
+  const roomId = hitTarget.dataset.roomId;
+  const label = hitTarget.dataset.elementLabel || "Element";
+  const elementType = hitTarget.dataset.elementType || "element";
+  const wallSide = hitTarget.dataset.wallSide || null;
+  const floorId = hitTarget.dataset.floorId || state.activeFloorId;
+  const openingId = hitTarget.dataset.openingId || null;
   if (!roomId) {
     return;
   }
@@ -2056,28 +2384,40 @@ const applyArchitectAdjustments = ({
     positionBounds.min,
     positionBounds.max,
   );
+  const heightBounds = getOpeningHeightBoundsMm(opening.type);
+  const newHeight = clamp(
+    getInputNumber(elements.measurementHeightNumber, elements.measurementHeight),
+    heightBounds.min,
+    heightBounds.max,
+  );
 
-  const changed =
+  const geometryChanged =
     Math.abs(newCenter - meta.position) > 0.01 ||
     Math.abs(newLength - meta.length) > 0.01;
-  if (changed) {
-    updateOpeningGeometry(opening, meta.axis, newCenter, newLength);
+  if (geometryChanged) {
+    const wallPosition = meta.axis === "x" ? opening.y1 : opening.x1;
+    setOpeningOnWall(opening, meta.axis, wallPosition, newCenter, newLength);
     renderFloorplan();
+  }
+  const heightChanged = Math.abs(newHeight - opening.heightMm) > 0.5;
+  if (heightChanged) {
+    opening.heightMm = newHeight;
   }
   if (refreshPanel) {
     renderArchitectPanel();
   }
-  if (commit && changed) {
+  if (commit && (geometryChanged || heightChanged)) {
     saveState();
   }
 };
 
 const startArchitectDrag = (event, target) => {
-  if (!state.isArchitectMode || !target.classList.contains("architect-hit")) {
+  const hitTarget = target?.closest?.(".architect-hit") || target;
+  if (!state.isArchitectMode || !hitTarget?.classList?.contains("architect-hit")) {
     return;
   }
 
-  const selection = selectArchitectElement(target) || state.selectedElement;
+  const selection = selectArchitectElement(hitTarget) || state.selectedElement;
   if (!selection) return;
 
   const pointer = getFloorplanPoint(event);
@@ -2106,7 +2446,11 @@ const startArchitectDrag = (event, target) => {
       dragState.axis === "x" ? pointer.x : pointer.y;
     dragState.startPosition = openingData.meta.position;
     dragState.lastPosition = openingData.meta.position;
-    dragState.context = openingData;
+    dragState.context = {
+      opening: openingData.opening,
+      room: openingData.room,
+      length: openingData.meta.length,
+    };
   }
 
   dragState.startClientX = event.clientX;
@@ -2152,16 +2496,35 @@ const handleArchitectPointerMove = (event) => {
     );
     dragState.lastPosition = newPosition;
   } else if (dragState.type === "opening") {
-    const { opening, meta, bounds } = dragState.context;
-    const positionBounds = getOpeningPositionBounds(bounds, meta.length);
-    const newCenter = clamp(
-      dragState.startPosition + delta,
-      positionBounds.min,
-      positionBounds.max,
+    const { opening, room } = dragState.context;
+    const targetWall = getClosestWallForPoint(
+      room,
+      pointer,
+      dragState.context.length,
     );
-    if (Math.abs(newCenter - dragState.lastPosition) < 0.1) return;
-    updateOpeningGeometry(opening, meta.axis, newCenter, meta.length);
+    if (!targetWall) return;
+    const bounds = getOpeningBoundsForWall(room, targetWall.side, targetWall.axis);
+    const span = Math.max(0, bounds.end - bounds.start);
+    const length =
+      dragState.context.length <= span ? dragState.context.length : span;
+    const positionBounds = getOpeningPositionBounds(bounds, length);
+    const axisValue = targetWall.axis === "x" ? pointer.x : pointer.y;
+    const newCenter = clamp(axisValue, positionBounds.min, positionBounds.max);
+    if (
+      targetWall.axis === dragState.axis &&
+      Math.abs(newCenter - dragState.lastPosition) < 0.1
+    )
+      return;
+    setOpeningOnWall(
+      opening,
+      targetWall.axis,
+      targetWall.position,
+      newCenter,
+      length,
+    );
+    dragState.axis = targetWall.axis;
     dragState.lastPosition = newCenter;
+    dragState.context.length = length;
   }
 
   renderFloorplan();
@@ -2218,13 +2581,14 @@ const syncRangeNumber = (rangeEl, numberEl) => {
 const bindEvents = () => {
   elements.floorplan.addEventListener("click", (event) => {
     const target = event.target;
+    const hitTarget = target?.closest?.(".architect-hit");
     if (dragState.suppressClick) {
       dragState.suppressClick = false;
       return;
     }
     if (state.isArchitectMode) {
-      if (target.classList.contains("architect-hit")) {
-        selectArchitectElement(target);
+      if (hitTarget) {
+        selectArchitectElement(hitTarget);
         return;
       }
     }
@@ -2242,9 +2606,10 @@ const bindEvents = () => {
   elements.floorplan.addEventListener("pointerdown", (event) => {
     if (!state.isArchitectMode) return;
     const target = event.target;
-    if (!target.classList.contains("architect-hit")) return;
+    const hitTarget = target?.closest?.(".architect-hit");
+    if (!hitTarget) return;
     event.preventDefault();
-    startArchitectDrag(event, target);
+    startArchitectDrag(event, hitTarget);
   });
 
   elements.floorplan.addEventListener("pointermove", handleArchitectPointerMove);
@@ -2254,17 +2619,19 @@ const bindEvents = () => {
   elements.floorplan.addEventListener("mouseover", (event) => {
     if (!state.isArchitectMode) return;
     const target = event.target;
-    if (target.classList.contains("architect-hit")) {
+    const hitTarget = target?.closest?.(".architect-hit");
+    if (hitTarget) {
       clearHoverState();
-      target.classList.add("hovered");
+      hitTarget.classList.add("hovered");
     }
   });
 
   elements.floorplan.addEventListener("mouseout", (event) => {
     if (!state.isArchitectMode) return;
     const target = event.target;
-    if (target.classList.contains("architect-hit")) {
-      target.classList.remove("hovered");
+    const hitTarget = target?.closest?.(".architect-hit");
+    if (hitTarget && !hitTarget.contains(event.relatedTarget)) {
+      hitTarget.classList.remove("hovered");
     }
   });
 
@@ -2317,6 +2684,7 @@ const bindEvents = () => {
   }
   syncRangeNumber(elements.measurementAxis, elements.measurementAxisNumber);
   syncRangeNumber(elements.measurementSpan, elements.measurementSpanNumber);
+  syncRangeNumber(elements.measurementHeight, elements.measurementHeightNumber);
   [elements.measurementAxis, elements.measurementAxisNumber].forEach((input) => {
     if (!input) return;
     input.addEventListener("input", () =>
@@ -2335,6 +2703,17 @@ const bindEvents = () => {
       applyArchitectAdjustments({ commit: true, refreshPanel: true }),
     );
   });
+  [elements.measurementHeight, elements.measurementHeightNumber].forEach(
+    (input) => {
+      if (!input) return;
+      input.addEventListener("input", () =>
+        applyArchitectAdjustments({ commit: false, refreshPanel: false }),
+      );
+      input.addEventListener("change", () =>
+        applyArchitectAdjustments({ commit: true, refreshPanel: true }),
+      );
+    },
+  );
   elements.measurementForm.addEventListener("submit", (event) => {
     event.preventDefault();
     applyArchitectAdjustments({ commit: true, refreshPanel: true });

@@ -47,8 +47,9 @@ create policy "house_state update" on public.house_state
 
 ## Benutzer
 
-- Für **Wolfgang** und **Konstantin** je ein Konto mit E‑Mail/Passwort über die UI erstellen.
-- Neue Nutzer können jederzeit über „Neues Konto“ angelegt werden.
+- Für **Wolfgang** und **Konstantin** je ein Konto mit E-Mail/Passwort über die UI erstellen.
+- Danach in Supabase unter Auth -> Providers -> Email die Selbstregistrierung deaktivieren (Enable Email Signup aus).
+- Neue Nutzer nur noch als Admin im Supabase Dashboard anlegen/einladen. Für spätere Öffnung der Registrierung den Toggle wieder aktivieren.
 
 ## Lokal entwickeln
 
