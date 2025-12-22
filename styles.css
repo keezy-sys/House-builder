@@ -369,12 +369,26 @@ svg {
   color: #b91c1c;
 }
 
+.architect-mode #floorplan {
+  touch-action: none;
+}
+
 .architect-mode .architect-hit {
-  cursor: crosshair;
+  cursor: grab;
   transition:
     stroke 0.12s ease,
     stroke-width 0.12s ease,
     stroke-opacity 0.12s ease;
+}
+
+.architect-dragging .architect-hit {
+  cursor: grabbing;
+}
+
+.architect-mode .architect-hit.selected {
+  stroke: var(--architect-accent);
+  stroke-width: 12;
+  stroke-opacity: 1;
 }
 
 .architect-mode .wall-line.hovered,
@@ -392,6 +406,10 @@ svg {
 .architect-mode .window-marker.hovered {
   stroke: #0ea5e9;
   stroke-width: 10;
+}
+
+.architect-mode .window-marker.selected {
+  stroke: #0ea5e9;
 }
 
 .floorplan-actions {

@@ -95,7 +95,9 @@
         <div class="floorplan-header">
           <div class="floorplan-copy">
             <h2>2D-Grundriss</h2>
-            <p>Bewegen Sie die Maus über einen Raum, um ihn hervorzuheben.</p>
+            <p id="floorplan-hint">
+              Bewegen Sie die Maus über einen Raum, um ihn hervorzuheben.
+            </p>
           </div>
           <div class="floor-switch" aria-label="Etage auswählen">
             <span class="floor-switch__label">Etage</span>
@@ -205,8 +207,8 @@
     <section id="architect-view" class="architect-view" hidden>
       <h2>Architekt-Ansicht</h2>
       <p>
-        Wählen Sie eine Wand, Tür oder ein Fenster im Grundriss, um Maße
-        anzupassen.
+        Ziehen Sie Wände und Türen direkt im Grundriss. Klicken Sie ein Element,
+        um Maße feinzujustieren.
       </p>
 
       <div class="architect-panel">
@@ -240,12 +242,11 @@
               />
             </div>
           </label>
-          <label class="measurement-toggle">
+          <label id="measure-lock-row" class="measurement-toggle">
             <input type="checkbox" id="measure-lock" checked />
-            Wände gekoppelt
+            Angrenzende Räume koppeln
           </label>
-          <p class="helper">Wandhöhe fix: 2800 mm.</p>
-          <button type="submit" class="primary">Übernehmen</button>
+          <p id="measure-note" class="helper">Wandhöhe fix: 2800 mm.</p>
         </form>
         <p id="architect-help" class="helper"></p>
       </div>

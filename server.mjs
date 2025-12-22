@@ -90,7 +90,6 @@ const handleImageGeneration = async (req, res) => {
         model: "gpt-image-1",
         prompt: prompt.trim(),
         size: "1024x1024",
-        response_format: "b64_json",
       }),
     });
   } catch (error) {

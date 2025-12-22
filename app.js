@@ -5,6 +5,10 @@ const floorBounds = { x: 50, y: 50, width: 680, height: 400 };
 const MM_PER_PX = 20;
 const WALL_HEIGHT_MM = 2800;
 const MIN_ROOM_SIZE_PX = 60;
+const MIN_OPENING_SIZE_PX = 30;
+const DRAG_THRESHOLD_PX = 4;
+const DEFAULT_FLOORPLAN_HINT =
+  "Bewegen Sie die Maus über einen Raum, um ihn hervorzuheben.";
 
 const LEGACY_ROOM_IDS = [
   "bedroom-left",
@@ -415,11 +419,27 @@ const state = {
   wallLinkLocked: true,
 };
 
+const dragState = {
+  active: false,
+  didMove: false,
+  suppressClick: false,
+  pointerId: null,
+  type: null,
+  axis: null,
+  startPointerAxis: 0,
+  startPosition: 0,
+  lastPosition: 0,
+  context: null,
+  startClientX: 0,
+  startClientY: 0,
+};
+
 const elements = {
   floorplan: document.getElementById("floorplan"),
   floorSwitch: document.getElementById("floor-toggle"),
   floorSwitchValue: document.getElementById("floor-label"),
   floorplanTitle: document.getElementById("floorplan-title"),
+  floorplanHint: document.getElementById("floorplan-hint"),
   roomTitle: document.getElementById("room-title"),
   roomSubtitle: document.getElementById("room-subtitle"),
   checklist: document.getElementById("checklist"),
@@ -443,6 +463,8 @@ const elements = {
   measurementSpanNumber: document.getElementById("measure-span-number"),
   measurementSpanLabel: document.getElementById("measure-span-label"),
   measurementLock: document.getElementById("measure-lock"),
+  measurementLockRow: document.getElementById("measure-lock-row"),
+  measurementNote: document.getElementById("measure-note"),
   threeDPanel: document.getElementById("three-d-panel"),
   threeDButton: document.getElementById("toggle-3d"),
   threeDLabel: document.getElementById("three-d-label"),
@@ -583,6 +605,21 @@ const findRoomById = (roomId) => {
 const toMm = (px) => Math.round(px * MM_PER_PX);
 const toPx = (mm) => Number(mm) / MM_PER_PX;
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+const getFloorplanPoint = (event) => {
+  const bounds = elements.floorplan.getBoundingClientRect();
+  return {
+    x: ((event.clientX - bounds.left) / bounds.width) * floorplanSize.width,
+    y: ((event.clientY - bounds.top) / bounds.height) * floorplanSize.height,
+  };
+};
+const getInputNumber = (primary, fallback) => {
+  const raw = primary?.value;
+  if (raw === "" || raw === null || raw === undefined) {
+    return Number(fallback?.value);
+  }
+  const value = Number(raw);
+  return Number.isNaN(value) ? Number(fallback?.value) : value;
+};
 
 const rangesOverlap = (startA, endA, startB, endB) =>
   Math.max(startA, startB) <= Math.min(endA, endB);
@@ -637,8 +674,12 @@ const getWallForRoomSide = (room, side) => {
 const getWallMeta = (wall) => {
   const isVertical = wall.x1 === wall.x2;
   const position = isVertical ? wall.x1 : wall.y1;
-  const spanStart = isVertical ? Math.min(wall.y1, wall.y2) : Math.min(wall.x1, wall.x2);
-  const spanEnd = isVertical ? Math.max(wall.y1, wall.y2) : Math.max(wall.x1, wall.x2);
+  const spanStart = isVertical
+    ? Math.min(wall.y1, wall.y2)
+    : Math.min(wall.x1, wall.x2);
+  const spanEnd = isVertical
+    ? Math.max(wall.y1, wall.y2)
+    : Math.max(wall.x1, wall.x2);
   const length = spanEnd - spanStart;
   return {
     orientation: isVertical ? "vertical" : "horizontal",
@@ -655,6 +696,108 @@ const getRoomMeasurements = (room) => ({
   length: toMm(room.height),
   height: WALL_HEIGHT_MM,
 });
+
+const getOpeningMeta = (opening) => {
+  const isVertical = opening.x1 === opening.x2;
+  const position = isVertical
+    ? (opening.y1 + opening.y2) / 2
+    : (opening.x1 + opening.x2) / 2;
+  const length = isVertical
+    ? Math.abs(opening.y2 - opening.y1)
+    : Math.abs(opening.x2 - opening.x1);
+  return {
+    axis: isVertical ? "y" : "x",
+    position,
+    length,
+  };
+};
+
+const getOpeningWallSide = (opening, room) => {
+  if (!room) return null;
+  const tolerance = 0.5;
+  if (opening.x1 === opening.x2) {
+    if (Math.abs(opening.x1 - room.x) <= tolerance) return "left";
+    if (Math.abs(opening.x1 - (room.x + room.width)) <= tolerance)
+      return "right";
+  } else {
+    if (Math.abs(opening.y1 - room.y) <= tolerance) return "top";
+    if (Math.abs(opening.y1 - (room.y + room.height)) <= tolerance)
+      return "bottom";
+  }
+  return null;
+};
+
+const getOpeningBoundsForWall = (room, wallSide, axis) => {
+  if (!room || !wallSide) {
+    return axis === "x"
+      ? { start: floorBounds.x, end: floorBounds.x + floorBounds.width }
+      : { start: floorBounds.y, end: floorBounds.y + floorBounds.height };
+  }
+  if (wallSide === "top" || wallSide === "bottom") {
+    return { start: room.x, end: room.x + room.width };
+  }
+  return { start: room.y, end: room.y + room.height };
+};
+
+const getOpeningPositionBounds = (bounds, length) => {
+  const half = length / 2;
+  return {
+    min: bounds.start + half,
+    max: bounds.end - half,
+  };
+};
+
+const updateOpeningGeometry = (opening, axis, center, length) => {
+  const half = length / 2;
+  if (axis === "x") {
+    opening.x1 = center - half;
+    opening.x2 = center + half;
+    return;
+  }
+  opening.y1 = center - half;
+  opening.y2 = center + half;
+};
+
+const getWallSelectionData = (selection) => {
+  if (!selection || selection.elementType !== "wall") return null;
+  const floor = state.floorPlans[selection.floorId] || getActiveFloor();
+  const room = floor.rooms.find((item) => item.id === selection.roomId);
+  if (!room) return null;
+  const wall = getWallForRoomSide(room, selection.wallSide);
+  if (!wall) return null;
+  const wallMeta = getWallMeta(wall);
+  const affectedRooms = state.wallLinkLocked
+    ? getRoomsSharingWall(floor, wallMeta)
+    : [{ room, edge: selection.wallSide }];
+  const constraints = getPositionConstraints(floor, wallMeta, affectedRooms);
+  return { floor, room, wallMeta, affectedRooms, constraints };
+};
+
+const getOpeningSelectionData = (selection) => {
+  if (!selection || selection.elementType === "wall") return null;
+  const floor = state.floorPlans[selection.floorId] || getActiveFloor();
+  const opening = floor.openings.find((item) => item.id === selection.openingId);
+  if (!opening) return null;
+  const room = floor.rooms.find((item) => item.id === opening.roomId);
+  const meta = getOpeningMeta(opening);
+  const wallSide = getOpeningWallSide(opening, room);
+  const bounds = getOpeningBoundsForWall(room, wallSide, meta.axis);
+  const span = Math.max(0, bounds.end - bounds.start);
+  const minLength = Math.min(MIN_OPENING_SIZE_PX, span);
+  const maxLength = Math.max(minLength, span);
+  const clampedLength = clamp(meta.length, minLength, maxLength);
+  const positionBounds = getOpeningPositionBounds(bounds, clampedLength);
+  return {
+    floor,
+    room,
+    opening,
+    meta: { ...meta, length: clampedLength },
+    bounds,
+    minLength,
+    maxLength,
+    positionBounds,
+  };
+};
 
 const getRoomsSharingWall = (floor, wallMeta) => {
   const matches = [];
@@ -1145,7 +1288,15 @@ const renderFloorplan = () => {
       line.setAttribute("y1", wall.y1);
       line.setAttribute("x2", wall.x2);
       line.setAttribute("y2", wall.y2);
-      line.setAttribute("class", "wall-line architect-hit");
+      const isSelected =
+        state.selectedElement?.elementType === "wall" &&
+        state.selectedElement?.roomId === room.id &&
+        state.selectedElement?.wallSide === wall.side &&
+        state.selectedElement?.floorId === floor.id;
+      line.setAttribute(
+        "class",
+        `wall-line architect-hit${isSelected ? " selected" : ""}`,
+      );
       line.dataset.roomId = room.id;
       line.dataset.floorId = floor.id;
       line.dataset.elementType = "wall";
@@ -1161,14 +1312,18 @@ const renderFloorplan = () => {
     line.setAttribute("y1", opening.y1);
     line.setAttribute("x2", opening.x2);
     line.setAttribute("y2", opening.y2);
+    const isSelected =
+      state.selectedElement?.openingId === opening.id &&
+      state.selectedElement?.floorId === floor.id;
     line.setAttribute(
       "class",
-      `${opening.type === "door" ? "door-marker" : "window-marker"} architect-hit`,
+      `${opening.type === "door" ? "door-marker" : "window-marker"} architect-hit${isSelected ? " selected" : ""}`,
     );
     line.dataset.roomId = opening.roomId;
     line.dataset.floorId = floor.id;
     line.dataset.elementType = opening.type;
     line.dataset.elementLabel = opening.label;
+    line.dataset.openingId = opening.id;
     elements.floorplan.appendChild(line);
   });
 
@@ -1284,105 +1439,162 @@ const renderArchitectPanel = () => {
   if (!state.isArchitectMode || !state.selectedElement) {
     elements.architectTitle.textContent = "Element wählen";
     if (elements.architectHelp) {
-      elements.architectHelp.textContent = "";
+      elements.architectHelp.textContent =
+        "Wand oder Tür im Grundriss ziehen, um zu starten.";
     }
     elements.measurementForm.hidden = true;
     return;
   }
 
-  const { roomId, label, elementType, wallSide, floorId } = state.selectedElement;
+  const { label, elementType } = state.selectedElement;
   elements.architectTitle.textContent = label;
 
-  if (elementType !== "wall") {
-    if (elements.architectHelp) {
-      elements.architectHelp.textContent =
-        "Maße sind aktuell nur für Wände verfügbar.";
+  if (elementType === "wall") {
+    const wallData = getWallSelectionData(state.selectedElement);
+    if (!wallData) {
+      elements.measurementForm.hidden = true;
+      return;
     }
+
+    const { room, wallMeta, constraints } = wallData;
+    const positionPx = clamp(wallMeta.position, constraints.min, constraints.max);
+
+    const axisLabel =
+      wallMeta.orientation === "vertical"
+        ? "X-Position der Wand (mm)"
+        : "Y-Position der Wand (mm)";
+    const spanLabel =
+      wallMeta.orientation === "vertical"
+        ? "Y-Länge der Wand (mm)"
+        : "X-Länge der Wand (mm)";
+
+    const positionMinMm = toMm(constraints.min);
+    const positionMaxMm = toMm(constraints.max);
+    const positionMm = toMm(positionPx);
+
+    const lengthMinMm = toMm(MIN_ROOM_SIZE_PX);
+    const lengthMaxPx =
+      wallMeta.orientation === "vertical"
+        ? floorBounds.y + floorBounds.height - room.y
+        : floorBounds.x + floorBounds.width - room.x;
+    const lengthMaxMm = toMm(lengthMaxPx);
+    const lengthMm = toMm(wallMeta.length);
+
+    const positionEditable = constraints.min !== constraints.max;
+    if (elements.measurementAxisLabel) {
+      elements.measurementAxisLabel.textContent = axisLabel;
+    }
+    if (elements.measurementSpanLabel) {
+      elements.measurementSpanLabel.textContent = spanLabel;
+    }
+    if (elements.measurementLock) {
+      elements.measurementLock.checked = state.wallLinkLocked;
+    }
+    if (elements.measurementLockRow) {
+      elements.measurementLockRow.hidden = false;
+    }
+    if (elements.measurementNote) {
+      elements.measurementNote.hidden = false;
+      elements.measurementNote.textContent = `Wandhöhe fix: ${WALL_HEIGHT_MM} mm.`;
+    }
+    if (elements.architectHelp) {
+      elements.architectHelp.textContent = !positionEditable
+        ? "Außenwände sind fixiert. Wählen Sie eine Innenwand für Änderungen."
+        : state.wallLinkLocked
+        ? "Wand gekoppelt: Bewegung passt angrenzende Räume an. Änderungen erscheinen sofort."
+        : "Kopplung gelöst: Änderungen wirken nur auf diesen Raum. Änderungen erscheinen sofort.";
+    }
+
+    elements.measurementAxis.min = positionMinMm;
+    elements.measurementAxis.max = positionMaxMm;
+    elements.measurementAxis.step = MM_PER_PX;
+    elements.measurementAxis.value = positionMm;
+    elements.measurementAxis.disabled = !positionEditable;
+
+    elements.measurementAxisNumber.min = positionMinMm;
+    elements.measurementAxisNumber.max = positionMaxMm;
+    elements.measurementAxisNumber.step = MM_PER_PX;
+    elements.measurementAxisNumber.value = positionMm;
+    elements.measurementAxisNumber.disabled = !positionEditable;
+
+    elements.measurementSpan.min = lengthMinMm;
+    elements.measurementSpan.max = lengthMaxMm;
+    elements.measurementSpan.step = MM_PER_PX;
+    elements.measurementSpan.value = lengthMm;
+    elements.measurementSpan.disabled = state.wallLinkLocked;
+
+    elements.measurementSpanNumber.min = lengthMinMm;
+    elements.measurementSpanNumber.max = lengthMaxMm;
+    elements.measurementSpanNumber.step = MM_PER_PX;
+    elements.measurementSpanNumber.value = lengthMm;
+    elements.measurementSpanNumber.disabled = state.wallLinkLocked;
+
+    elements.measurementForm.hidden = false;
+    return;
+  }
+
+  const openingData = getOpeningSelectionData(state.selectedElement);
+  if (!openingData) {
     elements.measurementForm.hidden = true;
     return;
   }
 
-  const floor = state.floorPlans[floorId] || getActiveFloor();
-  const room = floor.rooms.find((item) => item.id === roomId);
-  if (!room) {
-    elements.measurementForm.hidden = true;
-    return;
-  }
-
-  const wall = getWallForRoomSide(room, wallSide);
-  if (!wall) {
-    elements.measurementForm.hidden = true;
-    return;
-  }
-  const wallMeta = getWallMeta(wall);
-  const affectedRooms = state.wallLinkLocked
-    ? getRoomsSharingWall(floor, wallMeta)
-    : [{ room, edge: wallSide }];
-  const { min, max } = getPositionConstraints(floor, wallMeta, affectedRooms);
-  const positionPx = clamp(wallMeta.position, min, max);
-
+  const { meta, minLength, maxLength, positionBounds } = openingData;
   const axisLabel =
-    wallMeta.orientation === "vertical"
-      ? "X-Position der Wand (mm)"
-      : "Y-Position der Wand (mm)";
+    meta.axis === "x"
+      ? "Mitte der Öffnung (X, mm)"
+      : "Mitte der Öffnung (Y, mm)";
   const spanLabel =
-    wallMeta.orientation === "vertical"
-      ? "Y-Länge der Wand (mm)"
-      : "X-Länge der Wand (mm)";
+    elementType === "door" ? "Türbreite (mm)" : "Fensterbreite (mm)";
 
-  const positionMinMm = toMm(min);
-  const positionMaxMm = toMm(max);
-  const positionMm = toMm(positionPx);
+  const positionMinMm = toMm(positionBounds.min);
+  const positionMaxMm = toMm(positionBounds.max);
+  const positionMm = toMm(clamp(meta.position, positionBounds.min, positionBounds.max));
 
-  const lengthMinMm = toMm(MIN_ROOM_SIZE_PX);
-  const lengthMaxPx =
-    wallMeta.orientation === "vertical"
-      ? floorBounds.y + floorBounds.height - room.y
-      : floorBounds.x + floorBounds.width - room.x;
-  const lengthMaxMm = toMm(lengthMaxPx);
-  const lengthMm = toMm(wallMeta.length);
+  const lengthMinMm = toMm(minLength);
+  const lengthMaxMm = toMm(maxLength);
+  const lengthMm = toMm(meta.length);
 
-  const positionEditable = min !== max;
   if (elements.measurementAxisLabel) {
     elements.measurementAxisLabel.textContent = axisLabel;
   }
   if (elements.measurementSpanLabel) {
     elements.measurementSpanLabel.textContent = spanLabel;
   }
-  if (elements.measurementLock) {
-    elements.measurementLock.checked = state.wallLinkLocked;
+  if (elements.measurementLockRow) {
+    elements.measurementLockRow.hidden = true;
+  }
+  if (elements.measurementNote) {
+    elements.measurementNote.hidden = true;
   }
   if (elements.architectHelp) {
-    elements.architectHelp.textContent = !positionEditable
-      ? "Außenwände sind fixiert und können nicht verschoben werden."
-      : state.wallLinkLocked
-      ? "Wände sind gekoppelt: Position verschiebt angrenzende Räume."
-      : "Kopplung gelöst: Änderungen wirken nur auf diese Wand.";
+    elements.architectHelp.textContent =
+      "Öffnung entlang der Wand ziehen oder Werte direkt eingeben. Änderungen erscheinen sofort.";
   }
 
   elements.measurementAxis.min = positionMinMm;
   elements.measurementAxis.max = positionMaxMm;
   elements.measurementAxis.step = MM_PER_PX;
   elements.measurementAxis.value = positionMm;
-  elements.measurementAxis.disabled = !positionEditable;
+  elements.measurementAxis.disabled = false;
 
   elements.measurementAxisNumber.min = positionMinMm;
   elements.measurementAxisNumber.max = positionMaxMm;
   elements.measurementAxisNumber.step = MM_PER_PX;
   elements.measurementAxisNumber.value = positionMm;
-  elements.measurementAxisNumber.disabled = !positionEditable;
+  elements.measurementAxisNumber.disabled = false;
 
   elements.measurementSpan.min = lengthMinMm;
   elements.measurementSpan.max = lengthMaxMm;
   elements.measurementSpan.step = MM_PER_PX;
   elements.measurementSpan.value = lengthMm;
-  elements.measurementSpan.disabled = state.wallLinkLocked;
+  elements.measurementSpan.disabled = false;
 
   elements.measurementSpanNumber.min = lengthMinMm;
   elements.measurementSpanNumber.max = lengthMaxMm;
   elements.measurementSpanNumber.step = MM_PER_PX;
   elements.measurementSpanNumber.value = lengthMm;
-  elements.measurementSpanNumber.disabled = state.wallLinkLocked;
+  elements.measurementSpanNumber.disabled = false;
 
   elements.measurementForm.hidden = false;
 };
@@ -1410,12 +1622,48 @@ const clearHoverState = () => {
     .forEach((el) => el.classList.remove("hovered"));
 };
 
+const setArchitectDragging = (isDragging) => {
+  document.body.classList.toggle("architect-dragging", isDragging);
+};
+
+const resetDragState = ({ keepSuppressClick = false } = {}) => {
+  if (dragState.pointerId !== null) {
+    try {
+      elements.floorplan.releasePointerCapture(dragState.pointerId);
+    } catch {
+      // Ignore release failures when pointer capture is already cleared.
+    }
+  }
+  dragState.active = false;
+  dragState.didMove = false;
+  if (!keepSuppressClick) {
+    dragState.suppressClick = false;
+  }
+  dragState.pointerId = null;
+  dragState.type = null;
+  dragState.axis = null;
+  dragState.startPointerAxis = 0;
+  dragState.startPosition = 0;
+  dragState.lastPosition = 0;
+  dragState.context = null;
+  dragState.startClientX = 0;
+  dragState.startClientY = 0;
+  setArchitectDragging(false);
+};
+
 const setArchitectMode = (isOn) => {
   state.isArchitectMode = isOn;
   elements.architectView.hidden = !isOn;
   state.selectedElement = null;
   document.body.classList.toggle("architect-mode", isOn);
+  resetDragState();
   clearHoverState();
+  renderFloorplan();
+  if (elements.floorplanHint) {
+    elements.floorplanHint.textContent = isOn
+      ? "Architekt-Ansicht: Wände und Türen im Grundriss ziehen."
+      : DEFAULT_FLOORPLAN_HINT;
+  }
   renderArchitectPanel();
 };
 
@@ -1462,6 +1710,7 @@ const selectArchitectElement = (target) => {
   const elementType = target.dataset.elementType || "element";
   const wallSide = target.dataset.wallSide || null;
   const floorId = target.dataset.floorId || state.activeFloorId;
+  const openingId = target.dataset.openingId || null;
   if (!roomId) {
     return;
   }
@@ -1473,8 +1722,16 @@ const selectArchitectElement = (target) => {
     renderRoomPanel();
     renderFloorplan();
   }
-  state.selectedElement = { roomId, label, elementType, wallSide, floorId };
+  state.selectedElement = {
+    roomId,
+    label,
+    elementType,
+    wallSide,
+    floorId,
+    openingId,
+  };
   renderArchitectPanel();
+  return state.selectedElement;
 };
 
 const handleAddComment = (event) => {
@@ -1482,11 +1739,7 @@ const handleAddComment = (event) => {
     return;
   }
 
-  const bounds = elements.floorplan.getBoundingClientRect();
-  const x =
-    ((event.clientX - bounds.left) / bounds.width) * floorplanSize.width;
-  const y =
-    ((event.clientY - bounds.top) / bounds.height) * floorplanSize.height;
+  const { x, y } = getFloorplanPoint(event);
 
   const room = findRoomById(state.activeRoomId);
   if (!room) {
@@ -1731,60 +1984,219 @@ const handleUploadImage = (event) => {
   reader.readAsDataURL(file);
 };
 
-const handleMeasurementSubmit = (event) => {
-  event.preventDefault();
-  if (!state.selectedElement || state.selectedElement.elementType !== "wall") {
+const applyArchitectAdjustments = ({
+  commit = false,
+  refreshPanel = false,
+} = {}) => {
+  if (!state.selectedElement) return;
+
+  if (state.selectedElement.elementType === "wall") {
+    const wallData = getWallSelectionData(state.selectedElement);
+    if (!wallData) return;
+
+    const { floor, room, wallMeta, affectedRooms, constraints } = wallData;
+    const oldPosition = wallMeta.position;
+    const newPosition = clamp(
+      toPx(getInputNumber(elements.measurementAxisNumber, elements.measurementAxis)),
+      constraints.min,
+      constraints.max,
+    );
+
+    let changed = false;
+    if (Math.abs(newPosition - oldPosition) > 0.01) {
+      applyWallPosition(floor, wallMeta, affectedRooms, newPosition);
+      updateOpeningsForWallMove(floor, wallMeta, oldPosition, newPosition);
+      changed = true;
+    }
+
+    if (!state.wallLinkLocked) {
+      const maxLengthPx =
+        wallMeta.orientation === "vertical"
+          ? floorBounds.y + floorBounds.height - room.y
+          : floorBounds.x + floorBounds.width - room.x;
+      const newLength = clamp(
+        toPx(
+          getInputNumber(elements.measurementSpanNumber, elements.measurementSpan),
+        ),
+        MIN_ROOM_SIZE_PX,
+        maxLengthPx,
+      );
+      if (Math.abs(newLength - wallMeta.length) > 0.01) {
+        applyWallLength(room, wallMeta, newLength);
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      renderFloorplan();
+      renderRoomPanel();
+      update3DBox(room.id);
+    }
+    if (refreshPanel) {
+      renderArchitectPanel();
+    }
+    if (commit && changed) {
+      saveState();
+    }
     return;
   }
-  const { roomId, wallSide, floorId } = state.selectedElement;
-  const floor = state.floorPlans[floorId] || getActiveFloor();
-  const room = floor.rooms.find((item) => item.id === roomId);
-  if (!room) {
-    return;
-  }
-  const wall = getWallForRoomSide(room, wallSide);
-  if (!wall) {
-    return;
-  }
-  const wallMeta = getWallMeta(wall);
-  const affectedRooms = state.wallLinkLocked
-    ? getRoomsSharingWall(floor, wallMeta)
-    : [{ room, edge: wallSide }];
-  const { min, max } = getPositionConstraints(floor, wallMeta, affectedRooms);
-  const oldPosition = wallMeta.position;
-  const newPosition = clamp(
-    toPx(elements.measurementAxisNumber.value || elements.measurementAxis.value),
-    min,
-    max,
+
+  const openingData = getOpeningSelectionData(state.selectedElement);
+  if (!openingData) return;
+
+  const { opening, meta, bounds, minLength, maxLength } = openingData;
+  const newLength = clamp(
+    toPx(getInputNumber(elements.measurementSpanNumber, elements.measurementSpan)),
+    minLength,
+    maxLength,
+  );
+  const positionBounds = getOpeningPositionBounds(bounds, newLength);
+  const newCenter = clamp(
+    toPx(getInputNumber(elements.measurementAxisNumber, elements.measurementAxis)),
+    positionBounds.min,
+    positionBounds.max,
   );
 
-  if (Math.abs(newPosition - oldPosition) > 0.01) {
-    applyWallPosition(floor, wallMeta, affectedRooms, newPosition);
-    updateOpeningsForWallMove(floor, wallMeta, oldPosition, newPosition);
+  const changed =
+    Math.abs(newCenter - meta.position) > 0.01 ||
+    Math.abs(newLength - meta.length) > 0.01;
+  if (changed) {
+    updateOpeningGeometry(opening, meta.axis, newCenter, newLength);
+    renderFloorplan();
+  }
+  if (refreshPanel) {
+    renderArchitectPanel();
+  }
+  if (commit && changed) {
+    saveState();
+  }
+};
+
+const startArchitectDrag = (event, target) => {
+  if (!state.isArchitectMode || !target.classList.contains("architect-hit")) {
+    return;
   }
 
-  if (!state.wallLinkLocked) {
-    const maxLengthPx =
-      wallMeta.orientation === "vertical"
-        ? floorBounds.y + floorBounds.height - room.y
-        : floorBounds.x + floorBounds.width - room.x;
-    const newLength = clamp(
-      toPx(
-        elements.measurementSpanNumber.value || elements.measurementSpan.value,
-      ),
-      MIN_ROOM_SIZE_PX,
-      maxLengthPx,
+  const selection = selectArchitectElement(target) || state.selectedElement;
+  if (!selection) return;
+
+  const pointer = getFloorplanPoint(event);
+
+  if (selection.elementType === "wall") {
+    const wallData = getWallSelectionData(selection);
+    if (!wallData) return;
+    if (wallData.constraints.min === wallData.constraints.max) {
+      return;
+    }
+    dragState.active = true;
+    dragState.type = "wall";
+    dragState.axis = wallData.wallMeta.axis;
+    dragState.startPointerAxis =
+      dragState.axis === "x" ? pointer.x : pointer.y;
+    dragState.startPosition = wallData.wallMeta.position;
+    dragState.lastPosition = wallData.wallMeta.position;
+    dragState.context = wallData;
+  } else {
+    const openingData = getOpeningSelectionData(selection);
+    if (!openingData) return;
+    dragState.active = true;
+    dragState.type = "opening";
+    dragState.axis = openingData.meta.axis;
+    dragState.startPointerAxis =
+      dragState.axis === "x" ? pointer.x : pointer.y;
+    dragState.startPosition = openingData.meta.position;
+    dragState.lastPosition = openingData.meta.position;
+    dragState.context = openingData;
+  }
+
+  dragState.startClientX = event.clientX;
+  dragState.startClientY = event.clientY;
+  dragState.didMove = false;
+  dragState.pointerId = event.pointerId;
+  dragState.suppressClick = false;
+  elements.floorplan.setPointerCapture(event.pointerId);
+  setArchitectDragging(true);
+};
+
+const handleArchitectPointerMove = (event) => {
+  if (!dragState.active || event.pointerId !== dragState.pointerId) return;
+
+  const pointer = getFloorplanPoint(event);
+  const axisValue = dragState.axis === "x" ? pointer.x : pointer.y;
+  const delta = axisValue - dragState.startPointerAxis;
+  const movedDistance = Math.hypot(
+    event.clientX - dragState.startClientX,
+    event.clientY - dragState.startClientY,
+  );
+  if (!dragState.didMove) {
+    if (movedDistance < DRAG_THRESHOLD_PX) {
+      return;
+    }
+    dragState.didMove = true;
+  }
+
+  if (dragState.type === "wall") {
+    const { floor, wallMeta, affectedRooms, constraints } = dragState.context;
+    const newPosition = clamp(
+      dragState.startPosition + delta,
+      constraints.min,
+      constraints.max,
     );
-    if (Math.abs(newLength - wallMeta.length) > 0.01) {
-      applyWallLength(room, wallMeta, newLength);
+    if (Math.abs(newPosition - dragState.lastPosition) < 0.1) return;
+    applyWallPosition(floor, wallMeta, affectedRooms, newPosition);
+    updateOpeningsForWallMove(
+      floor,
+      wallMeta,
+      dragState.lastPosition,
+      newPosition,
+    );
+    dragState.lastPosition = newPosition;
+  } else if (dragState.type === "opening") {
+    const { opening, meta, bounds } = dragState.context;
+    const positionBounds = getOpeningPositionBounds(bounds, meta.length);
+    const newCenter = clamp(
+      dragState.startPosition + delta,
+      positionBounds.min,
+      positionBounds.max,
+    );
+    if (Math.abs(newCenter - dragState.lastPosition) < 0.1) return;
+    updateOpeningGeometry(opening, meta.axis, newCenter, meta.length);
+    dragState.lastPosition = newCenter;
+  }
+
+  renderFloorplan();
+};
+
+const finishArchitectDrag = () => {
+  if (!dragState.active) return;
+  if (dragState.pointerId !== null) {
+    try {
+      elements.floorplan.releasePointerCapture(dragState.pointerId);
+    } catch {
+      // Ignore release failures when pointer capture is already cleared.
     }
   }
 
-  saveState();
-  renderFloorplan();
-  renderRoomPanel();
-  renderArchitectPanel();
-  update3DBox(room.id);
+  if (dragState.didMove) {
+    saveState();
+    renderFloorplan();
+    renderArchitectPanel();
+    if (dragState.type === "wall") {
+      const roomId = dragState.context?.room?.id;
+      if (roomId) {
+        renderRoomPanel();
+        update3DBox(roomId);
+      }
+    }
+  }
+
+  dragState.suppressClick = dragState.didMove;
+  resetDragState({ keepSuppressClick: true });
+  if (dragState.suppressClick) {
+    window.setTimeout(() => {
+      dragState.suppressClick = false;
+    }, 0);
+  }
 };
 
 const syncRangeNumber = (rangeEl, numberEl) => {
@@ -1806,6 +2218,10 @@ const syncRangeNumber = (rangeEl, numberEl) => {
 const bindEvents = () => {
   elements.floorplan.addEventListener("click", (event) => {
     const target = event.target;
+    if (dragState.suppressClick) {
+      dragState.suppressClick = false;
+      return;
+    }
     if (state.isArchitectMode) {
       if (target.classList.contains("architect-hit")) {
         selectArchitectElement(target);
@@ -1822,6 +2238,18 @@ const bindEvents = () => {
       selectRoom(target.dataset.roomId);
     }
   });
+
+  elements.floorplan.addEventListener("pointerdown", (event) => {
+    if (!state.isArchitectMode) return;
+    const target = event.target;
+    if (!target.classList.contains("architect-hit")) return;
+    event.preventDefault();
+    startArchitectDrag(event, target);
+  });
+
+  elements.floorplan.addEventListener("pointermove", handleArchitectPointerMove);
+  elements.floorplan.addEventListener("pointerup", finishArchitectDrag);
+  elements.floorplan.addEventListener("pointercancel", finishArchitectDrag);
 
   elements.floorplan.addEventListener("mouseover", (event) => {
     if (!state.isArchitectMode) return;
@@ -1889,8 +2317,28 @@ const bindEvents = () => {
   }
   syncRangeNumber(elements.measurementAxis, elements.measurementAxisNumber);
   syncRangeNumber(elements.measurementSpan, elements.measurementSpanNumber);
-
-  elements.measurementForm.addEventListener("submit", handleMeasurementSubmit);
+  [elements.measurementAxis, elements.measurementAxisNumber].forEach((input) => {
+    if (!input) return;
+    input.addEventListener("input", () =>
+      applyArchitectAdjustments({ commit: false, refreshPanel: false }),
+    );
+    input.addEventListener("change", () =>
+      applyArchitectAdjustments({ commit: true, refreshPanel: true }),
+    );
+  });
+  [elements.measurementSpan, elements.measurementSpanNumber].forEach((input) => {
+    if (!input) return;
+    input.addEventListener("input", () =>
+      applyArchitectAdjustments({ commit: false, refreshPanel: false }),
+    );
+    input.addEventListener("change", () =>
+      applyArchitectAdjustments({ commit: true, refreshPanel: true }),
+    );
+  });
+  elements.measurementForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    applyArchitectAdjustments({ commit: true, refreshPanel: true });
+  });
 };
 
 const init = () => {
