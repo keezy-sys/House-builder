@@ -52,12 +52,19 @@ const getOpeningHeightBoundsMm = (type) => {
 };
 
 const applyOpeningDefaults = (openings) =>
-  openings.map((opening) => ({
-    ...opening,
-    heightMm: Number.isFinite(opening.heightMm)
-      ? opening.heightMm
-      : getDefaultOpeningHeightMm(opening.type),
-  }));
+  openings.map((opening) => {
+    const normalized = {
+      ...opening,
+      heightMm: Number.isFinite(opening.heightMm)
+        ? opening.heightMm
+        : getDefaultOpeningHeightMm(opening.type),
+    };
+    if (opening.type === "door") {
+      normalized.showSwing =
+        typeof opening.showSwing === "boolean" ? opening.showSwing : true;
+    }
+    return normalized;
+  });
 
 const buildDefaultFloorPlans = () => ({
   ground: {
@@ -493,6 +500,8 @@ const elements = {
   measurementHeightNumber: document.getElementById("measure-height-number"),
   measurementHeightLabel: document.getElementById("measure-height-label"),
   measurementHeightRow: document.getElementById("measure-height-row"),
+  measurementSwing: document.getElementById("measure-swing"),
+  measurementSwingRow: document.getElementById("measure-swing-row"),
   measurementLock: document.getElementById("measure-lock"),
   measurementLockRow: document.getElementById("measure-lock-row"),
   measurementNote: document.getElementById("measure-note"),
@@ -613,6 +622,9 @@ const normalizeOpenings = (floorPlans) => {
     floor.openings.forEach((opening) => {
       if (!Number.isFinite(opening.heightMm)) {
         opening.heightMm = getDefaultOpeningHeightMm(opening.type);
+      }
+      if (opening.type === "door" && typeof opening.showSwing !== "boolean") {
+        opening.showSwing = true;
       }
     });
   });
@@ -1411,9 +1423,12 @@ const getOffsetLineCoords = (data, offset) => {
   };
 };
 
-const appendDoorSymbol = (group, data) => {
+const appendDoorSymbol = (group, data, showSwing = true) => {
   const frameCoords = getOffsetLineCoords(data, OPENING_INSET_PX);
   group.appendChild(createSvgLine(frameCoords, "door-frame"));
+  if (!showSwing) {
+    return;
+  }
 
   const hinge =
     data.axis === "x"
@@ -1488,7 +1503,8 @@ const createOpeningGroup = (opening, room, floorId, isSelected) => {
 
   const renderData = getOpeningRenderData(opening, room);
   if (opening.type === "door") {
-    appendDoorSymbol(group, renderData);
+    const showSwing = opening.showSwing !== false;
+    appendDoorSymbol(group, renderData, showSwing);
   } else {
     appendWindowSymbol(group, renderData);
   }
@@ -1788,6 +1804,9 @@ const renderArchitectPanel = () => {
     if (elements.measurementHeightRow) {
       elements.measurementHeightRow.hidden = true;
     }
+    if (elements.measurementSwingRow) {
+      elements.measurementSwingRow.hidden = true;
+    }
     if (elements.measurementNote) {
       elements.measurementNote.hidden = false;
       elements.measurementNote.textContent = `Wandhöhe fix: ${WALL_HEIGHT_MM} mm.`;
@@ -1858,6 +1877,9 @@ const renderArchitectPanel = () => {
     heightBounds.max,
   );
   openingData.opening.heightMm = heightMm;
+  if (elementType === "door" && typeof openingData.opening.showSwing !== "boolean") {
+    openingData.opening.showSwing = true;
+  }
 
   if (elements.measurementAxisLabel) {
     elements.measurementAxisLabel.textContent = axisLabel;
@@ -1873,6 +1895,9 @@ const renderArchitectPanel = () => {
   }
   if (elements.measurementHeightRow) {
     elements.measurementHeightRow.hidden = false;
+  }
+  if (elements.measurementSwingRow) {
+    elements.measurementSwingRow.hidden = elementType !== "door";
   }
   if (elements.measurementNote) {
     elements.measurementNote.hidden = true;
@@ -1920,6 +1945,11 @@ const renderArchitectPanel = () => {
     elements.measurementHeightNumber.step = OPENING_HEIGHT_STEP_MM;
     elements.measurementHeightNumber.value = heightMm;
     elements.measurementHeightNumber.disabled = false;
+  }
+
+  if (elements.measurementSwing) {
+    elements.measurementSwing.checked = openingData.opening.showSwing !== false;
+    elements.measurementSwing.disabled = elementType !== "door";
   }
 
   elements.measurementForm.hidden = false;
@@ -2391,12 +2421,29 @@ const applyArchitectAdjustments = ({
     heightBounds.max,
   );
 
+  const wantsSwing =
+    opening.type === "door" && elements.measurementSwing
+      ? elements.measurementSwing.checked
+      : opening.showSwing !== false;
+
   const geometryChanged =
     Math.abs(newCenter - meta.position) > 0.01 ||
     Math.abs(newLength - meta.length) > 0.01;
+  const swingChanged =
+    opening.type === "door" &&
+    typeof wantsSwing === "boolean" &&
+    wantsSwing !== (opening.showSwing !== false);
+  let needsRender = false;
   if (geometryChanged) {
     const wallPosition = meta.axis === "x" ? opening.y1 : opening.x1;
     setOpeningOnWall(opening, meta.axis, wallPosition, newCenter, newLength);
+    needsRender = true;
+  }
+  if (swingChanged) {
+    opening.showSwing = wantsSwing;
+    needsRender = true;
+  }
+  if (needsRender) {
     renderFloorplan();
   }
   const heightChanged = Math.abs(newHeight - opening.heightMm) > 0.5;
@@ -2406,7 +2453,7 @@ const applyArchitectAdjustments = ({
   if (refreshPanel) {
     renderArchitectPanel();
   }
-  if (commit && (geometryChanged || heightChanged)) {
+  if (commit && (geometryChanged || heightChanged || swingChanged)) {
     saveState();
   }
 };
@@ -2714,6 +2761,11 @@ const bindEvents = () => {
       );
     },
   );
+  if (elements.measurementSwing) {
+    elements.measurementSwing.addEventListener("change", () =>
+      applyArchitectAdjustments({ commit: true, refreshPanel: true }),
+    );
+  }
   elements.measurementForm.addEventListener("submit", (event) => {
     event.preventDefault();
     applyArchitectAdjustments({ commit: true, refreshPanel: true });
