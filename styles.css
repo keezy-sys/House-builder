@@ -387,31 +387,47 @@ svg {
 
 .opening-group .door-leaf {
   stroke: var(--opening-ink);
-  stroke-width: 2.4;
+  stroke-width: 2.2;
   stroke-linecap: round;
+  opacity: 0.82;
 }
 
 .opening-group .door-arc {
   stroke: var(--opening-ink-light);
-  stroke-width: 1.6;
-  stroke-dasharray: 4 4;
+  stroke-width: 1.2;
+  stroke-dasharray: 6 6;
+  stroke-linecap: round;
   fill: none;
+  opacity: 0.3;
 }
 
 .opening-group .door-hinge {
   fill: var(--opening-ink);
+  opacity: 0.7;
 }
 
 .opening-group .window-line {
   stroke: var(--opening-ink-soft);
-  stroke-width: 2;
+  stroke-width: 1.8;
   stroke-linecap: round;
+  opacity: 0.85;
 }
 
 .opening-group .window-cross {
   stroke: var(--opening-ink-light);
-  stroke-width: 1.4;
+  stroke-width: 1.2;
   stroke-linecap: round;
+  opacity: 0.45;
+}
+
+.opening-group .door-leaf,
+.opening-group .door-arc,
+.opening-group .door-hinge,
+.opening-group .window-line,
+.opening-group .window-cross {
+  transition:
+    opacity 0.18s ease,
+    stroke 0.18s ease;
 }
 
 .status-line {
@@ -466,6 +482,7 @@ svg {
 .architect-mode .opening-group.hovered .window-line,
 .architect-mode .opening-group.selected .window-line {
   stroke: var(--architect-accent);
+  opacity: 1;
 }
 
 .architect-mode .opening-group.hovered .door-arc,
@@ -473,6 +490,7 @@ svg {
 .architect-mode .opening-group.hovered .window-cross,
 .architect-mode .opening-group.selected .window-cross {
   stroke: var(--architect-accent);
+  opacity: 0.75;
 }
 
 .architect-mode .opening-group.hovered .opening-hit,

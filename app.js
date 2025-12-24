@@ -270,7 +270,7 @@ const TASK_VIEW_PRESETS = {
   },
 };
 
-const ROOM_TABS = ["overview", "tasks", "evidence"];
+const ROOM_TABS = ["overview", "tasks", "inspiration", "decisions"];
 const APP_VIEWS = ["room", "tasks"];
 const IMAGE_PIN_SURFACE_LABELS = {
   "wall-north": "Wand Nord",
@@ -323,7 +323,7 @@ const applyOpeningDefaults = (openings) =>
     };
     if (opening.type === "door") {
       normalized.showSwing =
-        typeof opening.showSwing === "boolean" ? opening.showSwing : true;
+        typeof opening.showSwing === "boolean" ? opening.showSwing : false;
     }
     return normalized;
   });
@@ -1405,7 +1405,7 @@ const normalizeOpenings = (floorPlans) => {
         opening.heightMm = getDefaultOpeningHeightMm(opening.type);
       }
       if (opening.type === "door" && typeof opening.showSwing !== "boolean") {
-        opening.showSwing = true;
+        opening.showSwing = false;
       }
     });
   });
@@ -2501,9 +2501,6 @@ const getOffsetLineCoords = (data, offset) => {
 const appendDoorSymbol = (group, data, showSwing = true) => {
   const frameCoords = getOffsetLineCoords(data, OPENING_INSET_PX);
   group.appendChild(createSvgLine(frameCoords, "door-frame"));
-  if (!showSwing) {
-    return;
-  }
 
   const hinge =
     data.axis === "x"
@@ -2521,7 +2518,9 @@ const appendDoorSymbol = (group, data, showSwing = true) => {
     data.wallDir.x * data.normal.y - data.wallDir.y * data.normal.x > 0 ? 1 : 0;
 
   const arcPath = `M ${wallEnd.x} ${wallEnd.y} A ${data.length} ${data.length} 0 0 ${sweep} ${leafEnd.x} ${leafEnd.y}`;
-  group.appendChild(createSvgPath(arcPath, "door-arc"));
+  if (showSwing) {
+    group.appendChild(createSvgPath(arcPath, "door-arc"));
+  }
   group.appendChild(
     createSvgLine(
       { x1: hinge.x, y1: hinge.y, x2: leafEnd.x, y2: leafEnd.y },
@@ -2581,7 +2580,7 @@ const createOpeningGroup = (opening, room, floorId, isSelected) => {
 
   const renderData = getOpeningRenderData(opening, room);
   if (opening.type === "door") {
-    const showSwing = opening.showSwing !== false;
+    const showSwing = opening.showSwing === true;
     appendDoorSymbol(group, renderData, showSwing);
   } else {
     appendWindowSymbol(group, renderData);
@@ -2785,7 +2784,7 @@ const renderRoomPanel = () => {
 
   elements.roomTitle.textContent = room.name;
   elements.roomSubtitle.textContent =
-    "Aufgaben, Evidence und Entscheidungen für den Raum verwalten.";
+    "Aufgaben, Inspirationen und Entscheidungen für den Raum verwalten.";
   elements.threeDLabel.textContent = `3D-Ansicht für ${room.name}`;
   if (elements.threeDPanel) {
     elements.threeDPanel.classList.toggle("open", state.show3d);
@@ -2948,7 +2947,7 @@ const renderDecisions = (roomData) => {
   if (!decisions.length) {
     const empty = document.createElement("li");
     empty.className = "decision-card decision-empty";
-    empty.textContent = "Noch keine Entscheidungen.";
+    empty.textContent = "Noch keine Entscheidungen für diesen Raum.";
     elements.decisionList.appendChild(empty);
     return;
   }
@@ -4538,7 +4537,7 @@ const renderArchitectPanel = () => {
     elementType === "door" &&
     typeof openingData.opening.showSwing !== "boolean"
   ) {
-    openingData.opening.showSwing = true;
+    openingData.opening.showSwing = false;
   }
 
   if (elements.measurementAxisLabel) {
@@ -4608,7 +4607,7 @@ const renderArchitectPanel = () => {
   }
 
   if (elements.measurementSwing) {
-    elements.measurementSwing.checked = openingData.opening.showSwing !== false;
+    elements.measurementSwing.checked = openingData.opening.showSwing === true;
     elements.measurementSwing.disabled = elementType !== "door";
   }
 
@@ -6498,7 +6497,7 @@ const applyArchitectAdjustments = ({
   const wantsSwing =
     opening.type === "door" && elements.measurementSwing
       ? elements.measurementSwing.checked
-      : opening.showSwing !== false;
+      : opening.showSwing === true;
 
   const geometryChanged =
     Math.abs(newCenter - meta.position) > 0.01 ||
@@ -6506,7 +6505,7 @@ const applyArchitectAdjustments = ({
   const swingChanged =
     opening.type === "door" &&
     typeof wantsSwing === "boolean" &&
-    wantsSwing !== (opening.showSwing !== false);
+    wantsSwing !== (opening.showSwing === true);
   let needsRender = false;
   if (geometryChanged) {
     const wallPosition = meta.axis === "x" ? opening.y1 : opening.x1;

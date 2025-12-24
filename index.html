@@ -213,10 +213,18 @@
               <button
                 class="room-tab"
                 type="button"
-                data-room-tab="evidence"
+                data-room-tab="inspiration"
                 aria-selected="false"
               >
-                Evidence
+                Inspiration
+              </button>
+              <button
+                class="room-tab"
+                type="button"
+                data-room-tab="decisions"
+                aria-selected="false"
+              >
+                Entscheidungen
               </button>
             </div>
           </section>
@@ -324,10 +332,14 @@
             <p class="helper">Hashtags werden als Tags übernommen.</p>
           </section>
 
-          <section class="panel" data-room-panel="evidence">
-            <h3>Evidence</h3>
+          <section class="panel" data-room-panel="inspiration">
+            <h3>Inspirationen &amp; Referenzen</h3>
+            <p class="helper">
+              Sammeln Sie Bilder, Links und Dateien als Grundlage für
+              Entscheidungen.
+            </p>
             <div class="evidence-block">
-              <h4>Uploads</h4>
+              <h4>Bilder, Dateien &amp; Links</h4>
               <div id="image-gallery" class="image-gallery"></div>
               <div class="button-row">
                 <button id="generate-image" class="primary" type="button">
@@ -349,38 +361,43 @@
                 Tipp: mehrere Blickwinkel pro Raum speichern.
               </p>
             </div>
-            <div class="evidence-block">
-              <h4>Entscheidungen</h4>
-              <ul id="decision-list" class="decision-list"></ul>
-              <form id="decision-form" class="decision-form">
-                <label>
-                  Titel
-                  <input
-                    type="text"
-                    id="decision-title"
-                    name="decision-title"
-                    required
-                  />
-                </label>
-                <label>
-                  Begründung
-                  <textarea
-                    id="decision-body"
-                    name="decision-body"
-                    rows="4"
-                    required
-                  ></textarea>
-                </label>
-                <fieldset class="decision-links">
-                  <legend>Mit Aufgaben verknüpfen (optional)</legend>
-                  <div id="decision-tasks" class="decision-task-list"></div>
-                  <p id="decision-tasks-empty" class="helper"></p>
-                </fieldset>
-                <button class="primary" type="submit">
-                  Entscheidung speichern
-                </button>
-              </form>
-            </div>
+          </section>
+
+          <section class="panel" data-room-panel="decisions">
+            <h3>Entscheidungen</h3>
+            <p class="helper">
+              Halten Sie fest, was beschlossen wurde und warum. Optional mit
+              Aufgaben verknüpfen.
+            </p>
+            <ul id="decision-list" class="decision-list"></ul>
+            <form id="decision-form" class="decision-form">
+              <label>
+                Titel
+                <input
+                  type="text"
+                  id="decision-title"
+                  name="decision-title"
+                  required
+                />
+              </label>
+              <label>
+                Begründung
+                <textarea
+                  id="decision-body"
+                  name="decision-body"
+                  rows="4"
+                  required
+                ></textarea>
+              </label>
+              <fieldset class="decision-links">
+                <legend>Mit Aufgaben verknüpfen (optional)</legend>
+                <div id="decision-tasks" class="decision-task-list"></div>
+                <p id="decision-tasks-empty" class="helper"></p>
+              </fieldset>
+              <button class="primary" type="submit">
+                Entscheidung speichern
+              </button>
+            </form>
           </section>
 
           <section class="panel" data-room-panel="overview">
@@ -620,7 +637,7 @@
             </div>
           </div>
           <label id="measure-swing-row" class="measurement-toggle">
-            <input type="checkbox" id="measure-swing" checked />
+            <input type="checkbox" id="measure-swing" />
             Schwenkbogen anzeigen
           </label>
           <label id="measure-lock-row" class="measurement-toggle">
@@ -781,8 +798,8 @@
               <h4>Raumdetails</h4>
               <p>
                 Raum im Grundriss anklicken, dann Tabs nutzen: Übersicht
-                (Kommentare, Aktivität), Aufgaben (raumbezogen), Evidence
-                (Bilder, Links, Entscheidungen).
+                (Kommentare, Aktivität), Aufgaben (raumbezogen), Inspiration
+                (Bilder, Links, Dateien) und Entscheidungen.
               </p>
             </section>
             <section class="help-card">
@@ -793,11 +810,18 @@
               </p>
             </section>
             <section class="help-card">
-              <h4>Evidence &amp; Entscheidungen</h4>
+              <h4>Inspiration</h4>
               <p>
-                Bilder hochladen oder per ChatGPT erzeugen, Links speichern,
-                Entscheidungen mit Begründung und optionalen Aufgaben
-                verknüpfen.
+                Bilder hochladen oder per ChatGPT erzeugen, Links und Dateien
+                sammeln, um Referenzen für den Raum zu sichern.
+              </p>
+            </section>
+            <section class="help-card">
+              <h4>Entscheidungen</h4>
+              <p>
+                Beschlüsse dokumentieren, begründen und optional mit Aufgaben
+                verknüpfen, damit nachvollziehbar bleibt, warum etwas gewählt
+                wurde.
               </p>
             </section>
             <section class="help-card">
