@@ -226,27 +226,60 @@ const DEFAULT_TASK_FILTERS = {
   query: "",
 };
 
+const TASK_TAG_GROUPS = {
+  materials: ["material"],
+  permits: ["permit", "genehmigung"],
+  contractors: ["contractor", "handwerker", "auftragnehmer"],
+};
+
+const TASK_COST_FIELDS = [
+  {
+    key: "materials",
+    label: "Materialkosten (Schätzung)",
+    tags: TASK_TAG_GROUPS.materials,
+  },
+  {
+    key: "permits",
+    label: "Genehmigungskosten (Schätzung)",
+    tags: TASK_TAG_GROUPS.permits,
+  },
+  {
+    key: "contractors",
+    label: "Handwerkerkosten (Schätzung)",
+    tags: TASK_TAG_GROUPS.contractors,
+  },
+];
+
 const TASK_VIEW_PRESETS = {
   all: {
     label: "Alle",
     filter: () => true,
   },
   materials: {
-    label: "Materials",
-    filter: (task) => taskHasTag(task, "material") && !isTaskDone(task),
+    label: "Material",
+    filter: (task) =>
+      taskHasAnyTag(task, TASK_TAG_GROUPS.materials) && !isTaskDone(task),
   },
   permits: {
-    label: "Permits",
-    filter: (task) => taskHasTag(task, "permit"),
+    label: "Genehmigungen",
+    filter: (task) => taskHasAnyTag(task, TASK_TAG_GROUPS.permits),
   },
   contractors: {
-    label: "Contractors",
-    filter: (task) => taskHasTag(task, "contractor"),
+    label: "Handwerker",
+    filter: (task) => taskHasAnyTag(task, TASK_TAG_GROUPS.contractors),
   },
 };
 
 const ROOM_TABS = ["overview", "tasks", "evidence"];
 const APP_VIEWS = ["room", "tasks"];
+const IMAGE_PIN_SURFACE_LABELS = {
+  "wall-north": "Wand Nord",
+  "wall-south": "Wand Süd",
+  "wall-east": "Wand Ost",
+  "wall-west": "Wand West",
+  floor: "Boden",
+  ceiling: "Decke",
+};
 
 const LEGACY_ROOM_IDS = [
   "bedroom-left",
@@ -695,6 +728,21 @@ const taskModalState = {
   taskId: null,
 };
 
+const imageModalState = {
+  roomId: null,
+  imageId: null,
+  baseVersionId: null,
+  isOpen: false,
+};
+
+const imageMaskState = {
+  active: false,
+  drawing: false,
+  brushSize: 28,
+  hasEdits: false,
+  lastPoint: null,
+};
+
 const dragState = {
   active: false,
   didMove: false,
@@ -764,6 +812,9 @@ const elements = {
   generateImageBtn: document.getElementById("generate-image"),
   addEvidenceLinkBtn: document.getElementById("add-evidence-link"),
   toggleArchitect: document.getElementById("toggle-architect"),
+  helpButton: document.getElementById("help-button"),
+  helpModal: document.getElementById("help-modal"),
+  helpModalClose: document.getElementById("help-modal-close"),
   architectView: document.getElementById("architect-view"),
   architectTitle: document.getElementById("architect-title"),
   architectHelp: document.getElementById("architect-help"),
@@ -799,6 +850,23 @@ const elements = {
   ),
   setApiKeyBtn: document.getElementById("set-api-key"),
   imageStatus: document.getElementById("image-status"),
+  imageModal: document.getElementById("image-modal"),
+  imageModalClose: document.getElementById("image-modal-close"),
+  imageModalTitle: document.getElementById("image-modal-title"),
+  imageModalPreview: document.getElementById("image-modal-preview"),
+  imageModalMeta: document.getElementById("image-modal-meta"),
+  imageEditForm: document.getElementById("image-edit-form"),
+  imageEditPrompt: document.getElementById("image-edit-prompt"),
+  imageEditStatus: document.getElementById("image-edit-status"),
+  imageMaskCanvas: document.getElementById("image-mask-canvas"),
+  imageMaskToggle: document.getElementById("image-mask-toggle"),
+  imageMaskClear: document.getElementById("image-mask-clear"),
+  imageMaskSize: document.getElementById("image-mask-size"),
+  imageThreadList: document.getElementById("image-thread-list"),
+  imageDeleteBtn: document.getElementById("image-delete"),
+  imagePinSurface: document.getElementById("image-pin-surface"),
+  imagePinApply: document.getElementById("image-pin-apply"),
+  imagePinClear: document.getElementById("image-pin-clear"),
   taskForm: document.getElementById("task-form"),
   taskInput: document.getElementById("task-input"),
   taskTagsInput: document.getElementById("task-tags-input"),
@@ -912,6 +980,22 @@ const normalizeTaskMaterials = (materials) => ({
   vendor: typeof materials?.vendor === "string" ? materials.vendor.trim() : "",
 });
 
+const normalizeCostValue = (value) => {
+  if (value === null || value === undefined || value === "") return null;
+  const raw =
+    typeof value === "string" ? value.trim().replace(",", ".") : value;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const normalizeTaskCosts = (costs) => {
+  const source = costs && typeof costs === "object" ? costs : {};
+  return TASK_COST_FIELDS.reduce((normalized, field) => {
+    normalized[field.key] = normalizeCostValue(source[field.key]);
+    return normalized;
+  }, {});
+};
+
 const buildTaskSearchIndex = (task) => {
   const parts = [
     task.title,
@@ -940,7 +1024,14 @@ const taskHasTag = (task, needle) => {
   return task.tags.some((tag) => tag.includes(target));
 };
 
-const taskHasMaterialsTag = (task) => taskHasTag(task, "material");
+const taskHasAnyTag = (task, needles) => {
+  const targets = Array.isArray(needles) ? needles : [needles];
+  if (!targets.length) return false;
+  return targets.some((target) => taskHasTag(task, target));
+};
+
+const taskHasMaterialsTag = (task) =>
+  taskHasAnyTag(task, TASK_TAG_GROUPS.materials);
 
 const normalizeTask = (task, fallbackTitle) => {
   if (typeof task === "string") {
@@ -1000,6 +1091,7 @@ const normalizeTask = (task, fallbackTitle) => {
           ? task.dependsOn.filter((id) => typeof id === "string")
           : [],
     materials: normalizeTaskMaterials(task.materials),
+    costs: normalizeTaskCosts(task.costs),
     priority: normalizeTaskPriority(task.priority),
     notes: typeof task.notes === "string" ? task.notes : "",
     createdAt,
@@ -1049,6 +1141,7 @@ const createTask = ({
   endDate = null,
   dependencyIds = [],
   materials = null,
+  costs = null,
   priority = DEFAULT_TASK_PRIORITY,
   notes = "",
 } = {}) => {
@@ -1067,6 +1160,7 @@ const createTask = ({
       ? dependencyIds.filter((id) => typeof id === "string")
       : [],
     materials: normalizeTaskMaterials(materials),
+    costs: normalizeTaskCosts(costs),
     priority: TASK_PRIORITIES.includes(priority)
       ? priority
       : DEFAULT_TASK_PRIORITY,
@@ -2050,7 +2144,8 @@ const refreshUI = () => {
 };
 
 const setActiveView = (viewId) => {
-  state.activeView = APP_VIEWS.includes(viewId) ? viewId : APP_VIEWS[0];
+  const normalized = String(viewId || "").trim();
+  state.activeView = APP_VIEWS.includes(normalized) ? normalized : APP_VIEWS[0];
   updateViewUI();
 };
 
@@ -2090,11 +2185,17 @@ const updateViewUI = () => {
     ? state.activeView
     : APP_VIEWS[0];
   state.activeView = activeView;
+  const isRoomView = activeView === "room";
   if (elements.roomView) {
-    elements.roomView.hidden = activeView !== "room";
+    elements.roomView.hidden = !isRoomView;
+    elements.roomView.classList.toggle("is-active", isRoomView);
+    elements.roomView.setAttribute("aria-hidden", String(!isRoomView));
   }
   if (elements.tasksView) {
-    elements.tasksView.hidden = activeView !== "tasks";
+    const isTasksView = activeView === "tasks";
+    elements.tasksView.hidden = !isTasksView;
+    elements.tasksView.classList.toggle("is-active", isTasksView);
+    elements.tasksView.setAttribute("aria-hidden", String(!isTasksView));
   }
   if (elements.viewButtons?.length) {
     elements.viewButtons.forEach((button) => {
@@ -2746,6 +2847,11 @@ const formatEvidenceDetails = (file) => {
   return details.join(" · ");
 };
 
+const getPinSurfaceLabel = (pin) => {
+  if (!pin?.surface) return "";
+  return IMAGE_PIN_SURFACE_LABELS[pin.surface] || "Wand";
+};
+
 const renderImages = (roomData) => {
   elements.imageGallery.innerHTML = "";
   roomData.images.forEach((file) => {
@@ -2753,17 +2859,23 @@ const renderImages = (roomData) => {
     card.className = "image-card";
 
     const label = file.label || file.name || "Datei";
-    const previewWrapper = file.url
-      ? document.createElement("a")
-      : document.createElement("div");
-    if (file.url) {
+    const isImage = Boolean(file.url && isEvidenceImage(file));
+    let previewWrapper = null;
+    if (isImage) {
+      previewWrapper = document.createElement("button");
+      previewWrapper.type = "button";
+      previewWrapper.className = "image-preview";
+      previewWrapper.addEventListener("click", () => openImageModal(file.id));
+    } else if (file.url) {
+      previewWrapper = document.createElement("a");
       previewWrapper.href = file.url;
-      previewWrapper.target = "_blank";
       previewWrapper.rel = "noreferrer";
       previewWrapper.className = "evidence-link";
+    } else {
+      previewWrapper = document.createElement("div");
     }
 
-    if (file.url && isEvidenceImage(file)) {
+    if (isImage) {
       const img = document.createElement("img");
       img.src = file.url;
       img.alt = label;
@@ -2792,7 +2904,38 @@ const renderImages = (roomData) => {
       details.textContent = detailsText;
       meta.appendChild(details);
     }
+    const pinLabel = getPinSurfaceLabel(file.pin);
+    if (pinLabel) {
+      const pin = document.createElement("div");
+      pin.className = "image-pin-chip";
+      pin.textContent = `📌 ${pinLabel}`;
+      meta.appendChild(pin);
+    }
     card.appendChild(meta);
+
+    const actions = document.createElement("div");
+    actions.className = "image-actions";
+    if (isImage) {
+      const editButton = document.createElement("button");
+      editButton.type = "button";
+      editButton.textContent = "Bearbeiten";
+      editButton.addEventListener("click", () => openImageModal(file.id));
+      actions.appendChild(editButton);
+
+      const pinButton = document.createElement("button");
+      pinButton.type = "button";
+      pinButton.textContent = file.pin ? "Pin ändern" : "Pin setzen";
+      pinButton.addEventListener("click", () => openImageModal(file.id));
+      actions.appendChild(pinButton);
+    }
+
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.textContent = "Löschen";
+    deleteButton.className = "image-delete";
+    deleteButton.addEventListener("click", () => removeImage(file.id));
+    actions.appendChild(deleteButton);
+    card.appendChild(actions);
 
     elements.imageGallery.appendChild(card);
   });
@@ -3454,7 +3597,7 @@ const buildTaskField = (labelText, input) => {
 const buildTagInput = (task) => {
   const input = document.createElement("input");
   input.type = "text";
-  input.placeholder = "materials, permit";
+  input.placeholder = "material, genehmigung, handwerker";
   input.className = "task-text-input";
   input.value = Array.isArray(task.tags) ? task.tags.join(", ") : "";
   input.addEventListener("change", (event) => {
@@ -3553,6 +3696,48 @@ const buildMaterialsFields = (task) => {
   fields.appendChild(orderedLabel);
   fields.appendChild(buildTaskField("Lieferung", deliveryInput));
   fields.appendChild(buildTaskField("Lieferant", vendorInput));
+  wrapper.appendChild(fields);
+  return wrapper;
+};
+
+const buildCostFields = (task) => {
+  const entries = TASK_COST_FIELDS.filter((field) =>
+    taskHasAnyTag(task, field.tags),
+  );
+  if (!entries.length) return null;
+  if (!task.costs || typeof task.costs !== "object") {
+    task.costs = normalizeTaskCosts(task.costs);
+  }
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "task-costs";
+  const title = document.createElement("span");
+  title.className = "task-costs-title";
+  title.textContent = "Kostenschätzung";
+  wrapper.appendChild(title);
+
+  const fields = document.createElement("div");
+  fields.className = "task-costs-fields";
+
+  entries.forEach(({ key, label }) => {
+    const input = document.createElement("input");
+    input.type = "text";
+    input.inputMode = "decimal";
+    input.placeholder = "z. B. 1200";
+    input.className = "task-text-input";
+    const currentValue = normalizeCostValue(task.costs?.[key]);
+    input.value = currentValue !== null ? String(currentValue) : "";
+    input.addEventListener("change", (event) => {
+      const nextValue = normalizeCostValue(event.target.value);
+      if (Object.is(task.costs[key], nextValue)) return;
+      task.costs[key] = nextValue;
+      task.updatedAt = new Date().toISOString();
+      logTaskUpdate(task, { costs: { [key]: nextValue } });
+      saveState();
+    });
+    fields.appendChild(buildTaskField(label, input));
+  });
+
   wrapper.appendChild(fields);
   return wrapper;
 };
@@ -3760,6 +3945,7 @@ const buildTaskItem = (
     taskMap = null,
     showSelection = false,
     showMaterials = false,
+    showCosts = false,
     showFields = false,
   } = {},
 ) => {
@@ -3880,6 +4066,13 @@ const buildTaskItem = (
     item.appendChild(buildMaterialsFields(task));
   }
 
+  if (showCosts) {
+    const costFields = buildCostFields(task);
+    if (costFields) {
+      item.appendChild(costFields);
+    }
+  }
+
   const controls = document.createElement("div");
   controls.className = "task-controls";
   controls.appendChild(buildStatusSelect(task));
@@ -3944,6 +4137,7 @@ const renderTaskList = () => {
         showSelection: true,
         showFields: true,
         showMaterials: true,
+        showCosts: true,
         taskMap,
       }),
     );
@@ -4002,6 +4196,17 @@ const closeTaskModal = () => {
   if (!elements.taskModal) return;
   elements.taskModal.hidden = true;
   taskModalState.taskId = null;
+};
+
+const openHelpModal = () => {
+  if (!elements.helpModal) return;
+  elements.helpModal.hidden = false;
+  elements.helpModalClose?.focus();
+};
+
+const closeHelpModal = () => {
+  if (!elements.helpModal) return;
+  elements.helpModal.hidden = true;
 };
 
 const renderDependencyOptions = (task) => {
@@ -4579,6 +4784,14 @@ const buildThreeDRoomShell = () => {
 
   return {
     floorFurniture,
+    surfaces: {
+      floor,
+      ceiling,
+      "wall-north": wallNorth,
+      "wall-south": wallSouth,
+      "wall-east": wallEast,
+      "wall-west": wallWest,
+    },
     walls: {
       top: wallNorth,
       bottom: wallSouth,
@@ -4672,6 +4885,51 @@ const renderThreeDFurniture = (room, roomSize, floorFurniture) => {
   });
 };
 
+const clearPinnedImages = (surfaces) => {
+  if (!surfaces) return;
+  Object.values(surfaces).forEach((surface) => {
+    surface.querySelectorAll(".pinned-image").forEach((el) => el.remove());
+  });
+};
+
+const renderPinnedImages = (roomData, surfaces) => {
+  if (!roomData || !surfaces) return;
+  clearPinnedImages(surfaces);
+  const images = Array.isArray(roomData.images) ? roomData.images : [];
+  images.forEach((file) => {
+    if (!file?.pin?.surface) return;
+    if (!file.url || !isEvidenceImage(file)) return;
+    const surface = surfaces[file.pin.surface];
+    if (!surface) return;
+    const pinEl = document.createElement("button");
+    pinEl.type = "button";
+    pinEl.className = "pinned-image";
+    const x = Number.isFinite(file.pin.x) ? file.pin.x : 0.5;
+    const y = Number.isFinite(file.pin.y) ? file.pin.y : 0.5;
+    const scale = Number.isFinite(file.pin.scale)
+      ? file.pin.scale
+      : file.pin.surface === "floor" || file.pin.surface === "ceiling"
+        ? 0.4
+        : 0.35;
+    pinEl.style.setProperty("--pin-x", `${x * 100}%`);
+    pinEl.style.setProperty("--pin-y", `${y * 100}%`);
+    pinEl.style.setProperty("--pin-size", `${scale * 100}%`);
+    const img = document.createElement("img");
+    img.src = file.url;
+    img.alt = file.label || file.name || "Bild";
+    pinEl.appendChild(img);
+    pinEl.title = file.label || file.name || "Bild";
+    pinEl.addEventListener("click", (event) => {
+      event.stopPropagation();
+      openImageModal(file.id, state.activeRoomId);
+    });
+    pinEl.addEventListener("pointerdown", (event) => {
+      event.stopPropagation();
+    });
+    surface.appendChild(pinEl);
+  });
+};
+
 const updateThreeDReadout = (measurement) => {
   if (!elements.threeDReadout) return;
   const meters = (mm) => (mm / 1000).toFixed(1);
@@ -4739,6 +4997,7 @@ const update3DScene = (roomId, { resetCamera = false } = {}) => {
   if (shell) {
     renderThreeDOpenings(room, measurement, roomSize, shell.walls);
     renderThreeDFurniture(room, roomSize, shell.floorFurniture);
+    renderPinnedImages(roomData, shell.surfaces);
   }
   updateThreeDReadout(measurement);
 
@@ -5240,6 +5499,59 @@ const setImageStatus = (text, isError = false) => {
   elements.imageStatus.classList.toggle("error", isError);
 };
 
+const setImageEditStatus = (text, isError = false) => {
+  if (!elements.imageEditStatus) return;
+  elements.imageEditStatus.textContent = text || "";
+  elements.imageEditStatus.classList.toggle("status-line", Boolean(text));
+  elements.imageEditStatus.classList.toggle("error", isError);
+};
+
+const createImageVersionId = () =>
+  `imgv-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+const buildImageHistoryEntry = ({
+  prompt,
+  url,
+  createdAt,
+  userName,
+  userEmail,
+  source,
+}) => ({
+  id: createImageVersionId(),
+  prompt: prompt || "Bild",
+  url,
+  createdAt: createdAt || new Date().toISOString(),
+  userName: userName || getActivityActor(),
+  userEmail: userEmail || authState.user?.email || "",
+  source: source || "openai",
+});
+
+const buildInitialHistoryEntry = (file) =>
+  buildImageHistoryEntry({
+    prompt: file.prompt || file.label || file.name || "Original",
+    url: file.url,
+    createdAt: file.createdAt || new Date().toISOString(),
+    userName: file.userName || "",
+    userEmail: file.userEmail || "",
+    source: file.source || "upload",
+  });
+
+const ensureImageHistory = (file) => {
+  if (!file) return [];
+  if (!Array.isArray(file.history) || !file.history.length) {
+    file.history = file.url ? [buildInitialHistoryEntry(file)] : [];
+  }
+  return file.history;
+};
+
+const getImageHistory = (file) => {
+  if (!file) return [];
+  if (Array.isArray(file.history) && file.history.length) {
+    return file.history;
+  }
+  return file.url ? [buildInitialHistoryEntry(file)] : [];
+};
+
 const canUseEvidenceApi = () =>
   window.location.protocol !== "file:" &&
   Boolean(authState.session?.access_token);
@@ -5292,6 +5604,413 @@ const persistEvidenceFile = async (roomData, record) => {
   }
 };
 
+const persistEvidenceUpdate = async (roomId, roomData, record) => {
+  renderImages(roomData);
+  saveStateLocal();
+  const apiSaved = await postEvidenceItem(roomId, "files", record);
+  if (!apiSaved) {
+    saveState();
+  }
+};
+
+const blobToDataUrl = (blob) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () =>
+      reject(new Error("Bild konnte nicht gelesen werden."));
+    reader.readAsDataURL(blob);
+  });
+
+const resolveImageDataUrl = async (url) => {
+  if (!url) return "";
+  if (url.startsWith("data:")) return url;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Bild konnte nicht geladen werden (${response.status}).`);
+  }
+  const blob = await response.blob();
+  return blobToDataUrl(blob);
+};
+
+const requestImageFromOpenAI = async ({ prompt, baseImage, mask }) => {
+  const apiKey = readApiKey();
+  const cleanPrompt = String(prompt || "").trim();
+  const requestBody = { prompt: cleanPrompt };
+  if (baseImage) {
+    requestBody.image = baseImage;
+  }
+  if (mask) {
+    requestBody.mask = mask;
+  }
+  if (isLocalHost && apiKey) {
+    requestBody.apiKey = apiKey;
+  }
+
+  const response = await fetch("/api/image", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  let data = {};
+  try {
+    data = await response.json();
+  } catch {
+    data = {};
+  }
+
+  if (!response.ok) {
+    const error = new Error(data?.error || `HTTP ${response.status}`);
+    error.code = data?.code;
+    throw error;
+  }
+
+  const imageUrl = data?.imageUrl;
+  if (!imageUrl) {
+    const error = new Error("Kein Bild zurückgegeben");
+    error.code = "missing_image_data";
+    throw error;
+  }
+
+  return imageUrl;
+};
+
+const buildImageRecord = ({ url, prompt, source = "openai" }) => {
+  const timestamp = new Date().toISOString();
+  const id = `img-${Date.now()}`;
+  const prefix = source === "edit" ? "ChatGPT-Änderung" : "ChatGPT-Anfrage";
+  const label = prompt ? `${prefix}: ${prompt}` : "Bild";
+  const record = {
+    id,
+    label,
+    name: label,
+    url,
+    type: "image/png",
+    size: null,
+    createdAt: timestamp,
+    userName: getActivityActor(),
+    userEmail: authState.user?.email || "",
+    prompt,
+    source,
+    pin: null,
+  };
+  record.history = [
+    {
+      id: `${id}-v1`,
+      prompt: prompt || label,
+      url,
+      createdAt: timestamp,
+      userName: record.userName,
+      userEmail: record.userEmail,
+      source,
+    },
+  ];
+  return record;
+};
+
+const getActiveImageRecord = () => {
+  if (!imageModalState.roomId || !imageModalState.imageId) return null;
+  const roomData = ensureRoomData(imageModalState.roomId);
+  return (
+    roomData.images.find((item) => item.id === imageModalState.imageId) || null
+  );
+};
+
+const getImageVersionById = (file, versionId) => {
+  const history = getImageHistory(file);
+  if (!history.length) return null;
+  return history.find((entry) => entry.id === versionId) || history[0];
+};
+
+const setImageModalControlsEnabled = (isEnabled) => {
+  [
+    elements.imageEditPrompt,
+    elements.imageMaskToggle,
+    elements.imageMaskClear,
+    elements.imageMaskSize,
+    elements.imagePinSurface,
+    elements.imagePinApply,
+    elements.imagePinClear,
+    elements.imageDeleteBtn,
+  ].forEach((el) => {
+    if (el) {
+      el.disabled = !isEnabled;
+    }
+  });
+  const submit = elements.imageEditForm?.querySelector("button[type='submit']");
+  if (submit) {
+    submit.disabled = !isEnabled;
+  }
+};
+
+const updateImageModalMeta = (file) => {
+  if (!elements.imageModalMeta || !file) return;
+  if (elements.imageModalTitle) {
+    elements.imageModalTitle.textContent = file.label || file.name || "Bild";
+  }
+  elements.imageModalMeta.innerHTML = "";
+  const title = document.createElement("div");
+  title.textContent = file.label || file.name || "Bild";
+  elements.imageModalMeta.appendChild(title);
+
+  const author = file.userName || file.userEmail || "";
+  const created = formatActivityTimestamp(file.createdAt);
+  if (author || created) {
+    const meta = document.createElement("div");
+    meta.textContent = [author || "Unbekannt", created]
+      .filter(Boolean)
+      .join(" · ");
+    elements.imageModalMeta.appendChild(meta);
+  }
+
+  const pinLabel = getPinSurfaceLabel(file.pin);
+  if (pinLabel) {
+    const pin = document.createElement("div");
+    pin.textContent = `📌 ${pinLabel}`;
+    elements.imageModalMeta.appendChild(pin);
+  }
+};
+
+const updateImageModalPreview = (file, version) => {
+  if (!elements.imageModalPreview || !file) return;
+  const entry =
+    version || getImageVersionById(file, imageModalState.baseVersionId);
+  elements.imageModalPreview.src = entry?.url || file.url || "";
+  elements.imageModalPreview.alt = file.label || file.name || "Bild";
+};
+
+const renderImageThread = (file) => {
+  if (!elements.imageThreadList || !file) return;
+  elements.imageThreadList.innerHTML = "";
+  const history = getImageHistory(file);
+  if (!history.length) {
+    const empty = document.createElement("li");
+    empty.className = "helper";
+    empty.textContent = "Noch kein Verlauf.";
+    elements.imageThreadList.appendChild(empty);
+    return;
+  }
+  history.forEach((entry) => {
+    const item = document.createElement("li");
+    item.className = "image-thread-item";
+    if (entry.id === imageModalState.baseVersionId) {
+      item.classList.add("is-active");
+    }
+
+    const thumb = document.createElement("div");
+    thumb.className = "image-thread-thumb";
+    if (entry.url) {
+      const img = document.createElement("img");
+      img.src = entry.url;
+      img.alt = entry.prompt || "Version";
+      thumb.appendChild(img);
+    }
+    item.appendChild(thumb);
+
+    const body = document.createElement("div");
+    const prompt = document.createElement("div");
+    prompt.textContent = entry.prompt || "Version";
+    body.appendChild(prompt);
+    const meta = document.createElement("div");
+    meta.className = "image-thread-meta";
+    const metaParts = [
+      entry.userName || entry.userEmail || "",
+      formatActivityTimestamp(entry.createdAt),
+    ].filter(Boolean);
+    meta.textContent = metaParts.join(" · ");
+    body.appendChild(meta);
+    item.appendChild(body);
+
+    item.addEventListener("click", () => selectImageVersion(entry.id));
+    elements.imageThreadList.appendChild(item);
+  });
+};
+
+const selectImageVersion = (versionId) => {
+  const file = getActiveImageRecord();
+  if (!file) return;
+  const entry = getImageVersionById(file, versionId);
+  if (!entry) return;
+  imageModalState.baseVersionId = entry.id;
+  updateImageModalPreview(file, entry);
+  renderImageThread(file);
+  if (imageMaskState.active) {
+    resetImageMaskCanvas();
+  }
+};
+
+const openImageModal = (imageId, roomId = state.activeRoomId) => {
+  if (!elements.imageModal || !imageId || !roomId) return;
+  const roomData = ensureRoomData(roomId);
+  const file = roomData.images.find((item) => item.id === imageId);
+  if (!file) return;
+
+  imageModalState.roomId = roomId;
+  imageModalState.imageId = imageId;
+  imageModalState.isOpen = true;
+  const history = getImageHistory(file);
+  imageModalState.baseVersionId = history[0]?.id || null;
+
+  elements.imageModalTitle.textContent = file.label || file.name || "Bild";
+  elements.imageModal.hidden = false;
+  if (elements.imageEditPrompt) {
+    elements.imageEditPrompt.value = "";
+  }
+  setImageEditStatus("");
+  updateImageModalMeta(file);
+  updateImageModalPreview(file, history[0] || null);
+  renderImageThread(file);
+
+  if (elements.imagePinSurface) {
+    elements.imagePinSurface.value = file.pin?.surface || "";
+  }
+  if (elements.imagePinClear) {
+    elements.imagePinClear.disabled = !file.pin;
+  }
+
+  if (elements.imageMaskSize) {
+    imageMaskState.brushSize =
+      Number(elements.imageMaskSize.value) || imageMaskState.brushSize;
+  }
+  setImageMaskActive(false);
+  setImageModalControlsEnabled(true);
+};
+
+const closeImageModal = () => {
+  if (!elements.imageModal) return;
+  elements.imageModal.hidden = true;
+  imageModalState.roomId = null;
+  imageModalState.imageId = null;
+  imageModalState.baseVersionId = null;
+  imageModalState.isOpen = false;
+  if (elements.imageModalPreview) {
+    elements.imageModalPreview.src = "";
+  }
+  if (elements.imageEditPrompt) {
+    elements.imageEditPrompt.value = "";
+  }
+  setImageEditStatus("");
+  setImageMaskActive(false);
+};
+
+const resizeImageMaskCanvas = () => {
+  const canvas = elements.imageMaskCanvas;
+  const preview = elements.imageModalPreview;
+  if (!canvas || !preview) return false;
+  const width = preview.clientWidth;
+  const height = preview.clientHeight;
+  if (!width || !height) return false;
+  if (canvas.width === width && canvas.height === height) return true;
+  canvas.width = width;
+  canvas.height = height;
+  return true;
+};
+
+const resetImageMaskCanvas = () => {
+  const canvas = elements.imageMaskCanvas;
+  if (!canvas) return;
+  if (!resizeImageMaskCanvas()) return;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#000000";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  imageMaskState.hasEdits = false;
+  imageMaskState.lastPoint = null;
+};
+
+const setImageMaskActive = (isActive) => {
+  imageMaskState.active = isActive;
+  if (elements.imageMaskCanvas) {
+    elements.imageMaskCanvas.hidden = !isActive;
+  }
+  if (elements.imageMaskToggle) {
+    elements.imageMaskToggle.textContent = isActive
+      ? "Maske ausblenden"
+      : "Bereich markieren";
+  }
+  if (isActive) {
+    resetImageMaskCanvas();
+  } else {
+    imageMaskState.drawing = false;
+    imageMaskState.lastPoint = null;
+  }
+};
+
+const getMaskCanvasPoint = (event) => {
+  const canvas = elements.imageMaskCanvas;
+  if (!canvas) return { x: 0, y: 0 };
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top,
+  };
+};
+
+const drawMaskLine = (from, to) => {
+  const canvas = elements.imageMaskCanvas;
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  ctx.save();
+  ctx.globalCompositeOperation = "destination-out";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.lineWidth = imageMaskState.brushSize;
+  ctx.beginPath();
+  ctx.moveTo(from.x, from.y);
+  ctx.lineTo(to.x, to.y);
+  ctx.stroke();
+  ctx.restore();
+  imageMaskState.hasEdits = true;
+};
+
+const handleImageMaskPointerDown = (event) => {
+  if (!imageMaskState.active || !elements.imageMaskCanvas) return;
+  event.preventDefault();
+  imageMaskState.drawing = true;
+  elements.imageMaskCanvas.setPointerCapture?.(event.pointerId);
+  const point = getMaskCanvasPoint(event);
+  imageMaskState.lastPoint = point;
+  drawMaskLine(point, point);
+};
+
+const handleImageMaskPointerMove = (event) => {
+  if (!imageMaskState.drawing) return;
+  const point = getMaskCanvasPoint(event);
+  drawMaskLine(imageMaskState.lastPoint || point, point);
+  imageMaskState.lastPoint = point;
+};
+
+const handleImageMaskPointerUp = (event) => {
+  if (!imageMaskState.drawing) return;
+  imageMaskState.drawing = false;
+  imageMaskState.lastPoint = null;
+  elements.imageMaskCanvas?.releasePointerCapture?.(event.pointerId);
+};
+
+const getMaskDataUrl = () => {
+  if (!imageMaskState.active || !imageMaskState.hasEdits) return "";
+  const canvas = elements.imageMaskCanvas;
+  if (!canvas) return "";
+  const preview = elements.imageModalPreview;
+  const targetWidth = preview?.naturalWidth || canvas.width;
+  const targetHeight = preview?.naturalHeight || canvas.height;
+  if (!targetWidth || !targetHeight) {
+    return canvas.toDataURL("image/png");
+  }
+  if (canvas.width === targetWidth && canvas.height === targetHeight) {
+    return canvas.toDataURL("image/png");
+  }
+  const scaled = document.createElement("canvas");
+  scaled.width = targetWidth;
+  scaled.height = targetHeight;
+  const ctx = scaled.getContext("2d");
+  ctx.drawImage(canvas, 0, 0, scaled.width, scaled.height);
+  return scaled.toDataURL("image/png");
+};
+
 const isLikelyNetworkBlock = (error) => {
   const message = error?.message || "";
   return (
@@ -5323,29 +6042,151 @@ const handleSetApiKey = () => {
   );
 };
 
-const generateImageWithOpenAI = async (promptText, roomData) => {
-  const apiKey = readApiKey();
-  const requestId = `img-${Date.now()}`;
-  const label = `ChatGPT-Anfrage: ${promptText}`;
+const handleImagePinApply = () => {
+  const file = getActiveImageRecord();
+  if (!file || !imageModalState.roomId) return;
+  const surface = elements.imagePinSurface?.value || "";
+  if (!surface) {
+    file.pin = null;
+  } else {
+    const scale = surface === "floor" || surface === "ceiling" ? 0.4 : 0.35;
+    file.pin = { surface, x: 0.5, y: 0.5, scale };
+  }
+  const roomData = ensureRoomData(imageModalState.roomId);
+  renderImages(roomData);
+  updateImageModalMeta(file);
+  if (elements.imagePinClear) {
+    elements.imagePinClear.disabled = !file.pin;
+  }
+  saveState();
+  if (state.show3d) {
+    update3DScene(imageModalState.roomId);
+  }
+};
 
-  const pushImage = async (url) => {
-    const record = {
-      id: requestId,
-      label,
-      name: label,
-      url,
-      type: "image/png",
-      size: null,
-      createdAt: new Date().toISOString(),
-      userName: getActivityActor(),
-      userEmail: authState.user?.email || "",
-    };
-    await persistEvidenceFile(roomData, record);
-  };
+const handleImagePinClear = () => {
+  if (elements.imagePinSurface) {
+    elements.imagePinSurface.value = "";
+  }
+  handleImagePinApply();
+};
+
+const removeImage = (imageId, roomId = state.activeRoomId) => {
+  if (!roomId) return;
+  const roomData = ensureRoomData(roomId);
+  const index = roomData.images.findIndex((item) => item.id === imageId);
+  if (index === -1) return;
+  const file = roomData.images[index];
+  const label = file.label || file.name || "Bild";
+  const confirmRemove = window.confirm(`Bild "${label}" wirklich löschen?`);
+  if (!confirmRemove) return;
+  roomData.images.splice(index, 1);
+  renderImages(roomData);
+  saveState();
+  if (imageModalState.imageId === imageId) {
+    closeImageModal();
+  }
+  if (state.show3d) {
+    update3DScene(roomId);
+  }
+};
+
+const handleImageEditSubmit = async (event) => {
+  event.preventDefault();
+  const file = getActiveImageRecord();
+  if (!file || !imageModalState.roomId) return;
+  const promptText = elements.imageEditPrompt?.value?.trim() || "";
+  if (!promptText) {
+    setImageEditStatus("Bitte eine Anweisung eingeben.", true);
+    return;
+  }
+
+  const baseEntry = getImageVersionById(file, imageModalState.baseVersionId);
+  if (!baseEntry?.url) {
+    setImageEditStatus("Kein Basisbild verfügbar.", true);
+    return;
+  }
+
+  try {
+    setImageStatus("Bild wird bearbeitet …");
+    setImageEditStatus("Bild wird bearbeitet …");
+    setImageModalControlsEnabled(false);
+
+    const baseImage = await resolveImageDataUrl(baseEntry.url);
+    if (!baseImage) {
+      throw new Error("Basisbild konnte nicht geladen werden.");
+    }
+
+    const maskDataUrl = getMaskDataUrl();
+    const imageUrl = await requestImageFromOpenAI({
+      prompt: promptText,
+      baseImage,
+      mask: maskDataUrl || undefined,
+    });
+
+    ensureImageHistory(file);
+    const entry = buildImageHistoryEntry({
+      prompt: promptText,
+      url: imageUrl,
+      source: "edit",
+    });
+    file.history.unshift(entry);
+    file.url = imageUrl;
+    file.label = `ChatGPT-Änderung: ${promptText}`;
+    file.name = file.label;
+    file.prompt = promptText;
+    file.updatedAt = new Date().toISOString();
+
+    const roomData = ensureRoomData(imageModalState.roomId);
+    await persistEvidenceUpdate(imageModalState.roomId, roomData, file);
+
+    imageModalState.baseVersionId = entry.id;
+    updateImageModalMeta(file);
+    updateImageModalPreview(file, entry);
+    renderImageThread(file);
+    if (imageMaskState.active) {
+      resetImageMaskCanvas();
+    }
+    setImageStatus("Bild wurde aktualisiert.");
+    setImageEditStatus("Bild wurde aktualisiert.");
+    if (state.show3d) {
+      update3DScene(imageModalState.roomId);
+    }
+  } catch (error) {
+    console.error("Bildbearbeitung fehlgeschlagen:", error);
+    const networkBlocked = isLikelyNetworkBlock(error);
+    const message =
+      error?.code === "missing_api_key"
+        ? "Kein API-Schlüssel gefunden – im Dialog speichern oder OPENAI_API_KEY am Server setzen."
+        : error?.code === "invalid_image_data"
+          ? "Basisbild ist ungültig. Bitte ein lokales Bild verwenden."
+          : error?.code === "invalid_mask_data"
+            ? "Maske ist ungültig. Bitte Maske löschen und erneut versuchen."
+            : error?.code === "openai_network_error"
+              ? "Netzwerk blockiert – HTTPS zu api.openai.com ist gesperrt."
+              : networkBlocked
+                ? "Lokaler Bilddienst nicht erreichbar. App über npm run serve starten."
+                : error?.code === "openai_error"
+                  ? `OpenAI-Fehler: ${error.message}`
+                  : "Bildbearbeitung fehlgeschlagen. Bitte erneut versuchen.";
+    setImageStatus(message, true);
+    setImageEditStatus(message, true);
+  } finally {
+    setImageModalControlsEnabled(true);
+  }
+};
+
+const generateImageWithOpenAI = async (promptText, roomData) => {
+  const labelText = promptText || "Idee ohne Beschreibung";
 
   if (window.location.protocol === "file:") {
-    await pushImage(
-      buildPlaceholderImage(promptText || "Idee ohne Beschreibung"),
+    await persistEvidenceFile(
+      roomData,
+      buildImageRecord({
+        url: buildPlaceholderImage(labelText),
+        prompt: labelText,
+        source: "placeholder",
+      }),
     );
     setImageStatus(
       "Bildgenerierung benötigt einen lokalen Server. Bitte über npm run serve öffnen.",
@@ -5357,48 +6198,21 @@ const generateImageWithOpenAI = async (promptText, roomData) => {
   try {
     setImageStatus("Bild wird erzeugt …");
     elements.generateImageBtn.disabled = true;
-
-    const requestBody = {
-      prompt: promptText,
-    };
-    if (isLocalHost && apiKey) {
-      requestBody.apiKey = apiKey;
-    }
-
-    const response = await fetch("/api/image", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    let data = {};
-    try {
-      data = await response.json();
-    } catch {
-      data = {};
-    }
-
-    if (!response.ok) {
-      const error = new Error(data?.error || `HTTP ${response.status}`);
-      error.code = data?.code;
-      throw error;
-    }
-
-    const imageUrl = data?.imageUrl;
-    if (!imageUrl) {
-      const error = new Error("Kein Bild zurückgegeben");
-      error.code = "missing_image_data";
-      throw error;
-    }
-
-    await pushImage(imageUrl);
+    const imageUrl = await requestImageFromOpenAI({ prompt: labelText });
+    await persistEvidenceFile(
+      roomData,
+      buildImageRecord({ url: imageUrl, prompt: labelText, source: "openai" }),
+    );
     setImageStatus("Bild wurde erzeugt.");
   } catch (error) {
     console.error("Bildgenerierung fehlgeschlagen:", error);
-    await pushImage(
-      buildPlaceholderImage(promptText || "Idee ohne Beschreibung"),
+    await persistEvidenceFile(
+      roomData,
+      buildImageRecord({
+        url: buildPlaceholderImage(labelText),
+        prompt: labelText,
+        source: "placeholder",
+      }),
     );
     const networkBlocked = isLikelyNetworkBlock(error);
     const message =
@@ -5430,7 +6244,8 @@ const handleGenerateImage = () => {
     "Idee ohne Beschreibung";
 
   const roomData = ensureRoomData(state.activeRoomId);
-  generateImageWithOpenAI(promptText, roomData);
+  const cleanedPrompt = promptText.trim();
+  generateImageWithOpenAI(cleanedPrompt || "Idee ohne Beschreibung", roomData);
 };
 
 const handleUploadImage = (event) => {
@@ -5458,7 +6273,21 @@ const handleUploadImage = (event) => {
       createdAt: new Date().toISOString(),
       userName: getActivityActor(),
       userEmail: authState.user?.email || "",
+      source: "upload",
+      pin: null,
     };
+    if (isEvidenceImage(record)) {
+      record.history = [
+        buildImageHistoryEntry({
+          prompt: file.name,
+          url: record.url,
+          createdAt: record.createdAt,
+          userName: record.userName,
+          userEmail: record.userEmail,
+          source: "upload",
+        }),
+      ];
+    }
     logActivityEvent("file_uploaded", {
       roomId: state.activeRoomId,
       metadata: { filename: file.name },
@@ -5492,7 +6321,21 @@ const handleAddEvidenceLink = async () => {
     createdAt: new Date().toISOString(),
     userName: getActivityActor(),
     userEmail: authState.user?.email || "",
+    source: "link",
+    pin: null,
   };
+  if (isEvidenceImage(record)) {
+    record.history = [
+      buildImageHistoryEntry({
+        prompt: label,
+        url: record.url,
+        createdAt: record.createdAt,
+        userName: record.userName,
+        userEmail: record.userEmail,
+        source: "link",
+      }),
+    ];
+  }
   logActivityEvent("file_uploaded", {
     roomId: state.activeRoomId,
     metadata: { filename: label },
@@ -6087,6 +6930,72 @@ const bindEvents = () => {
   elements.taskModal?.addEventListener("click", (event) => {
     if (event.target === elements.taskModal) {
       closeTaskModal();
+    }
+  });
+  elements.helpButton?.addEventListener("click", openHelpModal);
+  elements.helpModalClose?.addEventListener("click", closeHelpModal);
+  elements.helpModal?.addEventListener("click", (event) => {
+    if (event.target === elements.helpModal) {
+      closeHelpModal();
+    }
+  });
+
+  elements.imageEditForm?.addEventListener("submit", handleImageEditSubmit);
+  elements.imageModalClose?.addEventListener("click", closeImageModal);
+  elements.imageModal?.addEventListener("click", (event) => {
+    if (event.target === elements.imageModal) {
+      closeImageModal();
+    }
+  });
+  elements.imageModalPreview?.addEventListener("load", () => {
+    if (imageMaskState.active) {
+      resetImageMaskCanvas();
+    }
+  });
+  elements.imageMaskToggle?.addEventListener("click", () =>
+    setImageMaskActive(!imageMaskState.active),
+  );
+  elements.imageMaskClear?.addEventListener("click", () => {
+    if (!imageMaskState.active) {
+      setImageMaskActive(true);
+    } else {
+      resetImageMaskCanvas();
+    }
+  });
+  elements.imageMaskSize?.addEventListener("input", (event) => {
+    imageMaskState.brushSize = Number(event.target.value) || 28;
+  });
+  if (elements.imageMaskCanvas) {
+    elements.imageMaskCanvas.addEventListener(
+      "pointerdown",
+      handleImageMaskPointerDown,
+    );
+    elements.imageMaskCanvas.addEventListener(
+      "pointermove",
+      handleImageMaskPointerMove,
+    );
+    elements.imageMaskCanvas.addEventListener(
+      "pointerup",
+      handleImageMaskPointerUp,
+    );
+    elements.imageMaskCanvas.addEventListener(
+      "pointerleave",
+      handleImageMaskPointerUp,
+    );
+    elements.imageMaskCanvas.addEventListener(
+      "pointercancel",
+      handleImageMaskPointerUp,
+    );
+  }
+  elements.imagePinApply?.addEventListener("click", handleImagePinApply);
+  elements.imagePinClear?.addEventListener("click", handleImagePinClear);
+  elements.imageDeleteBtn?.addEventListener("click", () => {
+    if (!imageModalState.imageId || !imageModalState.roomId) return;
+    removeImage(imageModalState.imageId, imageModalState.roomId);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && imageModalState.isOpen) {
+      closeImageModal();
     }
   });
 

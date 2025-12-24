@@ -70,6 +70,15 @@
           <input type="checkbox" id="toggle-architect" />
           <span>Architekt-Ansicht</span>
         </label>
+        <button
+          id="help-button"
+          class="help-button"
+          type="button"
+          aria-label="Hilfe öffnen"
+          title="Hilfe"
+        >
+          ?
+        </button>
         <div class="auth-info" id="auth-info" hidden>
           <div class="auth-user">
             <span class="auth-label">Angemeldet als</span>
@@ -178,7 +187,7 @@
           </div>
         </section>
 
-        <div class="view-stack" id="room-view">
+        <div class="view-stack is-active" id="room-view">
           <section class="panel" id="room-panel">
             <h2 id="room-title">Bitte wählen Sie einen Raum</h2>
             <p id="room-subtitle">
@@ -402,7 +411,7 @@
               <div
                 class="segmented-control"
                 role="tablist"
-                aria-label="Task Views"
+                aria-label="Aufgabenansichten"
               >
                 <button
                   class="segmented-option is-active"
@@ -418,7 +427,7 @@
                   data-task-view="materials"
                   aria-selected="false"
                 >
-                  Materials
+                  Material
                 </button>
                 <button
                   class="segmented-option"
@@ -426,7 +435,7 @@
                   data-task-view="permits"
                   aria-selected="false"
                 >
-                  Permits
+                  Genehmigungen
                 </button>
                 <button
                   class="segmented-option"
@@ -434,7 +443,7 @@
                   data-task-view="contractors"
                   aria-selected="false"
                 >
-                  Contractors
+                  Handwerker
                 </button>
               </div>
             </div>
@@ -656,6 +665,164 @@
             <button type="submit" class="primary">Speichern</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <div id="image-modal" class="modal" hidden>
+      <div
+        class="modal-surface image-modal-surface"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="image-modal-title"
+      >
+        <div class="modal-header">
+          <h3 id="image-modal-title">Bild bearbeiten</h3>
+          <button type="button" id="image-modal-close">Schließen</button>
+        </div>
+        <div class="image-modal-body">
+          <div class="image-modal-preview">
+            <div class="image-preview-frame">
+              <img
+                id="image-modal-preview"
+                alt=""
+                src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=="
+              />
+              <canvas id="image-mask-canvas" class="image-mask" hidden></canvas>
+            </div>
+            <div class="image-mask-tools">
+              <button type="button" id="image-mask-toggle">
+                Bereich markieren
+              </button>
+              <label class="image-mask-size">
+                <span>Pinsel</span>
+                <input
+                  type="range"
+                  id="image-mask-size"
+                  min="6"
+                  max="80"
+                  value="28"
+                />
+              </label>
+              <button type="button" id="image-mask-clear">Maske löschen</button>
+            </div>
+            <p class="helper image-mask-hint">
+              Transparente Bereiche werden verändert.
+            </p>
+          </div>
+          <div class="image-modal-sidebar">
+            <div id="image-modal-meta" class="image-modal-meta"></div>
+            <form id="image-edit-form" class="image-edit-form">
+              <label>
+                Neue Anweisung
+                <textarea
+                  id="image-edit-prompt"
+                  rows="3"
+                  placeholder="z.B. neue Farben, anderes Licht, Detail ändern"
+                ></textarea>
+              </label>
+              <button type="submit" class="primary">Änderung erzeugen</button>
+              <p id="image-edit-status" class="helper"></p>
+            </form>
+            <div class="image-pin-panel">
+              <label>
+                Pin an Fläche
+                <select id="image-pin-surface">
+                  <option value="">Nicht angeheftet</option>
+                  <option value="wall-north">Wand Nord</option>
+                  <option value="wall-south">Wand Süd</option>
+                  <option value="wall-east">Wand Ost</option>
+                  <option value="wall-west">Wand West</option>
+                  <option value="floor">Boden</option>
+                  <option value="ceiling">Decke</option>
+                </select>
+              </label>
+              <div class="image-pin-actions">
+                <button type="button" id="image-pin-apply">Anheften</button>
+                <button type="button" id="image-pin-clear">Pin lösen</button>
+              </div>
+            </div>
+            <div class="image-thread">
+              <h4>Verlauf</h4>
+              <ul id="image-thread-list" class="image-thread-list"></ul>
+            </div>
+            <button type="button" id="image-delete" class="image-delete">
+              Bild löschen
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="help-modal" class="modal" hidden>
+      <div
+        class="modal-surface help-surface"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="help-modal-title"
+      >
+        <div class="modal-header">
+          <h3 id="help-modal-title">Hilfe &amp; Schnellstart</h3>
+          <button type="button" id="help-modal-close">Schließen</button>
+        </div>
+        <div class="help-content">
+          <p class="helper">
+            Kurz erklärt: Die Bereiche aus den letzten Prompts (A-E) in
+            Klartext.
+          </p>
+          <div class="help-grid">
+            <section class="help-card">
+              <h4>Ansicht &amp; Navigation</h4>
+              <p>
+                Etage oben rechts wechseln. Im Block "Ansicht" zwischen Raum und
+                Aufgabenübersicht umschalten.
+              </p>
+            </section>
+            <section class="help-card">
+              <h4>Raumdetails</h4>
+              <p>
+                Raum im Grundriss anklicken, dann Tabs nutzen: Übersicht
+                (Kommentare, Aktivität), Aufgaben (raumbezogen), Evidence
+                (Bilder, Links, Entscheidungen).
+              </p>
+            </section>
+            <section class="help-card">
+              <h4>Aufgabenübersicht</h4>
+              <p>
+                Alle Aufgaben mit Filtern, Suche und Mehrfachauswahl. Bulk:
+                Erledigt, Zuweisen, Fällig. Timeline zeigt Termine.
+              </p>
+            </section>
+            <section class="help-card">
+              <h4>Evidence &amp; Entscheidungen</h4>
+              <p>
+                Bilder hochladen oder per ChatGPT erzeugen, Links speichern,
+                Entscheidungen mit Begründung und optionalen Aufgaben
+                verknüpfen.
+              </p>
+            </section>
+            <section class="help-card">
+              <h4>3D-Ansicht</h4>
+              <p>
+                Im Raum-Panel öffnen. Innen/Modell wählen, Stil, Material und
+                Licht anpassen, Ansicht zurücksetzen.
+              </p>
+            </section>
+            <section class="help-card">
+              <h4>Architekt-Ansicht</h4>
+              <p>
+                Oben aktivieren, Räume/Wände/Türen/Fenster ziehen. Maße rechts
+                justieren, "Angrenzende Räume koppeln" hält Nachbarn synchron.
+              </p>
+            </section>
+            <section class="help-card">
+              <h4>Aktivität</h4>
+              <p>
+                Der Aktivitätsfeed unten bündelt neue Aufgaben, Kommentare,
+                Dateien und Entscheidungen.
+              </p>
+            </section>
+          </div>
+        </div>
       </div>
     </div>
 

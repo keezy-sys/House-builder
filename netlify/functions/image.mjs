@@ -9,6 +9,17 @@ const jsonResponse = (statusCode, payload) => ({
 const imageModel =
   String(process.env.OPENAI_IMAGE_MODEL || "dall-e-3").trim() || "dall-e-3";
 
+const parseDataUrl = (value = "") => {
+  const match = String(value).match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return null;
+  const [, mime, payload] = match;
+  try {
+    return { mime, buffer: Buffer.from(payload, "base64") };
+  } catch {
+    return null;
+  }
+};
+
 export const handler = async (event) => {
   if (event.httpMethod !== "POST") {
     return jsonResponse(405, {
@@ -42,18 +53,60 @@ export const handler = async (event) => {
 
   let upstream;
   try {
-    upstream = await fetch("https://api.openai.com/v1/images/generations", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: imageModel,
-        prompt,
-        size: "1024x1024",
-      }),
-    });
+    if (body.image) {
+      const imageData = parseDataUrl(body.image);
+      if (!imageData) {
+        return jsonResponse(400, {
+          error: "Invalid image data.",
+          code: "invalid_image_data",
+        });
+      }
+      const form = new FormData();
+      form.append("model", imageModel);
+      form.append("prompt", prompt);
+      form.append("size", "1024x1024");
+      form.append("response_format", "b64_json");
+      form.append(
+        "image",
+        new Blob([imageData.buffer], { type: imageData.mime }),
+        `image.${imageData.mime.split("/")[1] || "png"}`,
+      );
+      if (body.mask) {
+        const maskData = parseDataUrl(body.mask);
+        if (!maskData) {
+          return jsonResponse(400, {
+            error: "Invalid mask data.",
+            code: "invalid_mask_data",
+          });
+        }
+        form.append(
+          "mask",
+          new Blob([maskData.buffer], { type: maskData.mime }),
+          `mask.${maskData.mime.split("/")[1] || "png"}`,
+        );
+      }
+      upstream = await fetch("https://api.openai.com/v1/images/edits", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: form,
+      });
+    } else {
+      upstream = await fetch("https://api.openai.com/v1/images/generations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: imageModel,
+          prompt,
+          size: "1024x1024",
+          response_format: "b64_json",
+        }),
+      });
+    }
   } catch {
     return jsonResponse(502, {
       error: "Failed to reach OpenAI.",

@@ -22,6 +22,7 @@ const TASK_STATUS_ALIASES = {
 const TASK_PRIORITIES = ["Low", "Med", "High"];
 const DEFAULT_TASK_STATUS = "Backlog";
 const DEFAULT_TASK_PRIORITY = "Med";
+const TASK_COST_KEYS = ["materials", "permits", "contractors"];
 
 const CONFIG_PATH = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -225,6 +226,22 @@ const normalizeDate = (value) => {
   return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : null;
 };
 
+const normalizeCostValue = (value) => {
+  if (value === null || value === undefined || value === "") return null;
+  const raw =
+    typeof value === "string" ? value.trim().replace(",", ".") : value;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const normalizeTaskCosts = (costs) => {
+  const source = costs && typeof costs === "object" ? costs : {};
+  return TASK_COST_KEYS.reduce((normalized, key) => {
+    normalized[key] = normalizeCostValue(source[key]);
+    return normalized;
+  }, {});
+};
+
 const parseFilters = (searchParams) => {
   if (!searchParams) {
     return {
@@ -343,6 +360,16 @@ const applyTaskPatch = (task, patch) => {
         ? patch.materials
         : null;
   }
+  if (Object.prototype.hasOwnProperty.call(patch, "costs")) {
+    if (patch.costs && typeof patch.costs === "object") {
+      task.costs = normalizeTaskCosts({
+        ...(task.costs && typeof task.costs === "object" ? task.costs : {}),
+        ...patch.costs,
+      });
+    } else {
+      task.costs = normalizeTaskCosts();
+    }
+  }
 };
 
 const handleTasksApi = async ({ method, urlPath, headers, body, query }) => {
@@ -436,6 +463,7 @@ const handleTasksApi = async ({ method, urlPath, headers, body, query }) => {
       dueDate: normalizeDate(input.dueDate),
       priority: coercePriority(input.priority),
       notes: typeof input.notes === "string" ? input.notes : "",
+      costs: normalizeTaskCosts(input.costs),
       createdAt: timestamp,
       updatedAt: timestamp,
     };

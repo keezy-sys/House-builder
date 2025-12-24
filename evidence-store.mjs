@@ -169,6 +169,42 @@ const normalizeFileRecord = (input = {}) => {
     return { error: "Missing file label." };
   }
   const size = Number(input.size);
+  const prompt = typeof input.prompt === "string" ? input.prompt.trim() : "";
+  const source = typeof input.source === "string" ? input.source.trim() : "";
+  const updatedAt =
+    typeof input.updatedAt === "string" && input.updatedAt.trim()
+      ? input.updatedAt.trim()
+      : "";
+  const normalizeHistoryEntry = (entry) => {
+    if (!entry || typeof entry !== "object") return null;
+    const url = String(entry.url || "").trim();
+    if (!url) return null;
+    const entryPrompt = String(entry.prompt || "").trim();
+    return {
+      id: String(entry.id || `imgv-${Date.now()}`),
+      prompt: entryPrompt || "Bild",
+      url,
+      createdAt: String(entry.createdAt || new Date().toISOString()),
+      userName: String(entry.userName || ""),
+      userEmail: String(entry.userEmail || ""),
+      source: String(entry.source || ""),
+    };
+  };
+  const history = Array.isArray(input.history)
+    ? input.history.map(normalizeHistoryEntry).filter(Boolean)
+    : [];
+  const rawPin = input.pin && typeof input.pin === "object" ? input.pin : null;
+  const pinSurface = rawPin ? String(rawPin.surface || "").trim() : "";
+  const pin = pinSurface
+    ? {
+        surface: pinSurface,
+        x: Number.isFinite(Number(rawPin.x)) ? Number(rawPin.x) : 0.5,
+        y: Number.isFinite(Number(rawPin.y)) ? Number(rawPin.y) : 0.5,
+        scale: Number.isFinite(Number(rawPin.scale))
+          ? Number(rawPin.scale)
+          : null,
+      }
+    : null;
   return {
     record: {
       id: String(input.id || `file-${Date.now()}`),
@@ -178,8 +214,13 @@ const normalizeFileRecord = (input = {}) => {
       type: String(input.type || ""),
       size: Number.isFinite(size) ? size : null,
       createdAt: String(input.createdAt || new Date().toISOString()),
+      updatedAt,
       userName: String(input.userName || ""),
       userEmail: String(input.userEmail || ""),
+      prompt,
+      source,
+      history,
+      pin,
     },
   };
 };

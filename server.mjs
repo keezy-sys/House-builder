@@ -34,6 +34,17 @@ const sendJson = (res, status, payload) => {
   res.end(body);
 };
 
+const parseDataUrl = (value = "") => {
+  const match = String(value).match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return null;
+  const [, mime, payload] = match;
+  try {
+    return { mime, buffer: Buffer.from(payload, "base64") };
+  } catch {
+    return null;
+  }
+};
+
 const readRequestBody = async (req) => {
   let body = "";
   for await (const chunk of req) {
@@ -62,7 +73,7 @@ const serveFile = async (filePath, res) => {
 };
 
 const handleImageGeneration = async (req, res) => {
-  const { prompt, apiKey } = await readRequestBody(req);
+  const { prompt, apiKey, image, mask } = await readRequestBody(req);
   const resolvedKey =
     (process.env.OPENAI_API_KEY || "").trim() || (apiKey || "").trim();
 
@@ -84,18 +95,62 @@ const handleImageGeneration = async (req, res) => {
 
   let upstream;
   try {
-    upstream = await fetch("https://api.openai.com/v1/images/generations", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${resolvedKey}`,
-      },
-      body: JSON.stringify({
-        model: imageModel,
-        prompt: prompt.trim(),
-        size: "1024x1024",
-      }),
-    });
+    if (image) {
+      const imageData = parseDataUrl(image);
+      if (!imageData) {
+        sendJson(res, 400, {
+          error: "Invalid image data.",
+          code: "invalid_image_data",
+        });
+        return;
+      }
+      const form = new FormData();
+      form.append("model", imageModel);
+      form.append("prompt", prompt.trim());
+      form.append("size", "1024x1024");
+      form.append("response_format", "b64_json");
+      form.append(
+        "image",
+        new Blob([imageData.buffer], { type: imageData.mime }),
+        `image.${imageData.mime.split("/")[1] || "png"}`,
+      );
+      if (mask) {
+        const maskData = parseDataUrl(mask);
+        if (!maskData) {
+          sendJson(res, 400, {
+            error: "Invalid mask data.",
+            code: "invalid_mask_data",
+          });
+          return;
+        }
+        form.append(
+          "mask",
+          new Blob([maskData.buffer], { type: maskData.mime }),
+          `mask.${maskData.mime.split("/")[1] || "png"}`,
+        );
+      }
+      upstream = await fetch("https://api.openai.com/v1/images/edits", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${resolvedKey}`,
+        },
+        body: form,
+      });
+    } else {
+      upstream = await fetch("https://api.openai.com/v1/images/generations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${resolvedKey}`,
+        },
+        body: JSON.stringify({
+          model: imageModel,
+          prompt: prompt.trim(),
+          size: "1024x1024",
+          response_format: "b64_json",
+        }),
+      });
+    }
   } catch (error) {
     sendJson(res, 502, {
       error: "Failed to reach OpenAI.",
