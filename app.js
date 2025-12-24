@@ -19,6 +19,175 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 const DEFAULT_FLOORPLAN_HINT =
   "Bewegen Sie die Maus über einen Raum, um ihn hervorzuheben.";
 
+const THREE_D_DEFAULT_SCENE = {
+  view: "walkthrough",
+  style: "soft-modern",
+  floor: "oak",
+  lighting: "day",
+};
+
+const THREE_D_VIEW_PRESETS = {
+  walkthrough: {
+    yaw: -22,
+    pitch: 14,
+    distanceFactor: 1.05,
+  },
+  dollhouse: {
+    yaw: -32,
+    pitch: 26,
+    distanceFactor: 1.4,
+  },
+};
+
+const THREE_D_STYLE_PRESETS = {
+  "soft-modern": {
+    wall: "#f5efe7",
+    wallShade: "#efe3d6",
+    ceiling: "#fbf8f4",
+    trim: "#e3d6c8",
+    accent: "#a16207",
+    glass: "rgba(191, 219, 254, 0.7)",
+    shadowSoft: "rgba(15, 23, 42, 0.18)",
+    shadowDeep: "rgba(15, 23, 42, 0.28)",
+  },
+  "warm-minimal": {
+    wall: "#f6efe4",
+    wallShade: "#e7d7c4",
+    ceiling: "#fcf7f2",
+    trim: "#e2d0bf",
+    accent: "#b45309",
+    glass: "rgba(191, 219, 254, 0.65)",
+    shadowSoft: "rgba(15, 23, 42, 0.2)",
+    shadowDeep: "rgba(15, 23, 42, 0.3)",
+  },
+  "urban-atelier": {
+    wall: "#e7e5e4",
+    wallShade: "#d6d3d1",
+    ceiling: "#f5f5f4",
+    trim: "#cbd5e1",
+    accent: "#0f172a",
+    glass: "rgba(148, 163, 184, 0.65)",
+    shadowSoft: "rgba(15, 23, 42, 0.22)",
+    shadowDeep: "rgba(15, 23, 42, 0.35)",
+  },
+  "scandi-light": {
+    wall: "#f8fafc",
+    wallShade: "#e2e8f0",
+    ceiling: "#ffffff",
+    trim: "#dbe2ea",
+    accent: "#2563eb",
+    glass: "rgba(191, 219, 254, 0.75)",
+    shadowSoft: "rgba(15, 23, 42, 0.18)",
+    shadowDeep: "rgba(15, 23, 42, 0.28)",
+  },
+};
+
+const THREE_D_FLOOR_PRESETS = {
+  oak: {
+    base: "#d5b186",
+    shade: "#b98f63",
+    pattern:
+      "repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0 16px, rgba(64, 49, 35, 0.18) 16px 18px)",
+    patternSize: "32px",
+  },
+  "warm-oak": {
+    base: "#c2926e",
+    shade: "#a87552",
+    pattern:
+      "repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0 14px, rgba(64, 49, 35, 0.18) 14px 16px)",
+    patternSize: "30px",
+  },
+  stone: {
+    base: "#d6d3d1",
+    shade: "#a8a29e",
+    pattern:
+      "radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.35) 0 2px, transparent 3px), radial-gradient(circle at 70% 60%, rgba(120, 113, 108, 0.35) 0 2px, transparent 3px)",
+    patternSize: "22px",
+  },
+  tile: {
+    base: "#dbeafe",
+    shade: "#bfdbfe",
+    pattern:
+      "linear-gradient(90deg, rgba(15, 23, 42, 0.16) 1px, transparent 1px), linear-gradient(180deg, rgba(15, 23, 42, 0.16) 1px, transparent 1px)",
+    patternSize: "38px",
+  },
+  terrazzo: {
+    base: "#e7e5e4",
+    shade: "#d6d3d1",
+    pattern:
+      "radial-gradient(circle at 30% 30%, rgba(248, 250, 252, 0.7) 0 2px, transparent 3px), radial-gradient(circle at 70% 50%, rgba(120, 113, 108, 0.35) 0 2px, transparent 3px)",
+    patternSize: "26px",
+  },
+};
+
+const THREE_D_LIGHTING_PRESETS = {
+  day: {
+    skyTop: "#e0f2fe",
+    skyMid: "#fef3c7",
+    skyBottom: "#f8fafc",
+    filter: "brightness(1) saturate(1)",
+    glow: "rgba(255, 255, 255, 0.35)",
+  },
+  golden: {
+    skyTop: "#fde68a",
+    skyMid: "#fbcfe8",
+    skyBottom: "#fff7ed",
+    filter: "brightness(1.05) saturate(1.12)",
+    glow: "rgba(251, 191, 36, 0.35)",
+  },
+  evening: {
+    skyTop: "#1e293b",
+    skyMid: "#0f172a",
+    skyBottom: "#1f2937",
+    filter: "brightness(0.9) saturate(0.9)",
+    glow: "rgba(59, 130, 246, 0.25)",
+  },
+  studio: {
+    skyTop: "#f1f5f9",
+    skyMid: "#e2e8f0",
+    skyBottom: "#f8fafc",
+    filter: "brightness(1.05) saturate(0.95)",
+    glow: "rgba(255, 255, 255, 0.4)",
+  },
+};
+
+const THREE_D_FURNITURE_PRESETS = {
+  living: [
+    { x: 0.08, z: 0.6, width: 0.52, depth: 0.24, soft: true },
+    { x: 0.44, z: 0.34, width: 0.2, depth: 0.2 },
+    { x: 0.68, z: 0.62, width: 0.2, depth: 0.18 },
+    { x: 0.1, z: 0.12, width: 0.18, depth: 0.18 },
+  ],
+  bedroom: [
+    { x: 0.1, z: 0.12, width: 0.58, depth: 0.32, soft: true },
+    { x: 0.14, z: 0.5, width: 0.3, depth: 0.14 },
+    { x: 0.72, z: 0.1, width: 0.2, depth: 0.2 },
+  ],
+  kitchen: [
+    { x: 0.06, z: 0.08, width: 0.86, depth: 0.16 },
+    { x: 0.36, z: 0.46, width: 0.32, depth: 0.2 },
+    { x: 0.72, z: 0.66, width: 0.2, depth: 0.16 },
+  ],
+  bathroom: [
+    { x: 0.08, z: 0.1, width: 0.34, depth: 0.18 },
+    { x: 0.6, z: 0.1, width: 0.22, depth: 0.2 },
+    { x: 0.12, z: 0.58, width: 0.4, depth: 0.18 },
+  ],
+  office: [
+    { x: 0.1, z: 0.12, width: 0.44, depth: 0.22 },
+    { x: 0.62, z: 0.12, width: 0.24, depth: 0.2 },
+    { x: 0.12, z: 0.58, width: 0.32, depth: 0.14 },
+  ],
+  hallway: [
+    { x: 0.14, z: 0.12, width: 0.72, depth: 0.12 },
+    { x: 0.7, z: 0.58, width: 0.18, depth: 0.18 },
+  ],
+  default: [
+    { x: 0.2, z: 0.12, width: 0.52, depth: 0.2 },
+    { x: 0.62, z: 0.56, width: 0.24, depth: 0.2 },
+  ],
+};
+
 const LEGACY_ROOM_IDS = [
   "bedroom-left",
   "living",
@@ -461,11 +630,33 @@ const dragState = {
   type: null,
   axis: null,
   startPointerAxis: 0,
+  startPointerX: 0,
+  startPointerY: 0,
   startPosition: 0,
   lastPosition: 0,
   context: null,
   startClientX: 0,
   startClientY: 0,
+};
+
+const threeDState = {
+  activeRoomId: null,
+  activeView: null,
+  camera: {
+    yaw: -22,
+    pitch: 14,
+    distance: -420,
+  },
+  bounds: {
+    minDistance: -720,
+    maxDistance: -220,
+  },
+  drag: {
+    active: false,
+    pointerId: null,
+    lastX: 0,
+    lastY: 0,
+  },
 };
 
 const elements = {
@@ -508,6 +699,17 @@ const elements = {
   threeDPanel: document.getElementById("three-d-panel"),
   threeDButton: document.getElementById("toggle-3d"),
   threeDLabel: document.getElementById("three-d-label"),
+  threeDStage: document.getElementById("three-d-stage"),
+  threeDCamera: document.getElementById("three-d-camera"),
+  threeDRoom: document.getElementById("three-d-room"),
+  threeDStyle: document.getElementById("three-d-style"),
+  threeDFloor: document.getElementById("three-d-floor"),
+  threeDLighting: document.getElementById("three-d-lighting"),
+  threeDReadout: document.getElementById("three-d-readout"),
+  threeDReset: document.getElementById("three-d-reset"),
+  threeDViewButtons: Array.from(
+    document.querySelectorAll(".segmented-option[data-view]"),
+  ),
   setApiKeyBtn: document.getElementById("set-api-key"),
   imageStatus: document.getElementById("image-status"),
   authScreen: document.getElementById("auth-screen"),
@@ -526,6 +728,7 @@ const defaultRoomData = () => ({
   checklist: [],
   images: [],
   comments: [],
+  scene: null,
 });
 
 const buildStatePayload = () => ({
@@ -635,7 +838,12 @@ const ensureRoomData = (roomId) => {
   if (!state.roomData[roomId]) {
     state.roomData[roomId] = defaultRoomData();
   }
-  return state.roomData[roomId];
+  const roomData = state.roomData[roomId];
+  if (!Array.isArray(roomData.checklist)) roomData.checklist = [];
+  if (!Array.isArray(roomData.images)) roomData.images = [];
+  if (!Array.isArray(roomData.comments)) roomData.comments = [];
+  if (roomData.scene === undefined) roomData.scene = null;
+  return roomData;
 };
 
 const ensureRoomDataForFloors = () => {
@@ -825,6 +1033,19 @@ const getRoomWalls = (room) => {
 const getWallDataForSide = (room, side) =>
   getRoomWalls(room).find((wall) => wall.side === side) || null;
 
+const getWallDistanceForPoint = (wall, point) => {
+  if (wall.axis === "x") {
+    const clamped = clamp(point.x, wall.spanStart, wall.spanEnd);
+    const dx = point.x - clamped;
+    const dy = point.y - wall.position;
+    return dx * dx + dy * dy;
+  }
+  const clamped = clamp(point.y, wall.spanStart, wall.spanEnd);
+  const dx = point.x - wall.position;
+  const dy = point.y - clamped;
+  return dx * dx + dy * dy;
+};
+
 const getClosestWallForPoint = (room, point, minSpan) => {
   const walls = getRoomWalls(room);
   if (!walls.length) return null;
@@ -832,25 +1053,46 @@ const getClosestWallForPoint = (room, point, minSpan) => {
     (wall) => wall.spanEnd - wall.spanStart >= minSpan,
   );
   const candidates = viableWalls.length ? viableWalls : walls;
-  let best = candidates[0];
+  let best = null;
   let bestDistance = Number.POSITIVE_INFINITY;
   candidates.forEach((wall) => {
-    let distance = 0;
-    if (wall.axis === "x") {
-      const clamped = clamp(point.x, wall.spanStart, wall.spanEnd);
-      const dx = point.x - clamped;
-      const dy = point.y - wall.position;
-      distance = dx * dx + dy * dy;
-    } else {
-      const clamped = clamp(point.y, wall.spanStart, wall.spanEnd);
-      const dx = point.x - wall.position;
-      const dy = point.y - clamped;
-      distance = dx * dx + dy * dy;
-    }
+    const distance = getWallDistanceForPoint(wall, point);
     if (distance < bestDistance) {
       bestDistance = distance;
-      best = wall;
+      best = { ...wall, distance };
     }
+  });
+  return best;
+};
+
+const getClosestWallForPointInFloor = (
+  floor,
+  point,
+  minSpan,
+  preferredRoomId = null,
+) => {
+  if (!floor || !Array.isArray(floor.rooms)) return null;
+  let best = null;
+  floor.rooms.forEach((room) => {
+    const walls = getRoomWalls(room);
+    if (!walls.length) return;
+    const viableWalls = walls.filter(
+      (wall) => wall.spanEnd - wall.spanStart >= minSpan,
+    );
+    const candidates = viableWalls.length ? viableWalls : walls;
+    candidates.forEach((wall) => {
+      const distance = getWallDistanceForPoint(wall, point);
+      const isPreferred = room.id === preferredRoomId;
+      if (
+        !best ||
+        distance < best.distance - 0.01 ||
+        (Math.abs(distance - best.distance) < 0.01 &&
+          isPreferred &&
+          !best.isPreferred)
+      ) {
+        best = { ...wall, room, distance, isPreferred };
+      }
+    });
   });
   return best;
 };
@@ -908,6 +1150,43 @@ const setOpeningOnWall = (opening, axis, wallPosition, center, length) => {
   opening.x2 = wallPosition;
 };
 
+const translateOpeningsForRoom = (floor, roomId, deltaX, deltaY) => {
+  if (!floor || (!deltaX && !deltaY)) return;
+  floor.openings.forEach((opening) => {
+    if (opening.roomId !== roomId) return;
+    opening.x1 += deltaX;
+    opening.x2 += deltaX;
+    opening.y1 += deltaY;
+    opening.y2 += deltaY;
+  });
+  const roomData = state.roomData?.[roomId];
+  if (roomData?.comments) {
+    roomData.comments.forEach((comment) => {
+      comment.x += deltaX;
+      comment.y += deltaY;
+    });
+  }
+};
+
+const updateOpeningsForRoomResize = (floor, room) => {
+  if (!floor || !room) return;
+  floor.openings.forEach((opening) => {
+    if (opening.roomId !== room.id) return;
+    const meta = getOpeningMeta(opening);
+    const wallSide = resolveOpeningWallSide(opening, room, meta);
+    const wallData = wallSide ? getWallDataForSide(room, wallSide) : null;
+    if (!wallData) return;
+    const bounds = getOpeningBoundsForWall(room, wallSide, wallData.axis);
+    const span = Math.max(0, bounds.end - bounds.start);
+    const minLength = Math.min(MIN_OPENING_SIZE_PX, span);
+    const maxLength = Math.max(minLength, span);
+    const length = clamp(meta.length, minLength, maxLength);
+    const positionBounds = getOpeningPositionBounds(bounds, length);
+    const center = clamp(meta.position, positionBounds.min, positionBounds.max);
+    setOpeningOnWall(opening, wallData.axis, wallData.position, center, length);
+  });
+};
+
 const getWallSelectionData = (selection) => {
   if (!selection || selection.elementType !== "wall") return null;
   const floor = state.floorPlans[selection.floorId] || getActiveFloor();
@@ -926,7 +1205,9 @@ const getWallSelectionData = (selection) => {
 const getOpeningSelectionData = (selection) => {
   if (!selection || selection.elementType === "wall") return null;
   const floor = state.floorPlans[selection.floorId] || getActiveFloor();
-  const opening = floor.openings.find((item) => item.id === selection.openingId);
+  const opening = floor.openings.find(
+    (item) => item.id === selection.openingId,
+  );
   if (!opening) return null;
   const room = floor.rooms.find((item) => item.id === opening.roomId);
   const meta = getOpeningMeta(opening);
@@ -984,7 +1265,14 @@ const getRoomsSharingWall = (floor, wallMeta) => {
     ];
     edges.forEach((edge) => {
       if (edge.coord !== wallMeta.position) return;
-      if (!rangesOverlap(edge.spanStart, edge.spanEnd, wallMeta.spanStart, wallMeta.spanEnd))
+      if (
+        !rangesOverlap(
+          edge.spanStart,
+          edge.spanEnd,
+          wallMeta.spanStart,
+          wallMeta.spanEnd,
+        )
+      )
         return;
       matches.push({ room, edge: edge.edge });
     });
@@ -1046,13 +1334,20 @@ const applyWallLength = (room, wallMeta, newLength) => {
   }
 };
 
-const updateOpeningsForWallMove = (floor, wallMeta, oldPosition, newPosition) => {
+const updateOpeningsForWallMove = (
+  floor,
+  wallMeta,
+  oldPosition,
+  newPosition,
+) => {
   floor.openings.forEach((opening) => {
     if (wallMeta.orientation === "vertical") {
       if (opening.x1 !== oldPosition || opening.x2 !== oldPosition) return;
       const spanStart = Math.min(opening.y1, opening.y2);
       const spanEnd = Math.max(opening.y1, opening.y2);
-      if (!rangesOverlap(spanStart, spanEnd, wallMeta.spanStart, wallMeta.spanEnd))
+      if (
+        !rangesOverlap(spanStart, spanEnd, wallMeta.spanStart, wallMeta.spanEnd)
+      )
         return;
       opening.x1 = newPosition;
       opening.x2 = newPosition;
@@ -1060,7 +1355,9 @@ const updateOpeningsForWallMove = (floor, wallMeta, oldPosition, newPosition) =>
       if (opening.y1 !== oldPosition || opening.y2 !== oldPosition) return;
       const spanStart = Math.min(opening.x1, opening.x2);
       const spanEnd = Math.max(opening.x1, opening.x2);
-      if (!rangesOverlap(spanStart, spanEnd, wallMeta.spanStart, wallMeta.spanEnd))
+      if (
+        !rangesOverlap(spanStart, spanEnd, wallMeta.spanStart, wallMeta.spanEnd)
+      )
         return;
       opening.y1 = newPosition;
       opening.y2 = newPosition;
@@ -1123,9 +1420,7 @@ const updateAuthUI = () => {
     elements.authInfo.hidden = !isAuthed;
   }
   if (elements.authUserName) {
-    elements.authUserName.textContent = isAuthed
-      ? authState.displayName
-      : "";
+    elements.authUserName.textContent = isAuthed ? authState.displayName : "";
   }
 };
 
@@ -1231,10 +1526,11 @@ const subscribeToStateChanges = () => {
         const remotePayload = payload?.new?.data;
         if (!remotePayload) return;
         const updatedAt = payload?.new?.updated_at;
-        const updatedTimestamp = updatedAt
-          ? new Date(updatedAt).getTime()
-          : 0;
-        if (updatedTimestamp && updatedTimestamp <= syncState.lastSavedAt + 1500)
+        const updatedTimestamp = updatedAt ? new Date(updatedAt).getTime() : 0;
+        if (
+          updatedTimestamp &&
+          updatedTimestamp <= syncState.lastSavedAt + 1500
+        )
           return;
 
         syncState.applyingRemote = true;
@@ -1251,9 +1547,7 @@ const handleSessionChange = async (session) => {
   const previousUserId = authState.user?.id;
   authState.session = session;
   authState.user = session?.user ?? null;
-  authState.displayName = authState.user
-    ? getDisplayName(authState.user)
-    : "";
+  authState.displayName = authState.user ? getDisplayName(authState.user) : "";
   updateAuthUI();
   if (authState.user) {
     setAuthMessage("", false);
@@ -1391,14 +1685,17 @@ const getOpeningRenderData = (opening, room) => {
   const wallSide = resolveOpeningWallSide(opening, room, meta);
   const wallData = wallSide ? getWallDataForSide(room, wallSide) : null;
   const axis = meta.axis;
-  const start = axis === "x"
-    ? Math.min(opening.x1, opening.x2)
-    : Math.min(opening.y1, opening.y2);
-  const end = axis === "x"
-    ? Math.max(opening.x1, opening.x2)
-    : Math.max(opening.y1, opening.y2);
+  const start =
+    axis === "x"
+      ? Math.min(opening.x1, opening.x2)
+      : Math.min(opening.y1, opening.y2);
+  const end =
+    axis === "x"
+      ? Math.max(opening.x1, opening.x2)
+      : Math.max(opening.y1, opening.y2);
   const position = axis === "x" ? opening.y1 : opening.x1;
-  const normal = wallData?.normal || (axis === "x" ? { x: 0, y: 1 } : { x: 1, y: 0 });
+  const normal =
+    wallData?.normal || (axis === "x" ? { x: 0, y: 1 } : { x: 1, y: 0 });
   const wallDir = axis === "x" ? { x: 1, y: 0 } : { x: 0, y: 1 };
   const length = Math.max(meta.length, 1);
   return { axis, start, end, position, normal, wallDir, length };
@@ -1442,7 +1739,8 @@ const appendDoorSymbol = (group, data, showSwing = true) => {
     x: hinge.x + data.wallDir.x * data.length,
     y: hinge.y + data.wallDir.y * data.length,
   };
-  const sweep = data.wallDir.x * data.normal.y - data.wallDir.y * data.normal.x > 0 ? 1 : 0;
+  const sweep =
+    data.wallDir.x * data.normal.y - data.wallDir.y * data.normal.x > 0 ? 1 : 0;
 
   const arcPath = `M ${wallEnd.x} ${wallEnd.y} A ${data.length} ${data.length} 0 0 ${sweep} ${leafEnd.x} ${leafEnd.y}`;
   group.appendChild(createSvgPath(arcPath, "door-arc"));
@@ -1467,13 +1765,15 @@ const appendWindowSymbol = (group, data) => {
   const center = (data.start + data.end) / 2;
   if (data.axis === "x") {
     const y1 = data.position + data.normal.y * OPENING_INSET_PX;
-    const y2 = data.position + data.normal.y * (OPENING_INSET_PX + WINDOW_GAP_PX);
+    const y2 =
+      data.position + data.normal.y * (OPENING_INSET_PX + WINDOW_GAP_PX);
     group.appendChild(
       createSvgLine({ x1: center, y1, x2: center, y2 }, "window-cross"),
     );
   } else {
     const x1 = data.position + data.normal.x * OPENING_INSET_PX;
-    const x2 = data.position + data.normal.x * (OPENING_INSET_PX + WINDOW_GAP_PX);
+    const x2 =
+      data.position + data.normal.x * (OPENING_INSET_PX + WINDOW_GAP_PX);
     group.appendChild(
       createSvgLine({ x1, y1: center, x2, y2: center }, "window-cross"),
     );
@@ -1543,11 +1843,20 @@ const renderFloorplan = () => {
     rect.setAttribute("y", room.y);
     rect.setAttribute("width", room.width);
     rect.setAttribute("height", room.height);
+    const isRoomSelected =
+      state.selectedElement?.elementType === "room" &&
+      state.selectedElement?.roomId === room.id &&
+      state.selectedElement?.floorId === floor.id;
     rect.setAttribute(
       "class",
-      `room-hit${state.activeRoomId === room.id ? " active" : ""}`,
+      `room-hit architect-hit${
+        state.activeRoomId === room.id ? " active" : ""
+      }${isRoomSelected ? " selected" : ""}`,
     );
     rect.dataset.roomId = room.id;
+    rect.dataset.floorId = floor.id;
+    rect.dataset.elementType = "room";
+    rect.dataset.elementLabel = `${room.name} – Raum`;
 
     const label = document.createElementNS(
       "http://www.w3.org/2000/svg",
@@ -1684,7 +1993,7 @@ const renderRoomPanel = () => {
   elements.threeDPanel.hidden = false;
   elements.threeDPanel.classList.toggle("open", state.show3d);
   elements.threeDButton.textContent = state.show3d ? "Schließen" : "Öffnen";
-  update3DBox(room.id);
+  update3DScene(room.id);
 
   renderChecklist(roomData);
   renderComments(roomData);
@@ -1748,7 +2057,7 @@ const renderArchitectPanel = () => {
     elements.architectTitle.textContent = "Element wählen";
     if (elements.architectHelp) {
       elements.architectHelp.textContent =
-        "Wand, Tür oder Fenster im Grundriss ziehen, um zu starten.";
+        "Raum, Wand, Tür oder Fenster im Grundriss ziehen, um zu starten.";
     }
     elements.measurementForm.hidden = true;
     return;
@@ -1765,7 +2074,11 @@ const renderArchitectPanel = () => {
     }
 
     const { room, wallMeta, constraints } = wallData;
-    const positionPx = clamp(wallMeta.position, constraints.min, constraints.max);
+    const positionPx = clamp(
+      wallMeta.position,
+      constraints.min,
+      constraints.max,
+    );
 
     const axisLabel =
       wallMeta.orientation === "vertical"
@@ -1815,8 +2128,8 @@ const renderArchitectPanel = () => {
       elements.architectHelp.textContent = !positionEditable
         ? "Außenwände sind fixiert. Wählen Sie eine Innenwand für Änderungen."
         : state.wallLinkLocked
-        ? "Wand gekoppelt: Bewegung passt angrenzende Räume an. Änderungen erscheinen sofort."
-        : "Kopplung gelöst: Änderungen wirken nur auf diesen Raum. Änderungen erscheinen sofort.";
+          ? "Wand gekoppelt: Bewegung passt angrenzende Räume an. Änderungen erscheinen sofort."
+          : "Kopplung gelöst: Änderungen wirken nur auf diesen Raum. Änderungen erscheinen sofort.";
     }
 
     elements.measurementAxis.min = positionMinMm;
@@ -1847,6 +2160,84 @@ const renderArchitectPanel = () => {
     return;
   }
 
+  if (elementType === "room") {
+    const floor =
+      state.floorPlans[state.selectedElement.floorId] || getActiveFloor();
+    const room = floor.rooms.find(
+      (item) => item.id === state.selectedElement.roomId,
+    );
+    if (!room) {
+      elements.measurementForm.hidden = true;
+      return;
+    }
+
+    const widthMinMm = toMm(MIN_ROOM_SIZE_PX);
+    const widthMaxPx = Math.max(
+      MIN_ROOM_SIZE_PX,
+      floorBounds.x + floorBounds.width - room.x,
+      room.width,
+    );
+    const heightMaxPx = Math.max(
+      MIN_ROOM_SIZE_PX,
+      floorBounds.y + floorBounds.height - room.y,
+      room.height,
+    );
+    const widthMaxMm = toMm(widthMaxPx);
+    const heightMaxMm = toMm(heightMaxPx);
+    const widthMm = toMm(room.width);
+    const heightMm = toMm(room.height);
+
+    if (elements.measurementAxisLabel) {
+      elements.measurementAxisLabel.textContent = "Raumbreite (mm)";
+    }
+    if (elements.measurementSpanLabel) {
+      elements.measurementSpanLabel.textContent = "Raumtiefe (mm)";
+    }
+    if (elements.measurementLockRow) {
+      elements.measurementLockRow.hidden = true;
+    }
+    if (elements.measurementHeightRow) {
+      elements.measurementHeightRow.hidden = true;
+    }
+    if (elements.measurementSwingRow) {
+      elements.measurementSwingRow.hidden = true;
+    }
+    if (elements.measurementNote) {
+      elements.measurementNote.hidden = true;
+    }
+    if (elements.architectHelp) {
+      elements.architectHelp.textContent =
+        "Raum ziehen, um ihn zu verschieben. Breite und Tiefe hier anpassen.";
+    }
+
+    elements.measurementAxis.min = widthMinMm;
+    elements.measurementAxis.max = widthMaxMm;
+    elements.measurementAxis.step = MM_PER_PX;
+    elements.measurementAxis.value = widthMm;
+    elements.measurementAxis.disabled = false;
+
+    elements.measurementAxisNumber.min = widthMinMm;
+    elements.measurementAxisNumber.max = widthMaxMm;
+    elements.measurementAxisNumber.step = MM_PER_PX;
+    elements.measurementAxisNumber.value = widthMm;
+    elements.measurementAxisNumber.disabled = false;
+
+    elements.measurementSpan.min = widthMinMm;
+    elements.measurementSpan.max = heightMaxMm;
+    elements.measurementSpan.step = MM_PER_PX;
+    elements.measurementSpan.value = heightMm;
+    elements.measurementSpan.disabled = false;
+
+    elements.measurementSpanNumber.min = widthMinMm;
+    elements.measurementSpanNumber.max = heightMaxMm;
+    elements.measurementSpanNumber.step = MM_PER_PX;
+    elements.measurementSpanNumber.value = heightMm;
+    elements.measurementSpanNumber.disabled = false;
+
+    elements.measurementForm.hidden = false;
+    return;
+  }
+
   const openingData = getOpeningSelectionData(state.selectedElement);
   if (!openingData) {
     elements.measurementForm.hidden = true;
@@ -1865,7 +2256,9 @@ const renderArchitectPanel = () => {
 
   const positionMinMm = toMm(positionBounds.min);
   const positionMaxMm = toMm(positionBounds.max);
-  const positionMm = toMm(clamp(meta.position, positionBounds.min, positionBounds.max));
+  const positionMm = toMm(
+    clamp(meta.position, positionBounds.min, positionBounds.max),
+  );
 
   const lengthMinMm = toMm(minLength);
   const lengthMaxMm = toMm(maxLength);
@@ -1877,7 +2270,10 @@ const renderArchitectPanel = () => {
     heightBounds.max,
   );
   openingData.opening.heightMm = heightMm;
-  if (elementType === "door" && typeof openingData.opening.showSwing !== "boolean") {
+  if (
+    elementType === "door" &&
+    typeof openingData.opening.showSwing !== "boolean"
+  ) {
     openingData.opening.showSwing = true;
   }
 
@@ -1955,21 +2351,416 @@ const renderArchitectPanel = () => {
   elements.measurementForm.hidden = false;
 };
 
-const update3DBox = (roomId) => {
-  const room = findRoomById(roomId);
-  if (!room) return;
-  const measurement = getRoomMeasurements(room);
+const getRoomCategory = (room) => {
+  const name = room?.name?.toLowerCase() || "";
+  if (name.includes("wohn")) return "living";
+  if (name.includes("schlaf")) return "bedroom";
+  if (name.includes("küche") || name.includes("kueche")) return "kitchen";
+  if (name.includes("bad")) return "bathroom";
+  if (name.includes("arbeits")) return "office";
+  if (name.includes("flur") || name.includes("treppe") || name.includes("gang"))
+    return "hallway";
+  return "default";
+};
 
-  const widthScale = Math.max(90, Math.min(200, measurement.width / 30));
-  const lengthScale = Math.max(70, Math.min(160, measurement.length / 30));
-  const depth = Math.round(
-    Math.max(40, Math.min(120, measurement.height / 60)),
+const buildDefaultScene = (room) => {
+  const name = room?.name?.toLowerCase() || "";
+  if (name.includes("wohn")) {
+    return {
+      ...THREE_D_DEFAULT_SCENE,
+      style: "warm-minimal",
+      floor: "warm-oak",
+      lighting: "golden",
+    };
+  }
+  if (name.includes("schlaf")) {
+    return {
+      ...THREE_D_DEFAULT_SCENE,
+      style: "scandi-light",
+      floor: "oak",
+      lighting: "day",
+    };
+  }
+  if (name.includes("küche") || name.includes("kueche")) {
+    return {
+      ...THREE_D_DEFAULT_SCENE,
+      style: "urban-atelier",
+      floor: "tile",
+      lighting: "day",
+    };
+  }
+  if (name.includes("bad")) {
+    return {
+      ...THREE_D_DEFAULT_SCENE,
+      style: "scandi-light",
+      floor: "tile",
+      lighting: "studio",
+    };
+  }
+  if (name.includes("arbeits")) {
+    return {
+      ...THREE_D_DEFAULT_SCENE,
+      style: "soft-modern",
+      floor: "oak",
+      lighting: "day",
+    };
+  }
+  if (name.includes("flur") || name.includes("treppe")) {
+    return {
+      ...THREE_D_DEFAULT_SCENE,
+      style: "soft-modern",
+      floor: "stone",
+      lighting: "day",
+    };
+  }
+  return { ...THREE_D_DEFAULT_SCENE };
+};
+
+const ensureRoomScene = (roomData, room) => {
+  if (!roomData.scene || typeof roomData.scene !== "object") {
+    roomData.scene = buildDefaultScene(room);
+  }
+  const scene = roomData.scene;
+  scene.view = THREE_D_VIEW_PRESETS[scene.view]
+    ? scene.view
+    : THREE_D_DEFAULT_SCENE.view;
+  scene.style = THREE_D_STYLE_PRESETS[scene.style]
+    ? scene.style
+    : THREE_D_DEFAULT_SCENE.style;
+  scene.floor = THREE_D_FLOOR_PRESETS[scene.floor]
+    ? scene.floor
+    : THREE_D_DEFAULT_SCENE.floor;
+  scene.lighting = THREE_D_LIGHTING_PRESETS[scene.lighting]
+    ? scene.lighting
+    : THREE_D_DEFAULT_SCENE.lighting;
+  return scene;
+};
+
+const syncThreeDControls = (scene) => {
+  if (elements.threeDStyle && elements.threeDStyle.value !== scene.style) {
+    elements.threeDStyle.value = scene.style;
+  }
+  if (elements.threeDFloor && elements.threeDFloor.value !== scene.floor) {
+    elements.threeDFloor.value = scene.floor;
+  }
+  if (
+    elements.threeDLighting &&
+    elements.threeDLighting.value !== scene.lighting
+  ) {
+    elements.threeDLighting.value = scene.lighting;
+  }
+  if (elements.threeDViewButtons?.length) {
+    elements.threeDViewButtons.forEach((button) => {
+      button.classList.toggle("is-active", button.dataset.view === scene.view);
+    });
+  }
+};
+
+const applyThreeDTheme = (scene) => {
+  if (!elements.threeDStage) return;
+  const style =
+    THREE_D_STYLE_PRESETS[scene.style] ||
+    THREE_D_STYLE_PRESETS[THREE_D_DEFAULT_SCENE.style];
+  const floor =
+    THREE_D_FLOOR_PRESETS[scene.floor] ||
+    THREE_D_FLOOR_PRESETS[THREE_D_DEFAULT_SCENE.floor];
+  const lighting =
+    THREE_D_LIGHTING_PRESETS[scene.lighting] ||
+    THREE_D_LIGHTING_PRESETS[THREE_D_DEFAULT_SCENE.lighting];
+  elements.threeDStage.style.setProperty("--wall-color", style.wall);
+  elements.threeDStage.style.setProperty("--wall-shade", style.wallShade);
+  elements.threeDStage.style.setProperty("--ceiling-color", style.ceiling);
+  elements.threeDStage.style.setProperty("--trim-color", style.trim);
+  elements.threeDStage.style.setProperty("--accent-color", style.accent);
+  elements.threeDStage.style.setProperty("--glass-color", style.glass);
+  elements.threeDStage.style.setProperty("--shadow-soft", style.shadowSoft);
+  elements.threeDStage.style.setProperty("--shadow-deep", style.shadowDeep);
+  elements.threeDStage.style.setProperty("--floor-base", floor.base);
+  elements.threeDStage.style.setProperty("--floor-shade", floor.shade);
+  elements.threeDStage.style.setProperty("--floor-pattern", floor.pattern);
+  elements.threeDStage.style.setProperty(
+    "--floor-pattern-size",
+    floor.patternSize,
+  );
+  elements.threeDStage.style.setProperty("--sky-top", lighting.skyTop);
+  elements.threeDStage.style.setProperty("--sky-mid", lighting.skyMid);
+  elements.threeDStage.style.setProperty("--sky-bottom", lighting.skyBottom);
+  elements.threeDStage.style.setProperty("--room-filter", lighting.filter);
+  elements.threeDStage.style.setProperty("--glow-spot", lighting.glow);
+  elements.threeDStage.dataset.view = scene.view;
+};
+
+const createRoomSurface = (className) => {
+  const surface = document.createElement("div");
+  surface.className = `room-surface ${className}`;
+  return surface;
+};
+
+const buildThreeDRoomShell = () => {
+  if (!elements.threeDRoom) return null;
+  elements.threeDRoom.innerHTML = "";
+
+  const floor = createRoomSurface("floor");
+  const floorFurniture = document.createElement("div");
+  floorFurniture.className = "floor-furniture";
+  floor.appendChild(floorFurniture);
+
+  const ceiling = createRoomSurface("ceiling");
+  const wallNorth = createRoomSurface("wall wall-north");
+  const wallSouth = createRoomSurface("wall wall-south");
+  const wallEast = createRoomSurface("wall wall-east");
+  const wallWest = createRoomSurface("wall wall-west");
+
+  elements.threeDRoom.appendChild(floor);
+  elements.threeDRoom.appendChild(ceiling);
+  elements.threeDRoom.appendChild(wallNorth);
+  elements.threeDRoom.appendChild(wallSouth);
+  elements.threeDRoom.appendChild(wallEast);
+  elements.threeDRoom.appendChild(wallWest);
+
+  return {
+    floorFurniture,
+    walls: {
+      top: wallNorth,
+      bottom: wallSouth,
+      left: wallWest,
+      right: wallEast,
+    },
+  };
+};
+
+const getWindowSillHeightMm = (opening, roomHeightMm) => {
+  if (opening.type !== "window") return 0;
+  const defaultSill = 900;
+  const maxSill = Math.max(0, roomHeightMm - opening.heightMm - 200);
+  return clamp(defaultSill, 0, maxSill);
+};
+
+const renderThreeDOpenings = (room, measurement, roomSize, walls) => {
+  const floor = getActiveFloor();
+  if (!floor) return;
+  floor.openings
+    .filter((opening) => opening.roomId === room.id)
+    .forEach((opening) => {
+      const meta = getOpeningMeta(opening);
+      const wallSide = resolveOpeningWallSide(opening, room, meta);
+      const wallEl = walls[wallSide];
+      if (!wallEl) return;
+
+      const wallSpan =
+        wallSide === "left" || wallSide === "right" ? room.height : room.width;
+      const wallSpanPx =
+        wallSide === "left" || wallSide === "right"
+          ? roomSize.depth
+          : roomSize.width;
+      const openingStart =
+        wallSide === "left" || wallSide === "right"
+          ? Math.min(opening.y1, opening.y2) - room.y
+          : Math.min(opening.x1, opening.x2) - room.x;
+      const openingWidth = Math.max(
+        18,
+        (meta.length / Math.max(wallSpan, 1)) * wallSpanPx,
+      );
+      const openingLeft = clamp(
+        (openingStart / Math.max(wallSpan, 1)) * wallSpanPx,
+        6,
+        wallSpanPx - openingWidth - 6,
+      );
+      const openingHeight = Math.max(
+        40,
+        (opening.heightMm / measurement.height) * roomSize.height,
+      );
+      const bottomMm = getWindowSillHeightMm(opening, measurement.height);
+      const openingBottom = (bottomMm / measurement.height) * roomSize.height;
+
+      const openingEl = document.createElement("div");
+      openingEl.className = `opening ${opening.type}`;
+      openingEl.style.setProperty("--opening-left", `${openingLeft}px`);
+      openingEl.style.setProperty("--opening-width", `${openingWidth}px`);
+      openingEl.style.setProperty("--opening-height", `${openingHeight}px`);
+      openingEl.style.setProperty("--opening-bottom", `${openingBottom}px`);
+      openingEl.title = opening.label;
+      wallEl.appendChild(openingEl);
+    });
+};
+
+const renderThreeDFurniture = (room, roomSize, floorFurniture) => {
+  if (!floorFurniture) return;
+  const category = getRoomCategory(room);
+  const layout =
+    THREE_D_FURNITURE_PRESETS[category] || THREE_D_FURNITURE_PRESETS.default;
+  const pad = 6;
+  layout.forEach((item) => {
+    const width = Math.max(20, item.width * roomSize.width);
+    const depth = Math.max(20, item.depth * roomSize.depth);
+    const left = clamp(
+      item.x * roomSize.width,
+      pad,
+      roomSize.width - width - pad,
+    );
+    const top = clamp(
+      item.z * roomSize.depth,
+      pad,
+      roomSize.depth - depth - pad,
+    );
+    const block = document.createElement("div");
+    block.className = `furniture-block${item.soft ? " is-soft" : ""}`;
+    block.style.width = `${width}px`;
+    block.style.height = `${depth}px`;
+    block.style.left = `${left}px`;
+    block.style.top = `${top}px`;
+    floorFurniture.appendChild(block);
+  });
+};
+
+const updateThreeDReadout = (measurement) => {
+  if (!elements.threeDReadout) return;
+  const meters = (mm) => (mm / 1000).toFixed(1);
+  elements.threeDReadout.textContent = `${meters(
+    measurement.width,
+  )}m × ${meters(measurement.length)}m × ${meters(measurement.height)}m`;
+};
+
+const updateThreeDCamera = () => {
+  if (!elements.threeDStage) return;
+  elements.threeDStage.style.setProperty(
+    "--camera-rotate",
+    `${threeDState.camera.yaw}deg`,
+  );
+  elements.threeDStage.style.setProperty(
+    "--camera-tilt",
+    `${threeDState.camera.pitch}deg`,
+  );
+  elements.threeDStage.style.setProperty(
+    "--camera-distance",
+    `${threeDState.camera.distance}px`,
+  );
+};
+
+const resetThreeDCamera = (view, roomSize) => {
+  const preset = THREE_D_VIEW_PRESETS[view] || THREE_D_VIEW_PRESETS.walkthrough;
+  const baseDistance = Math.max(roomSize.width, roomSize.depth) * 2.2;
+  threeDState.camera.yaw = preset.yaw;
+  threeDState.camera.pitch = preset.pitch;
+  threeDState.camera.distance = -baseDistance * preset.distanceFactor;
+  threeDState.bounds.minDistance = -baseDistance * 2.4;
+  threeDState.bounds.maxDistance = -baseDistance * 0.6;
+};
+
+const update3DScene = (roomId, { resetCamera = false } = {}) => {
+  const room = findRoomById(roomId);
+  if (!room || !elements.threeDStage || !elements.threeDRoom) return;
+  const roomData = ensureRoomData(roomId);
+  const scene = ensureRoomScene(roomData, room);
+  syncThreeDControls(scene);
+  applyThreeDTheme(scene);
+
+  const measurement = getRoomMeasurements(room);
+  const maxWidth = 320;
+  const maxDepth = 240;
+  const scale = clamp(
+    Math.min(maxWidth / measurement.width, maxDepth / measurement.length),
+    0.04,
+    0.09,
+  );
+  const roomSize = {
+    width: Math.round(measurement.width * scale),
+    depth: Math.round(measurement.length * scale),
+    height: Math.round(measurement.height * scale),
+  };
+
+  elements.threeDStage.style.setProperty("--room-width", `${roomSize.width}px`);
+  elements.threeDStage.style.setProperty("--room-depth", `${roomSize.depth}px`);
+  elements.threeDStage.style.setProperty(
+    "--room-height",
+    `${roomSize.height}px`,
   );
 
-  const box = elements.threeDPanel.querySelector(".three-d-box");
-  box.style.setProperty("--box-width", `${widthScale}px`);
-  box.style.setProperty("--box-height", `${lengthScale}px`);
-  box.style.setProperty("--box-depth", `${depth}px`);
+  const shell = buildThreeDRoomShell();
+  if (shell) {
+    renderThreeDOpenings(room, measurement, roomSize, shell.walls);
+    renderThreeDFurniture(room, roomSize, shell.floorFurniture);
+  }
+  updateThreeDReadout(measurement);
+
+  const shouldReset =
+    resetCamera ||
+    threeDState.activeRoomId !== roomId ||
+    threeDState.activeView !== scene.view;
+  if (shouldReset) {
+    resetThreeDCamera(scene.view, roomSize);
+  }
+  updateThreeDCamera();
+  threeDState.activeRoomId = roomId;
+  threeDState.activeView = scene.view;
+};
+
+const updateActiveRoomScene = (updates, { resetCamera = false } = {}) => {
+  if (!state.activeRoomId) return;
+  const room = findRoomById(state.activeRoomId);
+  if (!room) return;
+  const roomData = ensureRoomData(state.activeRoomId);
+  const scene = ensureRoomScene(roomData, room);
+  Object.assign(scene, updates);
+  ensureRoomScene(roomData, room);
+  saveState();
+  update3DScene(state.activeRoomId, { resetCamera });
+};
+
+const startThreeDDrag = (event) => {
+  if (!elements.threeDStage) return;
+  event.preventDefault();
+  threeDState.drag.active = true;
+  threeDState.drag.pointerId = event.pointerId;
+  threeDState.drag.lastX = event.clientX;
+  threeDState.drag.lastY = event.clientY;
+  elements.threeDStage.classList.add("is-dragging");
+  try {
+    elements.threeDStage.setPointerCapture(event.pointerId);
+  } catch {
+    // Ignore pointer capture failures.
+  }
+};
+
+const moveThreeDDrag = (event) => {
+  if (!threeDState.drag.active) return;
+  const deltaX = event.clientX - threeDState.drag.lastX;
+  const deltaY = event.clientY - threeDState.drag.lastY;
+  threeDState.drag.lastX = event.clientX;
+  threeDState.drag.lastY = event.clientY;
+  threeDState.camera.yaw += deltaX * 0.25;
+  threeDState.camera.pitch = clamp(
+    threeDState.camera.pitch + deltaY * 0.25,
+    -8,
+    45,
+  );
+  updateThreeDCamera();
+};
+
+const endThreeDDrag = () => {
+  if (!threeDState.drag.active) return;
+  if (threeDState.drag.pointerId !== null) {
+    try {
+      elements.threeDStage?.releasePointerCapture(threeDState.drag.pointerId);
+    } catch {
+      // Ignore pointer capture failures.
+    }
+  }
+  threeDState.drag.active = false;
+  threeDState.drag.pointerId = null;
+  elements.threeDStage?.classList.remove("is-dragging");
+};
+
+const handleThreeDWheel = (event) => {
+  if (!state.show3d) return;
+  event.preventDefault();
+  const step = Math.sign(event.deltaY) * 40;
+  threeDState.camera.distance = clamp(
+    threeDState.camera.distance - step,
+    threeDState.bounds.minDistance,
+    threeDState.bounds.maxDistance,
+  );
+  updateThreeDCamera();
 };
 
 const clearHoverState = () => {
@@ -1999,6 +2790,8 @@ const resetDragState = ({ keepSuppressClick = false } = {}) => {
   dragState.type = null;
   dragState.axis = null;
   dragState.startPointerAxis = 0;
+  dragState.startPointerX = 0;
+  dragState.startPointerY = 0;
   dragState.startPosition = 0;
   dragState.lastPosition = 0;
   dragState.context = null;
@@ -2017,7 +2810,7 @@ const setArchitectMode = (isOn) => {
   renderFloorplan();
   if (elements.floorplanHint) {
     elements.floorplanHint.textContent = isOn
-      ? "Architekt-Ansicht: Wände, Türen und Fenster im Grundriss ziehen."
+      ? "Architekt-Ansicht: Räume, Wände, Türen und Fenster im Grundriss ziehen."
       : DEFAULT_FLOORPLAN_HINT;
   }
   renderArchitectPanel();
@@ -2288,12 +3081,12 @@ const generateImageWithOpenAI = async (promptText, roomData) => {
       error?.code === "missing_api_key"
         ? "Kein API-Schlüssel gefunden – im Dialog speichern oder OPENAI_API_KEY am Server setzen."
         : error?.code === "openai_network_error"
-        ? "Netzwerk blockiert – HTTPS zu api.openai.com ist gesperrt. Zugriff erlauben und erneut versuchen."
-        : networkBlocked
-        ? "Lokaler Bilddienst nicht erreichbar. App über npm run serve starten."
-        : error?.code === "openai_error"
-        ? `OpenAI-Fehler: ${error.message}`
-        : "Bildgenerierung fehlgeschlagen – Platzhalter gespeichert. API-Schlüssel prüfen?";
+          ? "Netzwerk blockiert – HTTPS zu api.openai.com ist gesperrt. Zugriff erlauben und erneut versuchen."
+          : networkBlocked
+            ? "Lokaler Bilddienst nicht erreichbar. App über npm run serve starten."
+            : error?.code === "openai_error"
+              ? `OpenAI-Fehler: ${error.message}`
+              : "Bildgenerierung fehlgeschlagen – Platzhalter gespeichert. API-Schlüssel prüfen?";
     setImageStatus(message, true);
   } finally {
     elements.generateImageBtn.disabled = false;
@@ -2355,7 +3148,12 @@ const applyArchitectAdjustments = ({
     const { floor, room, wallMeta, affectedRooms, constraints } = wallData;
     const oldPosition = wallMeta.position;
     const newPosition = clamp(
-      toPx(getInputNumber(elements.measurementAxisNumber, elements.measurementAxis)),
+      toPx(
+        getInputNumber(
+          elements.measurementAxisNumber,
+          elements.measurementAxis,
+        ),
+      ),
       constraints.min,
       constraints.max,
     );
@@ -2374,7 +3172,10 @@ const applyArchitectAdjustments = ({
           : floorBounds.x + floorBounds.width - room.x;
       const newLength = clamp(
         toPx(
-          getInputNumber(elements.measurementSpanNumber, elements.measurementSpan),
+          getInputNumber(
+            elements.measurementSpanNumber,
+            elements.measurementSpan,
+          ),
         ),
         MIN_ROOM_SIZE_PX,
         maxLengthPx,
@@ -2388,7 +3189,7 @@ const applyArchitectAdjustments = ({
     if (changed) {
       renderFloorplan();
       renderRoomPanel();
-      update3DBox(room.id);
+      update3DScene(room.id);
     }
     if (refreshPanel) {
       renderArchitectPanel();
@@ -2399,24 +3200,89 @@ const applyArchitectAdjustments = ({
     return;
   }
 
+  if (state.selectedElement.elementType === "room") {
+    const floor =
+      state.floorPlans[state.selectedElement.floorId] || getActiveFloor();
+    const room = floor.rooms.find(
+      (item) => item.id === state.selectedElement.roomId,
+    );
+    if (!room) return;
+
+    const widthMaxPx = Math.max(
+      MIN_ROOM_SIZE_PX,
+      floorBounds.x + floorBounds.width - room.x,
+      room.width,
+    );
+    const heightMaxPx = Math.max(
+      MIN_ROOM_SIZE_PX,
+      floorBounds.y + floorBounds.height - room.y,
+      room.height,
+    );
+    const newWidth = clamp(
+      toPx(
+        getInputNumber(
+          elements.measurementAxisNumber,
+          elements.measurementAxis,
+        ),
+      ),
+      MIN_ROOM_SIZE_PX,
+      widthMaxPx,
+    );
+    const newHeight = clamp(
+      toPx(
+        getInputNumber(
+          elements.measurementSpanNumber,
+          elements.measurementSpan,
+        ),
+      ),
+      MIN_ROOM_SIZE_PX,
+      heightMaxPx,
+    );
+
+    const widthChanged = Math.abs(newWidth - room.width) > 0.01;
+    const heightChanged = Math.abs(newHeight - room.height) > 0.01;
+    if (widthChanged || heightChanged) {
+      room.width = newWidth;
+      room.height = newHeight;
+      updateOpeningsForRoomResize(floor, room);
+      renderFloorplan();
+      renderRoomPanel();
+      update3DScene(room.id);
+    }
+    if (refreshPanel) {
+      renderArchitectPanel();
+    }
+    if (commit && (widthChanged || heightChanged)) {
+      saveState();
+    }
+    return;
+  }
+
   const openingData = getOpeningSelectionData(state.selectedElement);
   if (!openingData) return;
 
   const { opening, meta, bounds, minLength, maxLength } = openingData;
   const newLength = clamp(
-    toPx(getInputNumber(elements.measurementSpanNumber, elements.measurementSpan)),
+    toPx(
+      getInputNumber(elements.measurementSpanNumber, elements.measurementSpan),
+    ),
     minLength,
     maxLength,
   );
   const positionBounds = getOpeningPositionBounds(bounds, newLength);
   const newCenter = clamp(
-    toPx(getInputNumber(elements.measurementAxisNumber, elements.measurementAxis)),
+    toPx(
+      getInputNumber(elements.measurementAxisNumber, elements.measurementAxis),
+    ),
     positionBounds.min,
     positionBounds.max,
   );
   const heightBounds = getOpeningHeightBoundsMm(opening.type);
   const newHeight = clamp(
-    getInputNumber(elements.measurementHeightNumber, elements.measurementHeight),
+    getInputNumber(
+      elements.measurementHeightNumber,
+      elements.measurementHeight,
+    ),
     heightBounds.min,
     heightBounds.max,
   );
@@ -2460,7 +3326,10 @@ const applyArchitectAdjustments = ({
 
 const startArchitectDrag = (event, target) => {
   const hitTarget = target?.closest?.(".architect-hit") || target;
-  if (!state.isArchitectMode || !hitTarget?.classList?.contains("architect-hit")) {
+  if (
+    !state.isArchitectMode ||
+    !hitTarget?.classList?.contains("architect-hit")
+  ) {
     return;
   }
 
@@ -2478,24 +3347,39 @@ const startArchitectDrag = (event, target) => {
     dragState.active = true;
     dragState.type = "wall";
     dragState.axis = wallData.wallMeta.axis;
-    dragState.startPointerAxis =
-      dragState.axis === "x" ? pointer.x : pointer.y;
+    dragState.startPointerAxis = dragState.axis === "x" ? pointer.x : pointer.y;
     dragState.startPosition = wallData.wallMeta.position;
     dragState.lastPosition = wallData.wallMeta.position;
     dragState.context = wallData;
+  } else if (selection.elementType === "room") {
+    const floor = state.floorPlans[selection.floorId] || getActiveFloor();
+    const room = floor.rooms.find((item) => item.id === selection.roomId);
+    if (!room) return;
+    dragState.active = true;
+    dragState.type = "room";
+    dragState.axis = null;
+    dragState.startPointerX = pointer.x;
+    dragState.startPointerY = pointer.y;
+    dragState.context = {
+      floor,
+      room,
+      startX: room.x,
+      startY: room.y,
+    };
   } else {
     const openingData = getOpeningSelectionData(selection);
     if (!openingData) return;
     dragState.active = true;
     dragState.type = "opening";
     dragState.axis = openingData.meta.axis;
-    dragState.startPointerAxis =
-      dragState.axis === "x" ? pointer.x : pointer.y;
+    dragState.startPointerAxis = dragState.axis === "x" ? pointer.x : pointer.y;
     dragState.startPosition = openingData.meta.position;
     dragState.lastPosition = openingData.meta.position;
     dragState.context = {
       opening: openingData.opening,
       room: openingData.room,
+      floor: openingData.floor,
+      startRoomId: openingData.opening.roomId,
       length: openingData.meta.length,
     };
   }
@@ -2542,15 +3426,47 @@ const handleArchitectPointerMove = (event) => {
       newPosition,
     );
     dragState.lastPosition = newPosition;
+  } else if (dragState.type === "room") {
+    const { floor, room, startX, startY } = dragState.context;
+    const maxX = Math.max(
+      floorBounds.x,
+      floorBounds.x + floorBounds.width - room.width,
+    );
+    const maxY = Math.max(
+      floorBounds.y,
+      floorBounds.y + floorBounds.height - room.height,
+    );
+    const newX = clamp(
+      startX + (pointer.x - dragState.startPointerX),
+      floorBounds.x,
+      maxX,
+    );
+    const newY = clamp(
+      startY + (pointer.y - dragState.startPointerY),
+      floorBounds.y,
+      maxY,
+    );
+    const deltaX = newX - room.x;
+    const deltaY = newY - room.y;
+    if (Math.abs(deltaX) < 0.1 && Math.abs(deltaY) < 0.1) return;
+    room.x = newX;
+    room.y = newY;
+    translateOpeningsForRoom(floor, room.id, deltaX, deltaY);
   } else if (dragState.type === "opening") {
-    const { opening, room } = dragState.context;
-    const targetWall = getClosestWallForPoint(
-      room,
+    const { opening, floor } = dragState.context;
+    const targetWall = getClosestWallForPointInFloor(
+      floor,
       pointer,
       dragState.context.length,
+      opening.roomId,
     );
     if (!targetWall) return;
-    const bounds = getOpeningBoundsForWall(room, targetWall.side, targetWall.axis);
+    const { room } = targetWall;
+    const bounds = getOpeningBoundsForWall(
+      room,
+      targetWall.side,
+      targetWall.axis,
+    );
     const span = Math.max(0, bounds.end - bounds.start);
     const length =
       dragState.context.length <= span ? dragState.context.length : span;
@@ -2569,6 +3485,8 @@ const handleArchitectPointerMove = (event) => {
       newCenter,
       length,
     );
+    opening.roomId = room.id;
+    dragState.context.room = room;
     dragState.axis = targetWall.axis;
     dragState.lastPosition = newCenter;
     dragState.context.length = length;
@@ -2595,7 +3513,24 @@ const finishArchitectDrag = () => {
       const roomId = dragState.context?.room?.id;
       if (roomId) {
         renderRoomPanel();
-        update3DBox(roomId);
+        update3DScene(roomId);
+      }
+    }
+    if (dragState.type === "room") {
+      const roomId = dragState.context?.room?.id;
+      if (roomId) {
+        renderRoomPanel();
+        update3DScene(roomId);
+      }
+    }
+    if (dragState.type === "opening") {
+      const { opening, startRoomId } = dragState.context || {};
+      if (opening?.roomId && opening.roomId !== startRoomId) {
+        state.activeRoomId = opening.roomId;
+        if (state.selectedElement) {
+          state.selectedElement.roomId = opening.roomId;
+        }
+        renderRoomPanel();
       }
     }
   }
@@ -2659,7 +3594,10 @@ const bindEvents = () => {
     startArchitectDrag(event, hitTarget);
   });
 
-  elements.floorplan.addEventListener("pointermove", handleArchitectPointerMove);
+  elements.floorplan.addEventListener(
+    "pointermove",
+    handleArchitectPointerMove,
+  );
   elements.floorplan.addEventListener("pointerup", finishArchitectDrag);
   elements.floorplan.addEventListener("pointercancel", finishArchitectDrag);
 
@@ -2721,6 +3659,47 @@ const bindEvents = () => {
     state.show3d = !state.show3d;
     elements.threeDPanel.classList.toggle("open", state.show3d);
     elements.threeDButton.textContent = state.show3d ? "Schließen" : "Öffnen";
+    if (state.show3d && state.activeRoomId) {
+      update3DScene(state.activeRoomId);
+    }
+  });
+
+  if (elements.threeDStage) {
+    elements.threeDStage.addEventListener("pointerdown", startThreeDDrag);
+    elements.threeDStage.addEventListener("pointermove", moveThreeDDrag);
+    elements.threeDStage.addEventListener("pointerup", endThreeDDrag);
+    elements.threeDStage.addEventListener("pointerleave", endThreeDDrag);
+    elements.threeDStage.addEventListener("pointercancel", endThreeDDrag);
+    elements.threeDStage.addEventListener("wheel", handleThreeDWheel, {
+      passive: false,
+    });
+  }
+
+  if (elements.threeDViewButtons?.length) {
+    elements.threeDViewButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const view = button.dataset.view;
+        if (!view || !THREE_D_VIEW_PRESETS[view]) return;
+        updateActiveRoomScene({ view }, { resetCamera: true });
+      });
+    });
+  }
+
+  elements.threeDStyle?.addEventListener("change", (event) => {
+    updateActiveRoomScene({ style: event.target.value });
+  });
+
+  elements.threeDFloor?.addEventListener("change", (event) => {
+    updateActiveRoomScene({ floor: event.target.value });
+  });
+
+  elements.threeDLighting?.addEventListener("change", (event) => {
+    updateActiveRoomScene({ lighting: event.target.value });
+  });
+
+  elements.threeDReset?.addEventListener("click", () => {
+    if (!state.activeRoomId) return;
+    update3DScene(state.activeRoomId, { resetCamera: true });
   });
 
   if (elements.measurementLock) {
@@ -2732,24 +3711,28 @@ const bindEvents = () => {
   syncRangeNumber(elements.measurementAxis, elements.measurementAxisNumber);
   syncRangeNumber(elements.measurementSpan, elements.measurementSpanNumber);
   syncRangeNumber(elements.measurementHeight, elements.measurementHeightNumber);
-  [elements.measurementAxis, elements.measurementAxisNumber].forEach((input) => {
-    if (!input) return;
-    input.addEventListener("input", () =>
-      applyArchitectAdjustments({ commit: false, refreshPanel: false }),
-    );
-    input.addEventListener("change", () =>
-      applyArchitectAdjustments({ commit: true, refreshPanel: true }),
-    );
-  });
-  [elements.measurementSpan, elements.measurementSpanNumber].forEach((input) => {
-    if (!input) return;
-    input.addEventListener("input", () =>
-      applyArchitectAdjustments({ commit: false, refreshPanel: false }),
-    );
-    input.addEventListener("change", () =>
-      applyArchitectAdjustments({ commit: true, refreshPanel: true }),
-    );
-  });
+  [elements.measurementAxis, elements.measurementAxisNumber].forEach(
+    (input) => {
+      if (!input) return;
+      input.addEventListener("input", () =>
+        applyArchitectAdjustments({ commit: false, refreshPanel: false }),
+      );
+      input.addEventListener("change", () =>
+        applyArchitectAdjustments({ commit: true, refreshPanel: true }),
+      );
+    },
+  );
+  [elements.measurementSpan, elements.measurementSpanNumber].forEach(
+    (input) => {
+      if (!input) return;
+      input.addEventListener("input", () =>
+        applyArchitectAdjustments({ commit: false, refreshPanel: false }),
+      );
+      input.addEventListener("change", () =>
+        applyArchitectAdjustments({ commit: true, refreshPanel: true }),
+      );
+    },
+  );
   [elements.measurementHeight, elements.measurementHeightNumber].forEach(
     (input) => {
       if (!input) return;

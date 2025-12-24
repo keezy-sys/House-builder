@@ -18,12 +18,7 @@
             <h3>Anmelden</h3>
             <label>
               E-Mail
-              <input
-                type="email"
-                name="email"
-                required
-                autocomplete="email"
-              />
+              <input type="email" name="email" required autocomplete="email" />
             </label>
             <label>
               Passwort
@@ -45,12 +40,7 @@
             </label>
             <label>
               E-Mail
-              <input
-                type="email"
-                name="email"
-                required
-                autocomplete="email"
-              />
+              <input type="email" name="email" required autocomplete="email" />
             </label>
             <label>
               Passwort
@@ -99,9 +89,9 @@
               Bewegen Sie die Maus über einen Raum, um ihn hervorzuheben.
             </p>
           </div>
-          <div class="floor-switch" aria-label="Etage auswählen">
-            <span class="floor-switch__label">Etage</span>
-            <div class="floor-switch__control">
+          <div class="floor-switch">
+            <span class="floor-switch-label">Etage</span>
+            <div class="floor-switch-control">
               <span>EG</span>
               <input
                 type="range"
@@ -114,9 +104,7 @@
               />
               <span>OG</span>
             </div>
-            <span id="floor-label" class="floor-switch__value"
-              >Erdgeschoss</span
-            >
+            <span id="floor-label" class="floor-switch-value">Erdgeschoss</span>
           </div>
         </div>
         <div class="floorplan-wrapper">
@@ -131,69 +119,24 @@
         </div>
         <div class="legend">
           <span class="legend-item">
-            <svg
-              class="legend-icon"
-              viewBox="0 0 36 12"
-              aria-hidden="true"
-            >
+            <svg class="legend-icon" viewBox="0 0 36 12" aria-hidden="true">
               <line class="legend-wall" x1="4" y1="6" x2="32" y2="6" />
             </svg>
             Wand
           </span>
           <span class="legend-item">
-            <svg
-              class="legend-icon"
-              viewBox="0 0 36 24"
-              aria-hidden="true"
-            >
-              <line
-                class="legend-door-frame"
-                x1="6"
-                y1="6"
-                x2="20"
-                y2="6"
-              />
-              <line
-                class="legend-door-leaf"
-                x1="6"
-                y1="6"
-                x2="6"
-                y2="20"
-              />
-              <path
-                class="legend-door-arc"
-                d="M 20 6 A 14 14 0 0 1 6 20"
-              />
+            <svg class="legend-icon" viewBox="0 0 36 24" aria-hidden="true">
+              <line class="legend-door-frame" x1="6" y1="6" x2="20" y2="6" />
+              <line class="legend-door-leaf" x1="6" y1="6" x2="6" y2="20" />
+              <path class="legend-door-arc" d="M 20 6 A 14 14 0 0 1 6 20" />
             </svg>
             Tür
           </span>
           <span class="legend-item">
-            <svg
-              class="legend-icon"
-              viewBox="0 0 36 12"
-              aria-hidden="true"
-            >
-              <line
-                class="legend-window-line"
-                x1="4"
-                y1="4"
-                x2="32"
-                y2="4"
-              />
-              <line
-                class="legend-window-line"
-                x1="4"
-                y1="8"
-                x2="32"
-                y2="8"
-              />
-              <line
-                class="legend-window-cross"
-                x1="18"
-                y1="4"
-                x2="18"
-                y2="8"
-              />
+            <svg class="legend-icon" viewBox="0 0 36 12" aria-hidden="true">
+              <line class="legend-window-line" x1="4" y1="4" x2="32" y2="4" />
+              <line class="legend-window-line" x1="4" y1="8" x2="32" y2="8" />
+              <line class="legend-window-cross" x1="18" y1="4" x2="18" y2="8" />
             </svg>
             Fenster
           </span>
@@ -214,19 +157,83 @@
           </p>
         </section>
 
-        <section class="panel" id="three-d-panel" hidden>
+        <section class="panel three-d-panel" id="three-d-panel" hidden>
           <div class="panel-header">
             <h3>3D-Ansicht</h3>
             <button id="toggle-3d" type="button">Öffnen</button>
           </div>
           <p id="three-d-label" class="helper">3D-Ansicht für den Raum</p>
-          <div class="three-d-scene">
-            <div class="three-d-box">
-              <div class="face front"></div>
-              <div class="face back"></div>
-              <div class="face right"></div>
-              <div class="face left"></div>
-              <div class="face top"></div>
+          <div class="three-d-controls">
+            <div class="three-d-control">
+              <span class="three-d-control-label">Ansicht</span>
+              <div
+                class="segmented-control"
+                role="group"
+                aria-label="3D-Ansicht wählen"
+              >
+                <button
+                  class="segmented-option is-active"
+                  type="button"
+                  data-view="walkthrough"
+                >
+                  Innen
+                </button>
+                <button
+                  class="segmented-option"
+                  type="button"
+                  data-view="dollhouse"
+                >
+                  Modell
+                </button>
+              </div>
+            </div>
+            <label class="three-d-control">
+              <span class="three-d-control-label">Stil</span>
+              <select id="three-d-style">
+                <option value="soft-modern">Soft Modern</option>
+                <option value="warm-minimal">Warm Minimal</option>
+                <option value="urban-atelier">Urban Atelier</option>
+                <option value="scandi-light">Scandi Light</option>
+              </select>
+            </label>
+            <label class="three-d-control">
+              <span class="three-d-control-label">Material</span>
+              <select id="three-d-floor">
+                <option value="oak">Eiche</option>
+                <option value="warm-oak">Räuchereiche</option>
+                <option value="stone">Naturstein</option>
+                <option value="tile">Feinsteinzeug</option>
+                <option value="terrazzo">Terrazzo</option>
+              </select>
+            </label>
+            <label class="three-d-control">
+              <span class="three-d-control-label">Licht</span>
+              <select id="three-d-lighting">
+                <option value="day">Tageslicht</option>
+                <option value="golden">Goldene Stunde</option>
+                <option value="evening">Abend</option>
+                <option value="studio">Studio</option>
+              </select>
+            </label>
+            <button id="three-d-reset" type="button">
+              Ansicht zurücksetzen
+            </button>
+          </div>
+          <div class="three-d-viewer">
+            <div
+              class="three-d-stage"
+              id="three-d-stage"
+              data-view="walkthrough"
+            >
+              <div class="three-d-camera" id="three-d-camera">
+                <div class="three-d-room" id="three-d-room"></div>
+              </div>
+            </div>
+            <div class="three-d-hud">
+              <span class="three-d-hint">
+                Ziehen: Blick drehen · Scrollen: Zoom
+              </span>
+              <span id="three-d-readout" class="three-d-readout"></span>
             </div>
           </div>
         </section>
@@ -271,17 +278,30 @@
     <section id="architect-view" class="architect-view" hidden>
       <h2>Architekt-Ansicht</h2>
       <p>
-        Ziehen Sie Wände, Türen und Fenster direkt im Grundriss. Öffnungen
-        rasten an Wänden ein. Klicken Sie ein Element, um Maße feinzujustieren.
+        Ziehen Sie Räume, Wände, Türen und Fenster direkt im Grundriss.
+        Öffnungen rasten an Wänden ein. Klicken Sie ein Element, um Maße
+        feinzujustieren.
       </p>
 
       <div class="architect-panel">
         <h3 id="architect-title">Element wählen</h3>
         <form id="measurement-form" class="measurement-form" hidden>
-          <label>
-            <span id="measure-axis-label">X-Position der Wand (mm)</span>
+          <div
+            class="measurement-group"
+            role="group"
+            aria-labelledby="measure-axis-label"
+          >
+            <span id="measure-axis-label" class="measurement-label">
+              X-Position der Wand (mm)
+            </span>
             <div class="measurement-row">
-              <input type="range" id="measure-axis" min="0" max="10000" />
+              <input
+                type="range"
+                id="measure-axis"
+                min="0"
+                max="10000"
+                aria-labelledby="measure-axis-label"
+              />
               <input
                 type="number"
                 id="measure-axis-number"
@@ -289,13 +309,26 @@
                 max="10000"
                 step="20"
                 required
+                aria-labelledby="measure-axis-label"
               />
             </div>
-          </label>
-          <label>
-            <span id="measure-span-label">Y-Länge der Wand (mm)</span>
+          </div>
+          <div
+            class="measurement-group"
+            role="group"
+            aria-labelledby="measure-span-label"
+          >
+            <span id="measure-span-label" class="measurement-label">
+              Y-Länge der Wand (mm)
+            </span>
             <div class="measurement-row">
-              <input type="range" id="measure-span" min="0" max="10000" />
+              <input
+                type="range"
+                id="measure-span"
+                min="0"
+                max="10000"
+                aria-labelledby="measure-span-label"
+              />
               <input
                 type="number"
                 id="measure-span-number"
@@ -303,13 +336,27 @@
                 max="10000"
                 step="20"
                 required
+                aria-labelledby="measure-span-label"
               />
             </div>
-          </label>
-          <label id="measure-height-row">
-            <span id="measure-height-label">Öffnungshöhe (mm)</span>
+          </div>
+          <div
+            id="measure-height-row"
+            class="measurement-group"
+            role="group"
+            aria-labelledby="measure-height-label"
+          >
+            <span id="measure-height-label" class="measurement-label">
+              Öffnungshöhe (mm)
+            </span>
             <div class="measurement-row">
-              <input type="range" id="measure-height" min="0" max="3000" />
+              <input
+                type="range"
+                id="measure-height"
+                min="0"
+                max="3000"
+                aria-labelledby="measure-height-label"
+              />
               <input
                 type="number"
                 id="measure-height-number"
@@ -317,9 +364,10 @@
                 max="3000"
                 step="10"
                 required
+                aria-labelledby="measure-height-label"
               />
             </div>
-          </label>
+          </div>
           <label id="measure-swing-row" class="measurement-toggle">
             <input type="checkbox" id="measure-swing" checked />
             Schwenkbogen anzeigen
@@ -329,6 +377,9 @@
             Angrenzende Räume koppeln
           </label>
           <p id="measure-note" class="helper">Wandhöhe fix: 2800 mm.</p>
+          <button type="submit" class="visually-hidden">
+            Werte übernehmen
+          </button>
         </form>
         <p id="architect-help" class="helper"></p>
       </div>
