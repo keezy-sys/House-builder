@@ -2,12 +2,16 @@ import { createServer } from "http";
 import { readFile, stat } from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
+import { handleEvidenceApi } from "./evidence-store.mjs";
+import { handleTasksApi } from "./tasks-store.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname);
 const port = Number(process.env.PORT || 3000);
 const host = process.env.HOST || "127.0.0.1";
+const imageModel =
+  (process.env.OPENAI_IMAGE_MODEL || "dall-e-3").trim() || "dall-e-3";
 
 const mimeTypes = {
   ".html": "text/html",
@@ -87,7 +91,7 @@ const handleImageGeneration = async (req, res) => {
         Authorization: `Bearer ${resolvedKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-image-1",
+        model: imageModel,
         prompt: prompt.trim(),
         size: "1024x1024",
       }),
@@ -135,7 +139,8 @@ const handleImageGeneration = async (req, res) => {
 const startServer = () =>
   new Promise((resolve, reject) => {
     const server = createServer(async (req, res) => {
-      const urlPath = decodeURIComponent((req.url || "/").split("?")[0]);
+      const parsedUrl = new URL(req.url || "/", `http://${host}:${port}`);
+      const urlPath = decodeURIComponent(parsedUrl.pathname);
 
       if (urlPath === "/api/image") {
         if (req.method !== "POST") {
@@ -147,6 +152,35 @@ const startServer = () =>
         }
 
         await handleImageGeneration(req, res);
+        return;
+      }
+
+      const method = String(req.method || "").toUpperCase();
+      const needsBody = ["POST", "PATCH", "PUT", "DELETE"].includes(method);
+      const body = needsBody ? await readRequestBody(req) : null;
+
+      const tasksResponse = await handleTasksApi({
+        method,
+        urlPath,
+        headers: req.headers,
+        query: parsedUrl.searchParams,
+        body,
+      });
+
+      if (tasksResponse) {
+        sendJson(res, tasksResponse.statusCode, tasksResponse.payload);
+        return;
+      }
+
+      const evidenceResponse = await handleEvidenceApi({
+        method,
+        urlPath,
+        headers: req.headers,
+        body: method === "POST" ? body : null,
+      });
+
+      if (evidenceResponse) {
+        sendJson(res, evidenceResponse.statusCode, evidenceResponse.payload);
         return;
       }
 

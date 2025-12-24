@@ -7,9 +7,8 @@ import { fileURLToPath, pathToFileURL } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "..");
-const port = Number(process.env.E2E_PORT || 4173);
 const host = "127.0.0.1";
-const baseUrl = `http://${host}:${port}`;
+const requestedPort = Number(process.env.E2E_PORT || 4173);
 
 const mimeTypes = {
   ".html": "text/html",
@@ -37,7 +36,7 @@ const serveFile = async (filePath, res) => {
   }
 };
 
-const startServer = () =>
+const startServer = (port) =>
   new Promise((resolve, reject) => {
     const server = createServer(async (req, res) => {
       const urlPath = decodeURIComponent(req.url.split("?")[0]);
@@ -57,11 +56,32 @@ const startServer = () =>
     });
 
     server.on("error", (err) => reject(err));
-    server.listen(port, host, () => resolve(server));
+    server.listen(port, host, () => {
+      const address = server.address();
+      const resolvedPort =
+        typeof address === "object" && address ? address.port : port;
+      resolve({ server, port: resolvedPort });
+    });
   });
 
+const startServerWithFallback = async () => {
+  if (process.env.E2E_PORT) {
+    return startServer(requestedPort);
+  }
+
+  try {
+    return await startServer(requestedPort);
+  } catch (error) {
+    if (error?.code !== "EADDRINUSE") {
+      throw error;
+    }
+    return startServer(0);
+  }
+};
+
 const run = async () => {
-  const server = await startServer();
+  const { server, port } = await startServerWithFallback();
+  const baseUrl = `http://${host}:${port}`;
   console.log(`Static server running at ${baseUrl}`);
 
   const env = {

@@ -62,7 +62,7 @@
       <div>
         <h1>Hausplaner</h1>
         <p class="subtitle">
-          Einfacher Grundriss, klare Checklisten und gute Zusammenarbeit.
+          Einfacher Grundriss, klare Aufgaben und gute Zusammenarbeit.
         </p>
       </div>
       <div class="header-actions">
@@ -150,130 +150,372 @@
       </section>
 
       <aside class="sidebar" aria-label="Raumdetails">
-        <section class="panel" id="room-panel">
-          <h2 id="room-title">Bitte wählen Sie einen Raum</h2>
-          <p id="room-subtitle">
-            Klicken Sie auf einen Raum im Grundriss, um Details zu sehen.
-          </p>
+        <section class="panel view-toggle">
+          <div class="panel-header">
+            <h3>Ansicht</h3>
+          </div>
+          <div
+            class="segmented-control"
+            role="tablist"
+            aria-label="Ansicht wählen"
+          >
+            <button
+              class="segmented-option is-active"
+              type="button"
+              data-app-view="room"
+              id="view-room"
+            >
+              Raum
+            </button>
+            <button
+              class="segmented-option"
+              type="button"
+              data-app-view="tasks"
+              id="view-tasks"
+            >
+              Aufgaben
+            </button>
+          </div>
         </section>
 
-        <section class="panel three-d-panel" id="three-d-panel" hidden>
-          <div class="panel-header">
-            <h3>3D-Ansicht</h3>
-            <button id="toggle-3d" type="button">Öffnen</button>
-          </div>
-          <p id="three-d-label" class="helper">3D-Ansicht für den Raum</p>
-          <div class="three-d-controls">
-            <div class="three-d-control">
-              <span class="three-d-control-label">Ansicht</span>
+        <div class="view-stack" id="room-view">
+          <section class="panel" id="room-panel">
+            <h2 id="room-title">Bitte wählen Sie einen Raum</h2>
+            <p id="room-subtitle">
+              Klicken Sie auf einen Raum im Grundriss, um Details zu sehen.
+            </p>
+            <div class="room-tabs" role="tablist" aria-label="Raumdetails">
+              <button
+                class="room-tab is-active"
+                type="button"
+                data-room-tab="overview"
+                aria-selected="true"
+              >
+                Übersicht
+              </button>
+              <button
+                class="room-tab"
+                type="button"
+                data-room-tab="tasks"
+                aria-selected="false"
+              >
+                Aufgaben
+              </button>
+              <button
+                class="room-tab"
+                type="button"
+                data-room-tab="evidence"
+                aria-selected="false"
+              >
+                Evidence
+              </button>
+            </div>
+          </section>
+
+          <section
+            class="panel three-d-panel"
+            id="three-d-panel"
+            data-room-panel="overview"
+            hidden
+          >
+            <div class="panel-header">
+              <h3>3D-Ansicht</h3>
+              <button id="toggle-3d" type="button">Öffnen</button>
+            </div>
+            <p id="three-d-label" class="helper">3D-Ansicht für den Raum</p>
+            <div class="three-d-controls">
+              <div class="three-d-control">
+                <span class="three-d-control-label">Ansicht</span>
+                <div
+                  class="segmented-control"
+                  role="group"
+                  aria-label="3D-Ansicht wählen"
+                >
+                  <button
+                    class="segmented-option is-active"
+                    type="button"
+                    data-view="walkthrough"
+                  >
+                    Innen
+                  </button>
+                  <button
+                    class="segmented-option"
+                    type="button"
+                    data-view="dollhouse"
+                  >
+                    Modell
+                  </button>
+                </div>
+              </div>
+              <label class="three-d-control">
+                <span class="three-d-control-label">Stil</span>
+                <select id="three-d-style">
+                  <option value="soft-modern">Soft Modern</option>
+                  <option value="warm-minimal">Warm Minimal</option>
+                  <option value="urban-atelier">Urban Atelier</option>
+                  <option value="scandi-light">Scandi Light</option>
+                </select>
+              </label>
+              <label class="three-d-control">
+                <span class="three-d-control-label">Material</span>
+                <select id="three-d-floor">
+                  <option value="oak">Eiche</option>
+                  <option value="warm-oak">Räuchereiche</option>
+                  <option value="stone">Naturstein</option>
+                  <option value="tile">Feinsteinzeug</option>
+                  <option value="terrazzo">Terrazzo</option>
+                </select>
+              </label>
+              <label class="three-d-control">
+                <span class="three-d-control-label">Licht</span>
+                <select id="three-d-lighting">
+                  <option value="day">Tageslicht</option>
+                  <option value="golden">Goldene Stunde</option>
+                  <option value="evening">Abend</option>
+                  <option value="studio">Studio</option>
+                </select>
+              </label>
+              <button id="three-d-reset" type="button">
+                Ansicht zurücksetzen
+              </button>
+            </div>
+            <div class="three-d-viewer">
+              <div
+                class="three-d-stage"
+                id="three-d-stage"
+                data-view="walkthrough"
+              >
+                <div class="three-d-camera" id="three-d-camera">
+                  <div class="three-d-room" id="three-d-room"></div>
+                </div>
+              </div>
+              <div class="three-d-hud">
+                <span class="three-d-hint">
+                  Ziehen: Blick drehen · Scrollen: Zoom
+                </span>
+                <span id="three-d-readout" class="three-d-readout"></span>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel" id="room-tasks-panel" data-room-panel="tasks">
+            <h3>Aufgaben</h3>
+            <ul id="room-tasks" class="task-list"></ul>
+            <p id="room-tasks-empty" class="helper" hidden>
+              Noch keine Aufgaben für diesen Raum.
+            </p>
+            <form id="task-form" class="form-row">
+              <input
+                type="text"
+                id="task-input"
+                placeholder="Aufgabe hinzufügen, z.B. Fliesen bestellen #material"
+              />
+              <button type="submit" class="primary">Hinzufügen</button>
+            </form>
+            <p class="helper">Hashtags werden als Tags übernommen.</p>
+          </section>
+
+          <section class="panel" data-room-panel="evidence">
+            <h3>Evidence</h3>
+            <div class="evidence-block">
+              <h4>Uploads</h4>
+              <div id="image-gallery" class="image-gallery"></div>
+              <div class="button-row">
+                <button id="generate-image" class="primary" type="button">
+                  Mit ChatGPT erzeugen
+                </button>
+                <label class="upload-btn">
+                  Datei hochladen
+                  <input type="file" id="upload-image" />
+                </label>
+                <button id="add-evidence-link" type="button">
+                  Link hinzufügen
+                </button>
+                <button id="set-api-key" type="button">
+                  API-Schlüssel setzen
+                </button>
+              </div>
+              <p id="image-status" class="helper"></p>
+              <p class="helper">
+                Tipp: mehrere Blickwinkel pro Raum speichern.
+              </p>
+            </div>
+            <div class="evidence-block">
+              <h4>Entscheidungen</h4>
+              <ul id="decision-list" class="decision-list"></ul>
+              <form id="decision-form" class="decision-form">
+                <label>
+                  Titel
+                  <input
+                    type="text"
+                    id="decision-title"
+                    name="decision-title"
+                    required
+                  />
+                </label>
+                <label>
+                  Begründung
+                  <textarea
+                    id="decision-body"
+                    name="decision-body"
+                    rows="4"
+                    required
+                  ></textarea>
+                </label>
+                <fieldset class="decision-links">
+                  <legend>Mit Aufgaben verknüpfen (optional)</legend>
+                  <div id="decision-tasks" class="decision-task-list"></div>
+                  <p id="decision-tasks-empty" class="helper"></p>
+                </fieldset>
+                <button class="primary" type="submit">
+                  Entscheidung speichern
+                </button>
+              </form>
+            </div>
+          </section>
+
+          <section class="panel" data-room-panel="overview">
+            <h3>Kommentare</h3>
+            <ul id="comments" class="comments"></ul>
+          </section>
+
+          <section class="panel" data-room-panel="overview">
+            <h3>Aktivität im Raum</h3>
+            <ul id="room-activity" class="activity-list"></ul>
+            <p id="room-activity-empty" class="helper"></p>
+          </section>
+        </div>
+
+        <div class="view-stack" id="tasks-view" hidden>
+          <section class="panel" id="tasks-panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <h2>Aufgabenübersicht</h2>
+                <p id="task-count" class="helper">0 Aufgaben</p>
+              </div>
+              <button id="tasks-reset" type="button">
+                Filter zurücksetzen
+              </button>
+            </div>
+            <div class="task-views">
+              <span class="task-views-label">Ansichten</span>
               <div
                 class="segmented-control"
-                role="group"
-                aria-label="3D-Ansicht wählen"
+                role="tablist"
+                aria-label="Task Views"
               >
                 <button
                   class="segmented-option is-active"
                   type="button"
-                  data-view="walkthrough"
+                  data-task-view="all"
+                  aria-selected="true"
                 >
-                  Innen
+                  Alle
                 </button>
                 <button
                   class="segmented-option"
                   type="button"
-                  data-view="dollhouse"
+                  data-task-view="materials"
+                  aria-selected="false"
                 >
-                  Modell
+                  Materials
+                </button>
+                <button
+                  class="segmented-option"
+                  type="button"
+                  data-task-view="permits"
+                  aria-selected="false"
+                >
+                  Permits
+                </button>
+                <button
+                  class="segmented-option"
+                  type="button"
+                  data-task-view="contractors"
+                  aria-selected="false"
+                >
+                  Contractors
                 </button>
               </div>
             </div>
-            <label class="three-d-control">
-              <span class="three-d-control-label">Stil</span>
-              <select id="three-d-style">
-                <option value="soft-modern">Soft Modern</option>
-                <option value="warm-minimal">Warm Minimal</option>
-                <option value="urban-atelier">Urban Atelier</option>
-                <option value="scandi-light">Scandi Light</option>
-              </select>
-            </label>
-            <label class="three-d-control">
-              <span class="three-d-control-label">Material</span>
-              <select id="three-d-floor">
-                <option value="oak">Eiche</option>
-                <option value="warm-oak">Räuchereiche</option>
-                <option value="stone">Naturstein</option>
-                <option value="tile">Feinsteinzeug</option>
-                <option value="terrazzo">Terrazzo</option>
-              </select>
-            </label>
-            <label class="three-d-control">
-              <span class="three-d-control-label">Licht</span>
-              <select id="three-d-lighting">
-                <option value="day">Tageslicht</option>
-                <option value="golden">Goldene Stunde</option>
-                <option value="evening">Abend</option>
-                <option value="studio">Studio</option>
-              </select>
-            </label>
-            <button id="three-d-reset" type="button">
-              Ansicht zurücksetzen
-            </button>
-          </div>
-          <div class="three-d-viewer">
-            <div
-              class="three-d-stage"
-              id="three-d-stage"
-              data-view="walkthrough"
-            >
-              <div class="three-d-camera" id="three-d-camera">
-                <div class="three-d-room" id="three-d-room"></div>
+            <div class="task-filters">
+              <label>
+                Raum
+                <select id="task-filter-room"></select>
+              </label>
+              <label>
+                Status
+                <select id="task-filter-status"></select>
+              </label>
+              <label>
+                Zuständig
+                <select id="task-filter-assignee"></select>
+              </label>
+              <label>
+                Tag
+                <select id="task-filter-tag"></select>
+              </label>
+              <label>
+                Suche
+                <input
+                  type="search"
+                  id="task-filter-search"
+                  placeholder="Nach Titel oder Notiz suchen"
+                />
+              </label>
+            </div>
+            <div class="task-bulk-actions">
+              <label class="task-select-all">
+                <input type="checkbox" id="task-select-all" />
+                <span>Alle auswählen</span>
+              </label>
+              <span id="task-selection-count" class="helper"
+                >Keine Auswahl</span
+              >
+              <div class="task-bulk-row">
+                <button id="task-bulk-done" type="button" disabled>
+                  Erledigt markieren
+                </button>
+                <div class="task-bulk-field">
+                  <select id="task-bulk-assignee"></select>
+                  <button id="task-bulk-assign" type="button" disabled>
+                    Zuweisen
+                  </button>
+                </div>
+                <div class="task-bulk-field">
+                  <input type="date" id="task-bulk-due" />
+                  <button id="task-bulk-due-apply" type="button" disabled>
+                    Fällig setzen
+                  </button>
+                </div>
               </div>
             </div>
-            <div class="three-d-hud">
-              <span class="three-d-hint">
-                Ziehen: Blick drehen · Scrollen: Zoom
-              </span>
-              <span id="three-d-readout" class="three-d-readout"></span>
+            <ul id="task-list" class="task-list"></ul>
+            <p id="tasks-empty" class="helper" hidden>
+              Keine Aufgaben für diese Filter.
+            </p>
+            <div class="timeline-panel">
+              <h3>Timeline</h3>
+              <div id="timeline-list" class="timeline-list"></div>
             </div>
-          </div>
-        </section>
-
-        <section class="panel">
-          <h3>Checkliste</h3>
-          <ul id="checklist" class="checklist"></ul>
-          <form id="checklist-form" class="form-row">
-            <input
-              type="text"
-              id="checklist-input"
-              placeholder="Material oder Aufgabe hinzufügen"
-            />
-            <button type="submit" class="primary">Hinzufügen</button>
-          </form>
-        </section>
-
-        <section class="panel">
-          <h3>Raumbilder</h3>
-          <div id="image-gallery" class="image-gallery"></div>
-          <div class="button-row">
-            <button id="generate-image" class="primary" type="button">
-              Mit ChatGPT erzeugen
-            </button>
-            <label class="upload-btn">
-              Foto hochladen
-              <input type="file" id="upload-image" accept="image/*" />
-            </label>
-            <button id="set-api-key" type="button">API-Schlüssel setzen</button>
-          </div>
-          <p id="image-status" class="helper"></p>
-          <p class="helper">Tipp: mehrere Blickwinkel pro Raum speichern.</p>
-        </section>
-
-        <section class="panel">
-          <h3>Kommentare</h3>
-          <ul id="comments" class="comments"></ul>
-        </section>
+          </section>
+        </div>
       </aside>
     </main>
+
+    <section class="activity-page" aria-label="Aktivitätsfeed">
+      <div class="activity-header">
+        <div>
+          <h2>Aktivitätsfeed</h2>
+          <p class="helper">
+            Letzte Ereignisse aus Aufgaben, Kommentaren, Dateien und
+            Entscheidungen.
+          </p>
+        </div>
+      </div>
+      <ul id="activity-feed" class="activity-list"></ul>
+      <p id="activity-empty" class="helper">Noch keine Aktivität vorhanden.</p>
+    </section>
 
     <section id="architect-view" class="architect-view" hidden>
       <h2>Architekt-Ansicht</h2>
@@ -384,6 +626,38 @@
         <p id="architect-help" class="helper"></p>
       </div>
     </section>
+
+    <div id="task-modal" class="modal" hidden>
+      <div
+        class="modal-surface"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="task-modal-title"
+      >
+        <div class="modal-header">
+          <h3 id="task-modal-title">Aufgabe planen</h3>
+          <button type="button" id="task-modal-close">Schließen</button>
+        </div>
+        <form id="task-modal-form" class="modal-form">
+          <label>
+            Startdatum
+            <input type="date" id="task-start-date" />
+          </label>
+          <label>
+            Enddatum
+            <input type="date" id="task-end-date" />
+          </label>
+          <div class="dependency-panel">
+            <div class="dependency-title">Abhängigkeiten</div>
+            <div id="task-dependency-list" class="dependency-list"></div>
+          </div>
+          <div class="modal-actions">
+            <button type="button" id="task-modal-cancel">Abbrechen</button>
+            <button type="submit" class="primary">Speichern</button>
+          </div>
+        </form>
+      </div>
+    </div>
 
     <footer class="app-footer">
       <p>Große Schaltflächen, klare Sprache und ein Raum nach dem anderen.</p>

@@ -6,6 +6,9 @@ const jsonResponse = (statusCode, payload) => ({
   body: JSON.stringify(payload),
 });
 
+const imageModel =
+  String(process.env.OPENAI_IMAGE_MODEL || "dall-e-3").trim() || "dall-e-3";
+
 export const handler = async (event) => {
   if (event.httpMethod !== "POST") {
     return jsonResponse(405, {
@@ -46,7 +49,7 @@ export const handler = async (event) => {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-image-1",
+        model: imageModel,
         prompt,
         size: "1024x1024",
       }),

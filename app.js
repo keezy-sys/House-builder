@@ -188,6 +188,66 @@ const THREE_D_FURNITURE_PRESETS = {
   ],
 };
 
+const TASK_STATUSES = ["Backlog", "Planned", "InProgress", "Blocked", "Done"];
+const TASK_STATUS_LABELS = {
+  Backlog: "Backlog",
+  Planned: "Geplant",
+  InProgress: "In Arbeit",
+  Blocked: "Blockiert",
+  Done: "Erledigt",
+};
+const TASK_STATUS_ALIASES = {
+  backlog: "Backlog",
+  todo: "Backlog",
+  planned: "Planned",
+  plan: "Planned",
+  inprogress: "InProgress",
+  "in-progress": "InProgress",
+  progress: "InProgress",
+  blocked: "Blocked",
+  done: "Done",
+  complete: "Done",
+  completed: "Done",
+};
+const TASK_PRIORITIES = ["Low", "Med", "High"];
+const TASK_PRIORITY_LABELS = {
+  Low: "Niedrig",
+  Med: "Mittel",
+  High: "Hoch",
+};
+const DEFAULT_TASK_STATUS = "Backlog";
+const DEFAULT_TASK_PRIORITY = "Med";
+const DEFAULT_TASK_FILTERS = {
+  view: "all",
+  roomId: "all",
+  status: "all",
+  assignee: "all",
+  tag: "all",
+  query: "",
+};
+
+const TASK_VIEW_PRESETS = {
+  all: {
+    label: "Alle",
+    filter: () => true,
+  },
+  materials: {
+    label: "Materials",
+    filter: (task) => taskHasTag(task, "material") && !isTaskDone(task),
+  },
+  permits: {
+    label: "Permits",
+    filter: (task) => taskHasTag(task, "permit"),
+  },
+  contractors: {
+    label: "Contractors",
+    filter: (task) => taskHasTag(task, "contractor"),
+  },
+};
+
+const ROOM_TABS = ["overview", "tasks", "evidence"];
+const APP_VIEWS = ["room", "tasks"];
+
 const LEGACY_ROOM_IDS = [
   "bedroom-left",
   "living",
@@ -575,6 +635,9 @@ const buildDefaultFloorPlans = () => ({
 const SHARED_STATE_TABLE = "house_state";
 const SHARED_STATE_ID = "default";
 const SAVE_DEBOUNCE_MS = 800;
+const ACTIVITY_EVENT_LIMIT = 200;
+const ACTIVITY_FEED_LIMIT = 40;
+const ROOM_ACTIVITY_LIMIT = 12;
 
 const isPlaceholder = (value) =>
   !value || value.includes("YOUR_") || value.includes("your_");
@@ -613,13 +676,23 @@ const isLocalHost = ["localhost", "127.0.0.1"].includes(
 const state = {
   activeRoomId: null,
   activeFloorId: "ground",
+  activeView: "room",
+  activeRoomTab: "overview",
   isAddingComment: false,
   isArchitectMode: false,
   floorPlans: buildDefaultFloorPlans(),
   roomData: {},
+  tasks: [],
+  taskFilters: { ...DEFAULT_TASK_FILTERS },
+  selectedTaskIds: new Set(),
+  activityEvents: [],
   selectedElement: null,
   show3d: false,
   wallLinkLocked: true,
+};
+
+const taskModalState = {
+  taskId: null,
 };
 
 const dragState = {
@@ -667,15 +740,29 @@ const elements = {
   floorplanHint: document.getElementById("floorplan-hint"),
   roomTitle: document.getElementById("room-title"),
   roomSubtitle: document.getElementById("room-subtitle"),
-  checklist: document.getElementById("checklist"),
-  checklistForm: document.getElementById("checklist-form"),
-  checklistInput: document.getElementById("checklist-input"),
+  roomTabButtons: Array.from(document.querySelectorAll("[data-room-tab]")),
+  roomTabPanels: Array.from(document.querySelectorAll("[data-room-panel]")),
+  roomView: document.getElementById("room-view"),
+  tasksView: document.getElementById("tasks-view"),
+  viewButtons: Array.from(document.querySelectorAll("[data-app-view]")),
+  taskViewButtons: Array.from(document.querySelectorAll("[data-task-view]")),
+  roomTasks: document.getElementById("room-tasks"),
+  roomTasksEmpty: document.getElementById("room-tasks-empty"),
   comments: document.getElementById("comments"),
+  decisionList: document.getElementById("decision-list"),
+  decisionForm: document.getElementById("decision-form"),
+  decisionTitleInput: document.getElementById("decision-title"),
+  decisionBodyInput: document.getElementById("decision-body"),
+  decisionTasks: document.getElementById("decision-tasks"),
+  decisionTasksEmpty: document.getElementById("decision-tasks-empty"),
+  roomActivity: document.getElementById("room-activity"),
+  roomActivityEmpty: document.getElementById("room-activity-empty"),
   imageGallery: document.getElementById("image-gallery"),
   addCommentBtn: document.getElementById("add-comment"),
   clearSelectionBtn: document.getElementById("clear-selection"),
   uploadImageInput: document.getElementById("upload-image"),
   generateImageBtn: document.getElementById("generate-image"),
+  addEvidenceLinkBtn: document.getElementById("add-evidence-link"),
   toggleArchitect: document.getElementById("toggle-architect"),
   architectView: document.getElementById("architect-view"),
   architectTitle: document.getElementById("architect-title"),
@@ -712,6 +799,37 @@ const elements = {
   ),
   setApiKeyBtn: document.getElementById("set-api-key"),
   imageStatus: document.getElementById("image-status"),
+  taskForm: document.getElementById("task-form"),
+  taskInput: document.getElementById("task-input"),
+  taskTagsInput: document.getElementById("task-tags-input"),
+  taskStatusInput: document.getElementById("task-status-input"),
+  taskList: document.getElementById("task-list"),
+  timelineList: document.getElementById("timeline-list"),
+  taskSelectAll: document.getElementById("task-select-all"),
+  taskSelectionCount: document.getElementById("task-selection-count"),
+  taskCount: document.getElementById("task-count"),
+  taskBulkDone: document.getElementById("task-bulk-done"),
+  taskBulkAssignee: document.getElementById("task-bulk-assignee"),
+  taskBulkAssign: document.getElementById("task-bulk-assign"),
+  taskBulkDueDate: document.getElementById("task-bulk-due"),
+  taskBulkDueApply: document.getElementById("task-bulk-due-apply"),
+  taskFilterRoom: document.getElementById("task-filter-room"),
+  taskFilterStatus: document.getElementById("task-filter-status"),
+  taskFilterAssignee: document.getElementById("task-filter-assignee"),
+  taskFilterTag: document.getElementById("task-filter-tag"),
+  taskFilterSearch: document.getElementById("task-filter-search"),
+  tasksReset: document.getElementById("tasks-reset"),
+  tasksEmpty: document.getElementById("tasks-empty"),
+  taskModal: document.getElementById("task-modal"),
+  taskModalForm: document.getElementById("task-modal-form"),
+  taskModalTitle: document.getElementById("task-modal-title"),
+  taskModalClose: document.getElementById("task-modal-close"),
+  taskModalCancel: document.getElementById("task-modal-cancel"),
+  taskStartDate: document.getElementById("task-start-date"),
+  taskEndDate: document.getElementById("task-end-date"),
+  taskDependencyList: document.getElementById("task-dependency-list"),
+  activityFeed: document.getElementById("activity-feed"),
+  activityEmpty: document.getElementById("activity-empty"),
   authScreen: document.getElementById("auth-screen"),
   loginForm: document.getElementById("login-form"),
   signupForm: document.getElementById("signup-form"),
@@ -728,12 +846,360 @@ const defaultRoomData = () => ({
   checklist: [],
   images: [],
   comments: [],
+  decisions: [],
   scene: null,
 });
+
+const createTaskId = () =>
+  `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const createActivityId = () =>
+  `activity-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const createDecisionId = () =>
+  `decision-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const isValidDateInput = (value) =>
+  typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+
+const normalizeTaskStatus = (status, doneFlag) => {
+  const raw = typeof status === "string" ? status.trim() : "";
+  if (TASK_STATUSES.includes(raw)) return raw;
+  if (doneFlag) return "Done";
+  const lowered = raw.toLowerCase().replace(/[\s_-]+/g, "");
+  return TASK_STATUS_ALIASES[lowered] || DEFAULT_TASK_STATUS;
+};
+
+const normalizeTaskPriority = (priority) => {
+  const raw = typeof priority === "string" ? priority.trim() : "";
+  if (TASK_PRIORITIES.includes(raw)) return raw;
+  const lowered = raw.toLowerCase();
+  if (lowered === "low") return "Low";
+  if (lowered === "med" || lowered === "medium") return "Med";
+  if (lowered === "high") return "High";
+  return DEFAULT_TASK_PRIORITY;
+};
+
+const normalizeTaskTags = (tags) => {
+  const raw = Array.isArray(tags)
+    ? tags
+    : typeof tags === "string"
+      ? tags.split(",")
+      : [];
+  const seen = new Set();
+  const normalized = [];
+  raw.forEach((tag) => {
+    String(tag || "")
+      .split(/\s+/)
+      .forEach((chunk) => {
+        const value = String(chunk || "")
+          .trim()
+          .replace(/^#/, "")
+          .toLowerCase();
+        if (!value || seen.has(value)) return;
+        seen.add(value);
+        normalized.push(value);
+      });
+  });
+  return normalized;
+};
+
+const normalizeTaskMaterials = (materials) => ({
+  ordered: Boolean(materials?.ordered),
+  deliveryDate: isValidDateInput(materials?.deliveryDate)
+    ? materials.deliveryDate
+    : null,
+  vendor: typeof materials?.vendor === "string" ? materials.vendor.trim() : "",
+});
+
+const buildTaskSearchIndex = (task) => {
+  const parts = [
+    task.title,
+    task.notes,
+    task.assignee,
+    Array.isArray(task.tags) ? task.tags.join(" ") : "",
+    task.materials?.vendor,
+  ];
+  return parts
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+};
+
+const updateTaskSearchIndex = (task) => {
+  task.searchIndex = buildTaskSearchIndex(task);
+  return task.searchIndex;
+};
+
+const taskHasTag = (task, needle) => {
+  const target = String(needle || "")
+    .trim()
+    .toLowerCase();
+  if (!target || !Array.isArray(task.tags)) return false;
+  return task.tags.some((tag) => tag.includes(target));
+};
+
+const taskHasMaterialsTag = (task) => taskHasTag(task, "material");
+
+const normalizeTask = (task, fallbackTitle) => {
+  if (typeof task === "string") {
+    const title = task.trim() || fallbackTitle;
+    return createTask({ title });
+  }
+  if (!task || typeof task !== "object") return null;
+
+  const title =
+    typeof task.title === "string"
+      ? task.title.trim()
+      : typeof task.name === "string"
+        ? task.name.trim()
+        : "";
+  const roomId =
+    task.roomId === null || task.roomId === undefined || task.roomId === ""
+      ? null
+      : String(task.roomId);
+  const assignee =
+    typeof task.assignee === "string"
+      ? task.assignee.trim()
+      : typeof task.assignedTo === "string"
+        ? task.assignedTo.trim()
+        : typeof task.owner === "string"
+          ? task.owner.trim()
+          : "";
+  const createdAt =
+    typeof task.createdAt === "string" && task.createdAt.trim()
+      ? task.createdAt
+      : new Date().toISOString();
+  const updatedAt =
+    typeof task.updatedAt === "string" && task.updatedAt.trim()
+      ? task.updatedAt
+      : createdAt;
+
+  const normalized = {
+    id:
+      typeof task.id === "string" && task.id.trim()
+        ? task.id.trim()
+        : createTaskId(),
+    title: title || fallbackTitle,
+    roomId,
+    status: normalizeTaskStatus(task.status, task.done || task.isDone),
+    tags: normalizeTaskTags(task.tags),
+    assignee,
+    dueDate:
+      typeof task.dueDate === "string" && task.dueDate.trim()
+        ? task.dueDate
+        : null,
+    startDate: isValidDateInput(task.startDate) ? task.startDate : null,
+    endDate: isValidDateInput(task.endDate) ? task.endDate : null,
+    dependencyIds: Array.isArray(task.dependencyIds)
+      ? task.dependencyIds.filter((id) => typeof id === "string")
+      : Array.isArray(task.dependencies)
+        ? task.dependencies.filter((id) => typeof id === "string")
+        : Array.isArray(task.dependsOn)
+          ? task.dependsOn.filter((id) => typeof id === "string")
+          : [],
+    materials: normalizeTaskMaterials(task.materials),
+    priority: normalizeTaskPriority(task.priority),
+    notes: typeof task.notes === "string" ? task.notes : "",
+    createdAt,
+    updatedAt,
+  };
+  updateTaskSearchIndex(normalized);
+  return normalized;
+};
+
+const normalizeTasks = (tasks) => {
+  if (!Array.isArray(tasks)) return [];
+  const normalized = [];
+  const seenIds = new Set();
+
+  tasks.forEach((task, index) => {
+    const item = normalizeTask(task, `Aufgabe ${index + 1}`);
+    if (!item) return;
+    while (seenIds.has(item.id)) {
+      item.id = createTaskId();
+    }
+    seenIds.add(item.id);
+    normalized.push(item);
+  });
+
+  const validIds = new Set(normalized.map((task) => task.id));
+  normalized.forEach((task) => {
+    task.dependencyIds = Array.from(
+      new Set(
+        (task.dependencyIds || []).filter(
+          (id) => validIds.has(id) && id !== task.id,
+        ),
+      ),
+    );
+  });
+
+  return normalized;
+};
+
+const createTask = ({
+  title,
+  roomId = null,
+  status = DEFAULT_TASK_STATUS,
+  tags = [],
+  assignee = "",
+  dueDate = null,
+  startDate = null,
+  endDate = null,
+  dependencyIds = [],
+  materials = null,
+  priority = DEFAULT_TASK_PRIORITY,
+  notes = "",
+} = {}) => {
+  const timestamp = new Date().toISOString();
+  const task = {
+    id: createTaskId(),
+    title: (title || "").trim(),
+    roomId: roomId || null,
+    status: TASK_STATUSES.includes(status) ? status : DEFAULT_TASK_STATUS,
+    tags: normalizeTaskTags(tags),
+    assignee: assignee || "",
+    dueDate: dueDate || null,
+    startDate: isValidDateInput(startDate) ? startDate : null,
+    endDate: isValidDateInput(endDate) ? endDate : null,
+    dependencyIds: Array.isArray(dependencyIds)
+      ? dependencyIds.filter((id) => typeof id === "string")
+      : [],
+    materials: normalizeTaskMaterials(materials),
+    priority: TASK_PRIORITIES.includes(priority)
+      ? priority
+      : DEFAULT_TASK_PRIORITY,
+    notes: notes || "",
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  updateTaskSearchIndex(task);
+  return task;
+};
+
+const normalizeDecision = (decision, fallbackText) => {
+  if (typeof decision === "string") {
+    const text = decision.trim();
+    if (!text) return null;
+    return {
+      id: createDecisionId(),
+      title: fallbackText || text,
+      body: text,
+      actor: "Unbekannt",
+      createdAt: new Date().toISOString(),
+      taskIds: [],
+      taskLinks: [],
+    };
+  }
+  if (!decision || typeof decision !== "object") return null;
+  const title = typeof decision.title === "string" ? decision.title.trim() : "";
+  const body = typeof decision.body === "string" ? decision.body.trim() : "";
+  const text = typeof decision.text === "string" ? decision.text.trim() : "";
+  const taskIdsRaw = Array.isArray(decision.taskIds) ? decision.taskIds : [];
+  const taskLinksRaw = Array.isArray(decision.taskLinks)
+    ? decision.taskLinks
+    : [];
+  const taskIds = taskIdsRaw
+    .map((id) => String(id || "").trim())
+    .filter(Boolean);
+  const taskLinks = taskLinksRaw
+    .map((label) => String(label || "").trim())
+    .filter(Boolean);
+  let resolvedBody = body || text;
+  let resolvedTitle = title;
+  if (!resolvedTitle) {
+    if (resolvedBody) {
+      resolvedTitle = fallbackText || resolvedBody;
+    } else if (text) {
+      resolvedTitle = fallbackText || text;
+    } else {
+      resolvedTitle = fallbackText || "";
+    }
+  }
+  if (!resolvedTitle && !resolvedBody) return null;
+  const actor =
+    typeof decision.actor === "string" && decision.actor.trim()
+      ? decision.actor.trim()
+      : typeof decision.userName === "string" && decision.userName.trim()
+        ? decision.userName.trim()
+        : typeof decision.userEmail === "string" && decision.userEmail.trim()
+          ? decision.userEmail.trim()
+          : "Unbekannt";
+  const createdAt =
+    typeof decision.createdAt === "string" && decision.createdAt.trim()
+      ? decision.createdAt.trim()
+      : new Date().toISOString();
+  return {
+    id:
+      typeof decision.id === "string" && decision.id.trim()
+        ? decision.id.trim()
+        : createDecisionId(),
+    title: resolvedTitle,
+    body: resolvedBody || "",
+    actor,
+    createdAt,
+    taskIds,
+    taskLinks,
+  };
+};
+
+const normalizeDecisions = (decisions) => {
+  if (!Array.isArray(decisions)) return [];
+  const normalized = [];
+  decisions.forEach((decision, index) => {
+    const item = normalizeDecision(decision, `Entscheidung ${index + 1}`);
+    if (!item) return;
+    normalized.push(item);
+  });
+  return normalized;
+};
+
+const normalizeActivityEvents = (events) => {
+  if (!Array.isArray(events)) return [];
+  return events
+    .map((event) => {
+      if (!event || typeof event !== "object") return null;
+      const metadata =
+        event.metadata && typeof event.metadata === "object"
+          ? event.metadata
+          : {};
+      return {
+        id:
+          typeof event.id === "string" && event.id.trim()
+            ? event.id.trim()
+            : createActivityId(),
+        type:
+          typeof event.type === "string" && event.type.trim()
+            ? event.type.trim()
+            : "activity",
+        actor:
+          typeof event.actor === "string" && event.actor.trim()
+            ? event.actor.trim()
+            : "Unbekannt",
+        roomId:
+          typeof event.roomId === "string" && event.roomId.trim()
+            ? event.roomId.trim()
+            : null,
+        taskId:
+          typeof event.taskId === "string" && event.taskId.trim()
+            ? event.taskId.trim()
+            : null,
+        metadata,
+        createdAt:
+          typeof event.createdAt === "string" && event.createdAt.trim()
+            ? event.createdAt.trim()
+            : new Date().toISOString(),
+      };
+    })
+    .filter(Boolean);
+};
 
 const buildStatePayload = () => ({
   roomData: state.roomData,
   floorPlans: state.floorPlans,
+  tasks: state.tasks,
+  activityEvents: state.activityEvents,
 });
 
 const saveStateLocal = () => {
@@ -757,16 +1223,34 @@ const applyStatePayload = (payload) => {
   state.floorPlans = normalizeOpenings(
     cloneFloorPlans(loadFloorPlans(payload?.floorPlans)),
   );
+  state.tasks = normalizeTasks(payload?.tasks);
+  clearTaskSelection();
+  state.activityEvents = normalizeActivityEvents(payload?.activityEvents);
+  let didMigrateTasks = false;
+  if (!state.tasks.length) {
+    const migratedTasks = migrateChecklistToTasks(state.roomData);
+    if (migratedTasks.length) {
+      state.tasks = migratedTasks;
+      didMigrateTasks = true;
+    }
+  }
   ensureRoomDataForFloors();
+  return didMigrateTasks;
 };
 
 const hydrateStateFromLocal = () => {
   const localPayload = loadStateLocal();
   if (localPayload) {
-    applyStatePayload(localPayload);
+    const didMigrateTasks = applyStatePayload(localPayload);
+    if (didMigrateTasks) {
+      saveStateLocal();
+    }
     return;
   }
   state.floorPlans = buildDefaultFloorPlans();
+  state.tasks = [];
+  clearTaskSelection();
+  state.activityEvents = [];
   ensureRoomDataForFloors();
 };
 
@@ -842,6 +1326,8 @@ const ensureRoomData = (roomId) => {
   if (!Array.isArray(roomData.checklist)) roomData.checklist = [];
   if (!Array.isArray(roomData.images)) roomData.images = [];
   if (!Array.isArray(roomData.comments)) roomData.comments = [];
+  if (!Array.isArray(roomData.decisions)) roomData.decisions = [];
+  roomData.decisions = normalizeDecisions(roomData.decisions);
   if (roomData.scene === undefined) roomData.scene = null;
   return roomData;
 };
@@ -852,9 +1338,111 @@ const ensureRoomDataForFloors = () => {
       if (!state.roomData[room.id]) {
         state.roomData[room.id] = defaultRoomData();
       }
+      ensureRoomData(room.id);
     });
   });
 };
+
+const migrateChecklistToTasks = (roomData) => {
+  const migrated = [];
+  Object.entries(roomData || {}).forEach(([roomId, data]) => {
+    if (!Array.isArray(data?.checklist)) return;
+    data.checklist.forEach((item) => {
+      const title = String(item || "").trim();
+      if (!title) return;
+      migrated.push(createTask({ title, roomId }));
+    });
+  });
+  return migrated;
+};
+
+const parseTaskInput = (value) => {
+  const raw = String(value || "");
+  const tags = [];
+  const seen = new Set();
+  const title = raw.replace(/#[A-Za-z0-9_-]+/g, (match) => {
+    const cleaned = match.slice(1).toLowerCase();
+    if (cleaned && !seen.has(cleaned)) {
+      seen.add(cleaned);
+      tags.push(cleaned);
+    }
+    return "";
+  });
+  return {
+    title: title.replace(/\s+/g, " ").trim(),
+    tags,
+  };
+};
+
+const buildTaskMap = (tasks = state.tasks) =>
+  new Map((tasks || []).map((task) => [task.id, task]));
+
+const isTaskDone = (task) => normalizeTaskStatus(task?.status) === "Done";
+
+const getBlockingTasks = (task, taskMap) => {
+  if (!task || !Array.isArray(task.dependencyIds)) return [];
+  return task.dependencyIds
+    .map((dependencyId) => taskMap.get(dependencyId))
+    .filter((dependency) => dependency && !isTaskDone(dependency));
+};
+
+const isTaskBlocked = (task, taskMap) =>
+  normalizeTaskStatus(task?.status) === "Blocked" ||
+  (!isTaskDone(task) && getBlockingTasks(task, taskMap).length > 0);
+
+const hasDependencyPath = (startId, targetId, taskMap, visited = new Set()) => {
+  if (startId === targetId) return true;
+  if (visited.has(startId)) return false;
+  visited.add(startId);
+  const node = taskMap.get(startId);
+  if (!node || !Array.isArray(node.dependencyIds)) return false;
+  return node.dependencyIds.some((dependencyId) =>
+    hasDependencyPath(dependencyId, targetId, taskMap, visited),
+  );
+};
+
+const wouldCreateCycle = (taskId, dependencyId, taskMap) =>
+  taskId === dependencyId || hasDependencyPath(dependencyId, taskId, taskMap);
+
+const getTaskScheduleDate = (task) => {
+  const candidate = task.startDate || task.dueDate;
+  return isValidDateInput(candidate) ? candidate : null;
+};
+
+const parseDateInput = (value) => {
+  if (!isValidDateInput(value)) return null;
+  const parsed = new Date(`${value}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const formatShortDate = (value) => {
+  const parsed = parseDateInput(value);
+  if (!parsed) return "";
+  return new Intl.DateTimeFormat("de-DE", {
+    day: "2-digit",
+    month: "short",
+  }).format(parsed);
+};
+
+const formatMonthLabel = (date) =>
+  new Intl.DateTimeFormat("de-DE", {
+    month: "long",
+    year: "numeric",
+  }).format(date);
+
+const getWeekStart = (date) => {
+  const dayIndex = (date.getDay() + 6) % 7;
+  const start = new Date(date);
+  start.setDate(date.getDate() - dayIndex);
+  start.setHours(0, 0, 0, 0);
+  return start;
+};
+
+const formatWeekLabel = (date) =>
+  `Woche ab ${new Intl.DateTimeFormat("de-DE", {
+    day: "2-digit",
+    month: "short",
+  }).format(date)}`;
 
 const getActiveFloor = () =>
   state.floorPlans[state.activeFloorId] || state.floorPlans.ground;
@@ -1398,6 +1986,34 @@ const formatAuthError = (error) => {
   return message;
 };
 
+const getActivityActor = () =>
+  authState.displayName ||
+  (authState.user ? getDisplayName(authState.user) : "Unbekannt");
+
+const logActivityEvent = (
+  type,
+  { roomId = null, taskId = null, metadata = {} } = {},
+) => {
+  const event = {
+    id: createActivityId(),
+    type,
+    actor: getActivityActor(),
+    roomId,
+    taskId,
+    metadata: metadata && typeof metadata === "object" ? metadata : {},
+    createdAt: new Date().toISOString(),
+  };
+  if (!Array.isArray(state.activityEvents)) {
+    state.activityEvents = [];
+  }
+  state.activityEvents.unshift(event);
+  if (state.activityEvents.length > ACTIVITY_EVENT_LIMIT) {
+    state.activityEvents.length = ACTIVITY_EVENT_LIMIT;
+  }
+  renderActivityFeed();
+  renderRoomActivity();
+};
+
 const setAuthFormsEnabled = (isEnabled) => {
   [elements.loginForm, elements.signupForm].forEach((form) => {
     if (!form) return;
@@ -1428,13 +2044,74 @@ const refreshUI = () => {
   renderFloorplan();
   renderRoomPanel();
   renderArchitectPanel();
+  renderTasksPanel();
+  renderActivityFeed();
   updateFloorButtons();
+};
+
+const setActiveView = (viewId) => {
+  state.activeView = APP_VIEWS.includes(viewId) ? viewId : APP_VIEWS[0];
+  updateViewUI();
+};
+
+const setActiveRoomTab = (tabId) => {
+  if (!ROOM_TABS.includes(tabId)) {
+    state.activeRoomTab = ROOM_TABS[0];
+  } else {
+    state.activeRoomTab = tabId;
+  }
+  updateRoomTabs();
+};
+
+const updateRoomTabs = () => {
+  if (!ROOM_TABS.includes(state.activeRoomTab)) {
+    state.activeRoomTab = ROOM_TABS[0];
+  }
+  const hasRoom = Boolean(state.activeRoomId);
+  if (elements.roomTabButtons?.length) {
+    elements.roomTabButtons.forEach((button) => {
+      const tab = button.dataset.roomTab;
+      const isActive = tab === state.activeRoomTab;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-selected", String(isActive));
+      button.disabled = !hasRoom;
+    });
+  }
+  if (elements.roomTabPanels?.length) {
+    elements.roomTabPanels.forEach((panel) => {
+      const tab = panel.dataset.roomPanel;
+      panel.hidden = !hasRoom || tab !== state.activeRoomTab;
+    });
+  }
+};
+
+const updateViewUI = () => {
+  const activeView = APP_VIEWS.includes(state.activeView)
+    ? state.activeView
+    : APP_VIEWS[0];
+  state.activeView = activeView;
+  if (elements.roomView) {
+    elements.roomView.hidden = activeView !== "room";
+  }
+  if (elements.tasksView) {
+    elements.tasksView.hidden = activeView !== "tasks";
+  }
+  if (elements.viewButtons?.length) {
+    elements.viewButtons.forEach((button) => {
+      const view = button.dataset.appView;
+      const isActive = view === activeView;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-selected", String(isActive));
+    });
+  }
 };
 
 const getInitialPayload = () =>
   loadStateLocal() || {
     roomData: {},
     floorPlans: buildDefaultFloorPlans(),
+    tasks: [],
+    activityEvents: [],
   };
 
 const loadRemoteState = async () => {
@@ -1962,63 +2639,68 @@ const renderFloorplan = () => {
 };
 
 const renderRoomPanel = () => {
-  if (!state.activeRoomId) {
-    elements.roomTitle.textContent = "Bitte wählen Sie einen Raum";
-    elements.roomSubtitle.textContent =
-      "Klicken Sie auf einen Raum im Grundriss, um Details zu sehen.";
-    elements.checklist.innerHTML = "";
-    elements.comments.innerHTML = "";
-    elements.imageGallery.innerHTML = "";
-    elements.threeDPanel.hidden = true;
-    return;
-  }
-
-  const room = findRoomById(state.activeRoomId);
+  const room = state.activeRoomId ? findRoomById(state.activeRoomId) : null;
   if (!room) {
     elements.roomTitle.textContent = "Bitte wählen Sie einen Raum";
     elements.roomSubtitle.textContent =
       "Klicken Sie auf einen Raum im Grundriss, um Details zu sehen.";
-    elements.checklist.innerHTML = "";
-    elements.comments.innerHTML = "";
-    elements.imageGallery.innerHTML = "";
-    elements.threeDPanel.hidden = true;
+    renderRoomTasks();
+    if (elements.comments) {
+      elements.comments.innerHTML = "";
+    }
+    if (elements.imageGallery) {
+      elements.imageGallery.innerHTML = "";
+    }
+    if (elements.decisionList) {
+      elements.decisionList.innerHTML = "";
+      const empty = document.createElement("li");
+      empty.className = "decision-card decision-empty";
+      empty.textContent = "Bitte zuerst einen Raum auswählen.";
+      elements.decisionList.appendChild(empty);
+    }
+    if (elements.decisionTasks) {
+      elements.decisionTasks.innerHTML = "";
+    }
+    if (elements.decisionTasksEmpty) {
+      elements.decisionTasksEmpty.textContent =
+        "Bitte zuerst einen Raum auswählen.";
+      elements.decisionTasksEmpty.hidden = false;
+    }
+    if (elements.roomActivity) {
+      elements.roomActivity.innerHTML = "";
+    }
+    if (elements.roomActivityEmpty) {
+      elements.roomActivityEmpty.textContent =
+        "Bitte zuerst einen Raum auswählen.";
+      elements.roomActivityEmpty.hidden = false;
+    }
+    if (elements.threeDPanel) {
+      elements.threeDPanel.hidden = true;
+    }
+    updateRoomTabs();
     return;
   }
   const roomData = ensureRoomData(state.activeRoomId);
 
   elements.roomTitle.textContent = room.name;
   elements.roomSubtitle.textContent =
-    "Aufgaben bearbeiten, Fotos ansehen oder Notizen hinterlassen.";
+    "Aufgaben, Evidence und Entscheidungen für den Raum verwalten.";
   elements.threeDLabel.textContent = `3D-Ansicht für ${room.name}`;
-  elements.threeDPanel.hidden = false;
-  elements.threeDPanel.classList.toggle("open", state.show3d);
-  elements.threeDButton.textContent = state.show3d ? "Schließen" : "Öffnen";
+  if (elements.threeDPanel) {
+    elements.threeDPanel.classList.toggle("open", state.show3d);
+  }
+  if (elements.threeDButton) {
+    elements.threeDButton.textContent = state.show3d ? "Schließen" : "Öffnen";
+  }
   update3DScene(room.id);
 
-  renderChecklist(roomData);
+  renderRoomTasks();
   renderComments(roomData);
   renderImages(roomData);
-};
-
-const renderChecklist = (roomData) => {
-  elements.checklist.innerHTML = "";
-  roomData.checklist.forEach((item, index) => {
-    const li = document.createElement("li");
-    const text = document.createElement("span");
-    text.textContent = item;
-
-    const removeBtn = document.createElement("button");
-    removeBtn.textContent = "Entfernen";
-    removeBtn.addEventListener("click", () => {
-      roomData.checklist.splice(index, 1);
-      saveState();
-      renderChecklist(roomData);
-    });
-
-    li.appendChild(text);
-    li.appendChild(removeBtn);
-    elements.checklist.appendChild(li);
-  });
+  renderDecisions(roomData);
+  renderDecisionTaskOptions();
+  renderRoomActivity();
+  updateRoomTabs();
 };
 
 const renderComments = (roomData) => {
@@ -2031,25 +2713,1402 @@ const renderComments = (roomData) => {
   });
 };
 
+const isEvidenceImage = (file) => {
+  if (!file) return false;
+  if (typeof file.type === "string" && file.type.startsWith("image/")) {
+    return true;
+  }
+  const url = String(file.url || "");
+  return (
+    url.startsWith("data:image") || /\.(png|jpe?g|gif|webp|svg)$/i.test(url)
+  );
+};
+
+const formatFileSize = (size) => {
+  if (!Number.isFinite(size)) return "";
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const formatEvidenceDetails = (file) => {
+  const details = [];
+  if (file?.type) {
+    const typeLabel = String(file.type).split("/").pop();
+    if (typeLabel) {
+      details.push(typeLabel.toUpperCase());
+    }
+  }
+  const sizeLabel = formatFileSize(file?.size);
+  if (sizeLabel) {
+    details.push(sizeLabel);
+  }
+  return details.join(" · ");
+};
+
 const renderImages = (roomData) => {
   elements.imageGallery.innerHTML = "";
-  roomData.images.forEach((image) => {
+  roomData.images.forEach((file) => {
     const card = document.createElement("div");
     card.className = "image-card";
 
-    if (image.url) {
-      const img = document.createElement("img");
-      img.src = image.url;
-      img.alt = image.label;
-      card.appendChild(img);
+    const label = file.label || file.name || "Datei";
+    const previewWrapper = file.url
+      ? document.createElement("a")
+      : document.createElement("div");
+    if (file.url) {
+      previewWrapper.href = file.url;
+      previewWrapper.target = "_blank";
+      previewWrapper.rel = "noreferrer";
+      previewWrapper.className = "evidence-link";
     }
 
+    if (file.url && isEvidenceImage(file)) {
+      const img = document.createElement("img");
+      img.src = file.url;
+      img.alt = label;
+      previewWrapper.appendChild(img);
+    } else {
+      const placeholder = document.createElement("div");
+      placeholder.className = "evidence-placeholder";
+      placeholder.textContent =
+        String(file.type || "File")
+          .split("/")
+          .pop()
+          ?.toUpperCase() || "FILE";
+      previewWrapper.appendChild(placeholder);
+    }
+    card.appendChild(previewWrapper);
+
+    const meta = document.createElement("div");
+    meta.className = "evidence-meta";
     const caption = document.createElement("div");
-    caption.textContent = image.label;
-    card.appendChild(caption);
+    caption.textContent = label;
+    meta.appendChild(caption);
+    const detailsText = formatEvidenceDetails(file);
+    if (detailsText) {
+      const details = document.createElement("div");
+      details.className = "evidence-details";
+      details.textContent = detailsText;
+      meta.appendChild(details);
+    }
+    card.appendChild(meta);
 
     elements.imageGallery.appendChild(card);
   });
+};
+
+const renderDecisions = (roomData) => {
+  if (!elements.decisionList) return;
+  elements.decisionList.innerHTML = "";
+  const decisions = Array.isArray(roomData.decisions) ? roomData.decisions : [];
+  if (!decisions.length) {
+    const empty = document.createElement("li");
+    empty.className = "decision-card decision-empty";
+    empty.textContent = "Noch keine Entscheidungen.";
+    elements.decisionList.appendChild(empty);
+    return;
+  }
+
+  const taskMap = buildTaskMap();
+  decisions.forEach((decision) => {
+    const item = document.createElement("li");
+    item.className = "decision-card";
+
+    const title = document.createElement("div");
+    title.className = "decision-title";
+    title.textContent = decision.title || decision.text || "Entscheidung";
+    item.appendChild(title);
+
+    const bodyText = decision.body || decision.text || "";
+    if (bodyText) {
+      const body = document.createElement("div");
+      body.className = "decision-body";
+      body.textContent = bodyText;
+      item.appendChild(body);
+    }
+
+    const meta = document.createElement("div");
+    meta.className = "decision-meta";
+    const actor =
+      decision.actor || decision.userName || decision.userEmail || "Unbekannt";
+    const time = formatActivityTimestamp(decision.createdAt);
+    meta.textContent = time ? `${actor} · ${time}` : actor;
+    item.appendChild(meta);
+
+    const taskIds = Array.isArray(decision.taskIds) ? decision.taskIds : [];
+    const taskLinks = Array.isArray(decision.taskLinks)
+      ? decision.taskLinks
+      : [];
+    if (taskIds.length || taskLinks.length) {
+      const tags = document.createElement("div");
+      tags.className = "decision-tags";
+      taskIds
+        .map((taskId) => taskMap.get(taskId))
+        .filter(Boolean)
+        .forEach((task) => {
+          const tag = document.createElement("span");
+          tag.className = "decision-tag";
+          tag.textContent = task.title;
+          tags.appendChild(tag);
+        });
+      if (!tags.childNodes.length && taskLinks.length) {
+        taskLinks.forEach((task) => {
+          const tag = document.createElement("span");
+          tag.className = "decision-tag";
+          tag.textContent = task;
+          tags.appendChild(tag);
+        });
+      }
+      if (tags.childNodes.length) {
+        item.appendChild(tags);
+      }
+    }
+
+    elements.decisionList.appendChild(item);
+  });
+};
+
+const renderDecisionTaskOptions = () => {
+  if (!elements.decisionTasks) return;
+  if (!state.activeRoomId) {
+    elements.decisionTasks.innerHTML = "";
+    if (elements.decisionTasksEmpty) {
+      elements.decisionTasksEmpty.textContent =
+        "Bitte zuerst einen Raum auswählen.";
+      elements.decisionTasksEmpty.hidden = false;
+    }
+    return;
+  }
+  const selected = new Set(
+    Array.from(
+      elements.decisionTasks.querySelectorAll("input[type='checkbox']:checked"),
+    ).map((input) => input.value),
+  );
+  elements.decisionTasks.innerHTML = "";
+
+  if (!state.activeRoomId) {
+    if (elements.decisionTasksEmpty) {
+      elements.decisionTasksEmpty.textContent =
+        "Bitte zuerst einen Raum auswählen.";
+      elements.decisionTasksEmpty.hidden = false;
+    }
+    return;
+  }
+
+  const tasks = state.tasks.filter(
+    (task) => task.roomId === state.activeRoomId,
+  );
+  if (!tasks.length) {
+    if (elements.decisionTasksEmpty) {
+      elements.decisionTasksEmpty.textContent =
+        "Keine Aufgaben zum Verknüpfen.";
+      elements.decisionTasksEmpty.hidden = false;
+    }
+    return;
+  }
+
+  if (elements.decisionTasksEmpty) {
+    elements.decisionTasksEmpty.hidden = true;
+  }
+
+  tasks.forEach((task) => {
+    const label = document.createElement("label");
+    label.className = "decision-task-item";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = task.id;
+    checkbox.checked = selected.has(task.id);
+    const text = document.createElement("span");
+    text.textContent = task.title;
+    label.appendChild(checkbox);
+    label.appendChild(text);
+    elements.decisionTasks.appendChild(label);
+  });
+};
+
+const truncateText = (value, max = 90) => {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (text.length <= max) return text;
+  return `${text.slice(0, Math.max(0, max - 3))}...`;
+};
+
+const formatTaskStatus = (status) => {
+  const normalized = normalizeTaskStatus(status);
+  return TASK_STATUS_LABELS[normalized] || "Offen";
+};
+
+const ACTIVITY_CATEGORY_BY_TYPE = {
+  task_created: "task",
+  task_updated: "task",
+  task_status_changed: "task",
+  task_assigned: "task",
+  comment_added: "comment",
+  file_uploaded: "file",
+  decision_created: "decision",
+};
+
+const ACTIVITY_LABELS = {
+  task: "Aufgabe",
+  comment: "Kommentar",
+  file: "Datei",
+  decision: "Entscheidung",
+  activity: "Aktivität",
+};
+
+const getActivityCategory = (type) =>
+  ACTIVITY_CATEGORY_BY_TYPE[type] || "activity";
+
+const getActivityLabel = (category) =>
+  ACTIVITY_LABELS[category] || ACTIVITY_LABELS.activity;
+
+const formatActivitySummary = (event) => {
+  const actor = event.actor || "Jemand";
+  const metadata = event.metadata || {};
+  const title = truncateText(metadata.title || metadata.text || "Aufgabe", 90);
+
+  switch (event.type) {
+    case "task_created":
+      return `${actor} hat eine Aufgabe erstellt: ${title}`;
+    case "task_updated":
+      return `${actor} hat eine Aufgabe aktualisiert: ${title}`;
+    case "task_status_changed": {
+      const fromStatus = formatTaskStatus(metadata.fromStatus);
+      const toStatus = formatTaskStatus(metadata.toStatus);
+      return `${actor} hat den Status geändert (${fromStatus} -> ${toStatus}): ${title}`;
+    }
+    case "task_assigned": {
+      const assignee = metadata.assignee;
+      if (assignee) {
+        return `${actor} hat ${title} an ${formatAssigneeLabel(
+          assignee,
+        )} zugewiesen.`;
+      }
+      return `${actor} hat die Zuweisung entfernt: ${title}`;
+    }
+    case "comment_added": {
+      const text = truncateText(metadata.text || "Kommentar", 90);
+      return `${actor} hat einen Kommentar hinzugefügt: ${text}`;
+    }
+    case "file_uploaded": {
+      const label = truncateText(
+        metadata.filename || metadata.label || "Datei",
+        90,
+      );
+      return `${actor} hat eine Datei hochgeladen: ${label}`;
+    }
+    case "decision_created": {
+      const text = truncateText(
+        metadata.title || metadata.text || "Entscheidung",
+        90,
+      );
+      return `${actor} hat eine Entscheidung festgehalten: ${text}`;
+    }
+    default:
+      return `${actor} hat ein Update erfasst.`;
+  }
+};
+
+const formatActivityTimestamp = (value) => {
+  const parsed = value ? new Date(value) : null;
+  if (!parsed || Number.isNaN(parsed.getTime())) return "";
+  return new Intl.DateTimeFormat("de-DE", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(parsed);
+};
+
+const getActivityRoomLabel = (roomId) => {
+  if (!roomId) return "Allgemein";
+  const room = findRoomById(roomId);
+  return room ? room.name : "Unbekannter Raum";
+};
+
+const buildActivityItem = (event, { showRoom = true } = {}) => {
+  const item = document.createElement("li");
+  item.className = "activity-item";
+  const category = getActivityCategory(event.type);
+  item.dataset.category = category;
+
+  const main = document.createElement("div");
+  main.className = "activity-main";
+  const chip = document.createElement("span");
+  chip.className = "activity-chip";
+  chip.textContent = getActivityLabel(category);
+  const summary = document.createElement("span");
+  summary.className = "activity-summary";
+  summary.textContent = formatActivitySummary(event);
+  main.appendChild(chip);
+  main.appendChild(summary);
+  item.appendChild(main);
+
+  const meta = document.createElement("div");
+  meta.className = "activity-meta";
+  if (showRoom) {
+    const room = document.createElement("span");
+    room.className = "activity-room";
+    room.textContent = getActivityRoomLabel(event.roomId);
+    meta.appendChild(room);
+  }
+  const time = document.createElement("span");
+  time.className = "activity-time";
+  time.textContent = formatActivityTimestamp(event.createdAt);
+  meta.appendChild(time);
+  item.appendChild(meta);
+  return item;
+};
+
+const getSortedActivityEvents = () =>
+  (Array.isArray(state.activityEvents) ? state.activityEvents : [])
+    .slice()
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+
+const renderActivityFeed = () => {
+  if (!elements.activityFeed) return;
+  elements.activityFeed.innerHTML = "";
+  const events = getSortedActivityEvents().slice(0, ACTIVITY_FEED_LIMIT);
+  if (!events.length) {
+    if (elements.activityEmpty) {
+      elements.activityEmpty.hidden = false;
+    }
+    return;
+  }
+  if (elements.activityEmpty) {
+    elements.activityEmpty.hidden = true;
+  }
+  events.forEach((event) => {
+    elements.activityFeed.appendChild(buildActivityItem(event));
+  });
+};
+
+const renderRoomActivity = () => {
+  if (!elements.roomActivity) return;
+  elements.roomActivity.innerHTML = "";
+  if (!state.activeRoomId) {
+    if (elements.roomActivityEmpty) {
+      elements.roomActivityEmpty.textContent =
+        "Bitte zuerst einen Raum auswählen.";
+      elements.roomActivityEmpty.hidden = false;
+    }
+    return;
+  }
+
+  const events = getSortedActivityEvents()
+    .filter((event) => event.roomId === state.activeRoomId)
+    .slice(0, ROOM_ACTIVITY_LIMIT);
+  if (!events.length) {
+    if (elements.roomActivityEmpty) {
+      elements.roomActivityEmpty.textContent =
+        "Noch keine Aktivität in diesem Raum.";
+      elements.roomActivityEmpty.hidden = false;
+    }
+    return;
+  }
+
+  if (elements.roomActivityEmpty) {
+    elements.roomActivityEmpty.hidden = true;
+  }
+  events.forEach((event) => {
+    elements.roomActivity.appendChild(
+      buildActivityItem(event, { showRoom: false }),
+    );
+  });
+};
+
+const getRoomLabel = (roomId) => {
+  if (!roomId) return "Ohne Raum";
+  let info = null;
+  Object.values(state.floorPlans).some((floor) => {
+    const room = floor.rooms.find((item) => item.id === roomId);
+    if (!room) return false;
+    info = { room, floor };
+    return true;
+  });
+  if (!info) return "Unbekannter Raum";
+  const floorLabel = info.floor?.name ? ` (${info.floor.name})` : "";
+  return `${info.room.name}${floorLabel}`;
+};
+
+const formatAssigneeLabel = (assignee) => {
+  if (!assignee) return "Unzugewiesen";
+  if (authState.user?.id && assignee === authState.user.id) {
+    return authState.displayName ? `Ich (${authState.displayName})` : "Ich";
+  }
+  if (assignee === "me") return "Ich";
+  if (assignee === "dad") return "Dad";
+  return assignee;
+};
+
+const buildAssigneeOptions = () => {
+  const options = new Map();
+  options.set("", "Unzugewiesen");
+  if (authState.user?.id) {
+    options.set(
+      authState.user.id,
+      authState.displayName ? `Ich (${authState.displayName})` : "Ich (Login)",
+    );
+  }
+  options.set("me", "Ich (me)");
+  options.set("dad", "Dad");
+  state.tasks.forEach((task) => {
+    if (!task.assignee) return;
+    options.set(task.assignee, formatAssigneeLabel(task.assignee));
+  });
+  return Array.from(options, ([value, label]) => ({ value, label }));
+};
+
+const setSelectOptions = (select, options, selectedValue) => {
+  if (!select) return selectedValue;
+  select.innerHTML = "";
+  options.forEach((option) => {
+    const entry = document.createElement("option");
+    entry.value = option.value;
+    entry.textContent = option.label;
+    select.appendChild(entry);
+  });
+  const values = options.map((option) => option.value);
+  const nextValue = values.includes(selectedValue)
+    ? selectedValue
+    : options[0]?.value;
+  if (nextValue !== undefined) {
+    select.value = nextValue;
+  }
+  return nextValue;
+};
+
+const buildRoomFilterOptions = () => {
+  const options = [
+    { value: "all", label: "Alle Räume" },
+    { value: "none", label: "Ohne Raum" },
+  ];
+  Object.values(state.floorPlans).forEach((floor) => {
+    floor.rooms.forEach((room) => {
+      options.push({
+        value: room.id,
+        label: `${room.name} (${floor.name})`,
+      });
+    });
+  });
+  return options;
+};
+
+const buildStatusFilterOptions = () => [
+  { value: "all", label: "Alle Stati" },
+  ...TASK_STATUSES.map((status) => ({
+    value: status,
+    label: TASK_STATUS_LABELS[status] || status,
+  })),
+];
+
+const buildTagFilterOptions = () => {
+  const tags = new Set();
+  state.tasks.forEach((task) => {
+    (task.tags || []).forEach((tag) => tags.add(tag));
+  });
+  const options = [{ value: "all", label: "Alle Tags" }];
+  Array.from(tags)
+    .sort((a, b) => a.localeCompare(b))
+    .forEach((tag) => {
+      options.push({ value: tag, label: `#${tag}` });
+    });
+  return options;
+};
+
+const buildAssigneeFilterOptions = () => {
+  const options = new Map();
+  options.set("all", "Alle Zuständigen");
+  options.set("unassigned", "Unzugewiesen");
+  state.tasks.forEach((task) => {
+    if (!task.assignee) return;
+    options.set(task.assignee, formatAssigneeLabel(task.assignee));
+  });
+  return Array.from(options, ([value, label]) => ({ value, label }));
+};
+
+const buildBulkAssigneeOptions = () => [
+  { value: "", label: "Zuweisen..." },
+  ...buildAssigneeOptions().filter((option) => option.value),
+];
+
+const renderTaskBulkAssigneeOptions = () => {
+  if (!elements.taskBulkAssignee) return;
+  const currentValue = elements.taskBulkAssignee.value;
+  setSelectOptions(
+    elements.taskBulkAssignee,
+    buildBulkAssigneeOptions(),
+    currentValue,
+  );
+};
+
+const renderTaskFilters = () => {
+  state.taskFilters.roomId = setSelectOptions(
+    elements.taskFilterRoom,
+    buildRoomFilterOptions(),
+    state.taskFilters.roomId,
+  );
+  state.taskFilters.status = setSelectOptions(
+    elements.taskFilterStatus,
+    buildStatusFilterOptions(),
+    state.taskFilters.status,
+  );
+  state.taskFilters.assignee = setSelectOptions(
+    elements.taskFilterAssignee,
+    buildAssigneeFilterOptions(),
+    state.taskFilters.assignee,
+  );
+  state.taskFilters.tag = setSelectOptions(
+    elements.taskFilterTag,
+    buildTagFilterOptions(),
+    state.taskFilters.tag,
+  );
+  if (elements.taskFilterSearch) {
+    elements.taskFilterSearch.value = state.taskFilters.query;
+  }
+};
+
+const applyTaskFilters = (tasks) => {
+  const { view, roomId, status, assignee, tag, query } = state.taskFilters;
+  const search = query.trim().toLowerCase();
+  const preset = TASK_VIEW_PRESETS[view] || TASK_VIEW_PRESETS.all;
+  return tasks.filter((task) => {
+    const normalizedStatus = normalizeTaskStatus(task.status);
+    if (preset?.filter && !preset.filter(task)) return false;
+    if (roomId !== "all") {
+      if (roomId === "none") {
+        if (task.roomId) return false;
+      } else if (task.roomId !== roomId) {
+        return false;
+      }
+    }
+    if (status !== "all" && normalizedStatus !== status) return false;
+    if (assignee !== "all") {
+      if (assignee === "unassigned") {
+        if (task.assignee) return false;
+      } else if (task.assignee !== assignee) {
+        return false;
+      }
+    }
+    if (tag !== "all" && !task.tags?.includes(tag)) return false;
+    if (search) {
+      const haystack =
+        typeof task.searchIndex === "string"
+          ? task.searchIndex
+          : updateTaskSearchIndex(task);
+      if (!haystack.includes(search)) return false;
+    }
+    return true;
+  });
+};
+
+const updateTaskViewButtons = () => {
+  if (!elements.taskViewButtons?.length) return;
+  const activeView = TASK_VIEW_PRESETS[state.taskFilters.view]
+    ? state.taskFilters.view
+    : "all";
+  state.taskFilters.view = activeView;
+  elements.taskViewButtons.forEach((button) => {
+    const view = button.dataset.taskView;
+    const isActive = view === activeView;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", String(isActive));
+  });
+};
+
+const clearTaskSelection = () => {
+  state.selectedTaskIds.clear();
+};
+
+const pruneTaskSelection = () => {
+  const validIds = new Set(state.tasks.map((task) => task.id));
+  state.selectedTaskIds.forEach((id) => {
+    if (!validIds.has(id)) {
+      state.selectedTaskIds.delete(id);
+    }
+  });
+};
+
+const updateTaskSelectionState = (
+  visibleTasks = applyTaskFilters(state.tasks),
+) => {
+  const selectedCount = state.selectedTaskIds.size;
+  const hasSelection = selectedCount > 0;
+  if (elements.taskSelectionCount) {
+    elements.taskSelectionCount.textContent = hasSelection
+      ? `${selectedCount} ausgewählt`
+      : "Keine Auswahl";
+  }
+  if (elements.taskBulkDone) {
+    elements.taskBulkDone.disabled = !hasSelection;
+  }
+  if (elements.taskBulkAssign) {
+    const hasAssignee = Boolean(elements.taskBulkAssignee?.value?.trim());
+    elements.taskBulkAssign.disabled = !hasSelection || !hasAssignee;
+  }
+  if (elements.taskBulkDueApply) {
+    const hasDate = Boolean(elements.taskBulkDueDate?.value);
+    elements.taskBulkDueApply.disabled = !hasSelection || !hasDate;
+  }
+  if (elements.taskSelectAll) {
+    const totalVisible = visibleTasks.length;
+    const selectedVisible = visibleTasks.filter((task) =>
+      state.selectedTaskIds.has(task.id),
+    ).length;
+    elements.taskSelectAll.checked =
+      totalVisible > 0 && selectedVisible === totalVisible;
+    elements.taskSelectAll.indeterminate =
+      selectedVisible > 0 && selectedVisible < totalVisible;
+  }
+};
+
+const buildStatusSelect = (task) => {
+  const select = document.createElement("select");
+  select.className = "task-select";
+  select.dataset.field = "status";
+  TASK_STATUSES.forEach((status) => {
+    const option = document.createElement("option");
+    option.value = status;
+    option.textContent = TASK_STATUS_LABELS[status] || status;
+    select.appendChild(option);
+  });
+  select.value = normalizeTaskStatus(task.status);
+  select.addEventListener("change", (event) => {
+    const previousStatus = task.status;
+    const nextStatus = normalizeTaskStatus(event.target.value);
+    if (previousStatus === nextStatus) return;
+    task.status = nextStatus;
+    task.updatedAt = new Date().toISOString();
+    updateTaskSearchIndex(task);
+    logActivityEvent("task_status_changed", {
+      taskId: task.id,
+      roomId: task.roomId,
+      metadata: {
+        title: task.title,
+        fromStatus: previousStatus,
+        toStatus: nextStatus,
+      },
+    });
+    saveState();
+    renderTasksPanel();
+  });
+  return select;
+};
+
+const buildAssigneeSelect = (task) => {
+  const select = document.createElement("select");
+  select.className = "task-select";
+  select.dataset.field = "assignee";
+  buildAssigneeOptions().forEach((option) => {
+    const entry = document.createElement("option");
+    entry.value = option.value;
+    entry.textContent = option.label;
+    select.appendChild(entry);
+  });
+  select.value = task.assignee || "";
+  select.addEventListener("change", (event) => {
+    const previousAssignee = task.assignee || "";
+    const nextAssignee = event.target.value;
+    if (previousAssignee === nextAssignee) return;
+    task.assignee = nextAssignee;
+    task.updatedAt = new Date().toISOString();
+    updateTaskSearchIndex(task);
+    logActivityEvent("task_assigned", {
+      taskId: task.id,
+      roomId: task.roomId,
+      metadata: {
+        title: task.title,
+        assignee: nextAssignee || null,
+        previousAssignee: previousAssignee || null,
+      },
+    });
+    saveState();
+    renderTasksPanel();
+  });
+  return select;
+};
+
+const logTaskUpdate = (task, metadata = {}) => {
+  logActivityEvent("task_updated", {
+    taskId: task.id,
+    roomId: task.roomId,
+    metadata: {
+      title: task.title,
+      ...metadata,
+    },
+  });
+};
+
+const buildTaskField = (labelText, input) => {
+  const label = document.createElement("label");
+  label.className = "task-field";
+  const text = document.createElement("span");
+  text.textContent = labelText;
+  label.appendChild(text);
+  label.appendChild(input);
+  return label;
+};
+
+const buildTagInput = (task) => {
+  const input = document.createElement("input");
+  input.type = "text";
+  input.placeholder = "materials, permit";
+  input.className = "task-text-input";
+  input.value = Array.isArray(task.tags) ? task.tags.join(", ") : "";
+  input.addEventListener("change", (event) => {
+    const nextTags = normalizeTaskTags(event.target.value);
+    const previousTags = (task.tags || []).join(",");
+    if (previousTags === nextTags.join(",")) return;
+    task.tags = nextTags;
+    task.updatedAt = new Date().toISOString();
+    updateTaskSearchIndex(task);
+    logTaskUpdate(task, { tags: nextTags });
+    saveState();
+    renderTasksPanel();
+  });
+  return buildTaskField("Tags", input);
+};
+
+const buildDueDateInput = (task) => {
+  const input = document.createElement("input");
+  input.type = "date";
+  input.className = "task-date-input";
+  input.dataset.taskDue = "true";
+  input.value = task.dueDate || "";
+  input.addEventListener("change", (event) => {
+    const nextDueDate = event.target.value || null;
+    if (task.dueDate === nextDueDate) return;
+    task.dueDate = nextDueDate;
+    task.updatedAt = new Date().toISOString();
+    logTaskUpdate(task, { dueDate: nextDueDate });
+    saveState();
+    renderTasksPanel();
+  });
+  return buildTaskField("Fällig bis", input);
+};
+
+const buildMaterialsFields = (task) => {
+  if (!task.materials) {
+    task.materials = normalizeTaskMaterials();
+  }
+  const wrapper = document.createElement("div");
+  wrapper.className = "task-materials";
+  const title = document.createElement("span");
+  title.className = "task-materials-title";
+  title.textContent = "Material-Workflow";
+  wrapper.appendChild(title);
+
+  const fields = document.createElement("div");
+  fields.className = "task-materials-fields";
+
+  const orderedLabel = document.createElement("label");
+  orderedLabel.className = "task-field task-field-toggle";
+  const orderedInput = document.createElement("input");
+  orderedInput.type = "checkbox";
+  orderedInput.className = "task-toggle-input";
+  orderedInput.checked = Boolean(task.materials.ordered);
+  const orderedText = document.createElement("span");
+  orderedText.textContent = "Bestellt";
+  orderedLabel.appendChild(orderedInput);
+  orderedLabel.appendChild(orderedText);
+  orderedInput.addEventListener("change", (event) => {
+    const nextOrdered = Boolean(event.target.checked);
+    if (task.materials.ordered === nextOrdered) return;
+    task.materials.ordered = nextOrdered;
+    task.updatedAt = new Date().toISOString();
+    logTaskUpdate(task, { materials: { ordered: nextOrdered } });
+    saveState();
+  });
+
+  const deliveryInput = document.createElement("input");
+  deliveryInput.type = "date";
+  deliveryInput.className = "task-date-input";
+  deliveryInput.value = task.materials.deliveryDate || "";
+  deliveryInput.addEventListener("change", (event) => {
+    const nextDate = event.target.value || null;
+    if (task.materials.deliveryDate === nextDate) return;
+    task.materials.deliveryDate = nextDate;
+    task.updatedAt = new Date().toISOString();
+    logTaskUpdate(task, { materials: { deliveryDate: nextDate } });
+    saveState();
+  });
+
+  const vendorInput = document.createElement("input");
+  vendorInput.type = "text";
+  vendorInput.placeholder = "Lieferant";
+  vendorInput.className = "task-text-input";
+  vendorInput.value = task.materials.vendor || "";
+  vendorInput.addEventListener("change", (event) => {
+    const nextVendor = event.target.value.trim();
+    if (task.materials.vendor === nextVendor) return;
+    task.materials.vendor = nextVendor;
+    task.updatedAt = new Date().toISOString();
+    updateTaskSearchIndex(task);
+    logTaskUpdate(task, { materials: { vendor: nextVendor } });
+    saveState();
+  });
+
+  fields.appendChild(orderedLabel);
+  fields.appendChild(buildTaskField("Lieferung", deliveryInput));
+  fields.appendChild(buildTaskField("Lieferant", vendorInput));
+  wrapper.appendChild(fields);
+  return wrapper;
+};
+
+const buildTaskTags = (task, taskMap) => {
+  const tags = document.createElement("div");
+  tags.className = "task-tags";
+  let hasTag = false;
+
+  if (isTaskDone(task)) {
+    const tag = document.createElement("span");
+    tag.className = "task-tag done";
+    tag.textContent = "Erledigt";
+    tags.appendChild(tag);
+    hasTag = true;
+  }
+
+  if (isTaskBlocked(task, taskMap)) {
+    const tag = document.createElement("span");
+    tag.className = "task-tag blocked";
+    tag.textContent = "Blockiert";
+    tags.appendChild(tag);
+    hasTag = true;
+  }
+
+  return hasTag ? tags : null;
+};
+
+const getTaskMetaText = (task) => {
+  const parts = [];
+  if (task.startDate) {
+    parts.push(`Start: ${formatShortDate(task.startDate)}`);
+  }
+  if (task.endDate) {
+    parts.push(`Ende: ${formatShortDate(task.endDate)}`);
+  }
+  if (!task.startDate && task.dueDate) {
+    parts.push(`Fällig: ${formatShortDate(task.dueDate)}`);
+  }
+  if (task.assignee) {
+    parts.push(`Zuständig: ${task.assignee}`);
+  }
+  if (Array.isArray(task.dependencyIds) && task.dependencyIds.length) {
+    parts.push(`${task.dependencyIds.length} Abhängigkeit(en)`);
+  }
+  return parts.join(" · ");
+};
+
+const buildBlockingRow = (task, taskMap) => {
+  const blockingTasks = getBlockingTasks(task, taskMap);
+  if (!blockingTasks.length) return null;
+  const row = document.createElement("div");
+  row.className = "task-blocked";
+  const label = document.createElement("span");
+  label.textContent = "Blockiert durch:";
+  row.appendChild(label);
+  blockingTasks.forEach((blockingTask) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "task-link";
+    button.textContent = blockingTask.title;
+    button.addEventListener("click", () => openTaskModal(blockingTask.id));
+    row.appendChild(button);
+  });
+  return row;
+};
+
+const buildTimelineItem = (task, taskMap) => {
+  const item = document.createElement("li");
+  item.className = "timeline-item";
+
+  const title = document.createElement("div");
+  title.className = "task-title";
+  title.textContent = task.title;
+  item.appendChild(title);
+
+  const statusTags = buildTaskTags(task, taskMap);
+  if (statusTags) {
+    item.appendChild(statusTags);
+  }
+
+  const metaText = getTaskMetaText(task);
+  if (metaText) {
+    const meta = document.createElement("div");
+    meta.className = "timeline-meta";
+    meta.textContent = metaText;
+    item.appendChild(meta);
+  }
+
+  const blockingRow = buildBlockingRow(task, taskMap);
+  if (blockingRow) {
+    item.appendChild(blockingRow);
+  }
+
+  return item;
+};
+
+const renderTimeline = (tasks = state.tasks) => {
+  if (!elements.timelineList) return;
+  elements.timelineList.innerHTML = "";
+
+  if (!tasks.length) {
+    const empty = document.createElement("div");
+    empty.className = "timeline-empty";
+    empty.textContent = "Noch keine Aufgaben für die Timeline.";
+    elements.timelineList.appendChild(empty);
+    return;
+  }
+
+  const taskMap = buildTaskMap();
+  const scheduled = [];
+  const unscheduled = [];
+
+  tasks.forEach((task) => {
+    const dateKey = getTaskScheduleDate(task);
+    const parsed = parseDateInput(dateKey);
+    if (!parsed) {
+      unscheduled.push(task);
+      return;
+    }
+    scheduled.push({ task, date: parsed });
+  });
+
+  scheduled.sort((a, b) => a.date - b.date);
+
+  const monthGroups = new Map();
+  scheduled.forEach((entry) => {
+    const monthKey = `${entry.date.getFullYear()}-${String(
+      entry.date.getMonth() + 1,
+    ).padStart(2, "0")}`;
+    if (!monthGroups.has(monthKey)) {
+      monthGroups.set(monthKey, {
+        date: new Date(entry.date.getFullYear(), entry.date.getMonth(), 1),
+        weeks: new Map(),
+      });
+    }
+    const group = monthGroups.get(monthKey);
+    const weekStart = getWeekStart(entry.date);
+    const weekKey = weekStart.toISOString().slice(0, 10);
+    if (!group.weeks.has(weekKey)) {
+      group.weeks.set(weekKey, {
+        date: weekStart,
+        tasks: [],
+      });
+    }
+    group.weeks.get(weekKey).tasks.push(entry.task);
+  });
+
+  const orderedMonths = Array.from(monthGroups.values()).sort(
+    (a, b) => a.date - b.date,
+  );
+
+  orderedMonths.forEach((monthGroup) => {
+    const section = document.createElement("div");
+    const heading = document.createElement("div");
+    heading.className = "timeline-month";
+    heading.textContent = formatMonthLabel(monthGroup.date);
+    section.appendChild(heading);
+
+    const orderedWeeks = Array.from(monthGroup.weeks.values()).sort(
+      (a, b) => a.date - b.date,
+    );
+
+    orderedWeeks.forEach((weekGroup) => {
+      const weekSection = document.createElement("div");
+      weekSection.className = "timeline-week";
+
+      const weekLabel = document.createElement("div");
+      weekLabel.className = "timeline-week-label";
+      weekLabel.textContent = formatWeekLabel(weekGroup.date);
+      weekSection.appendChild(weekLabel);
+
+      const list = document.createElement("ul");
+      list.className = "timeline-items";
+      weekGroup.tasks.forEach((task) => {
+        list.appendChild(buildTimelineItem(task, taskMap));
+      });
+      weekSection.appendChild(list);
+      section.appendChild(weekSection);
+    });
+    elements.timelineList.appendChild(section);
+  });
+
+  if (unscheduled.length) {
+    const section = document.createElement("div");
+    const heading = document.createElement("div");
+    heading.className = "timeline-month";
+    heading.textContent = "Ohne Termin";
+    section.appendChild(heading);
+
+    const list = document.createElement("ul");
+    list.className = "timeline-items";
+    unscheduled.forEach((task) => {
+      list.appendChild(buildTimelineItem(task, taskMap));
+    });
+    section.appendChild(list);
+    elements.timelineList.appendChild(section);
+  }
+};
+
+const buildTaskItem = (
+  task,
+  {
+    showRoom = false,
+    taskMap = null,
+    showSelection = false,
+    showMaterials = false,
+    showFields = false,
+  } = {},
+) => {
+  const item = document.createElement("li");
+  item.className = "task-item";
+  item.dataset.taskId = task.id;
+  if (showSelection) {
+    item.dataset.taskTitle = task.title;
+  }
+  if (isTaskDone(task)) {
+    item.classList.add("is-done");
+  }
+
+  const header = document.createElement("div");
+  header.className = "task-header";
+
+  if (showSelection) {
+    const selection = document.createElement("label");
+    selection.className = "task-select-toggle";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.dataset.taskSelect = task.id;
+    checkbox.checked = state.selectedTaskIds.has(task.id);
+    checkbox.addEventListener("change", (event) => {
+      if (event.target.checked) {
+        state.selectedTaskIds.add(task.id);
+      } else {
+        state.selectedTaskIds.delete(task.id);
+      }
+      updateTaskSelectionState();
+    });
+    const title = document.createElement("span");
+    title.className = "task-title";
+    title.textContent = task.title;
+    selection.appendChild(checkbox);
+    selection.appendChild(title);
+    header.appendChild(selection);
+  } else {
+    const title = document.createElement("span");
+    title.className = "task-title";
+    title.textContent = task.title;
+    header.appendChild(title);
+  }
+
+  if (showRoom) {
+    const room = document.createElement("span");
+    room.className = "task-room";
+    room.textContent = getRoomLabel(task.roomId);
+    header.appendChild(room);
+  }
+
+  item.appendChild(header);
+
+  if (task.tags?.length) {
+    const tags = document.createElement("div");
+    tags.className = "task-tags";
+    task.tags.forEach((tag) => {
+      const tagEl = document.createElement("span");
+      tagEl.className = "task-tag";
+      tagEl.textContent = `#${tag}`;
+      tags.appendChild(tagEl);
+    });
+    item.appendChild(tags);
+  }
+
+  const statusTags = taskMap ? buildTaskTags(task, taskMap) : null;
+  if (statusTags) {
+    item.appendChild(statusTags);
+  }
+
+  const meta = document.createElement("div");
+  meta.className = "task-meta";
+  if (task.priority) {
+    const priority = document.createElement("span");
+    priority.textContent = `Priorität: ${
+      TASK_PRIORITY_LABELS[task.priority] || task.priority
+    }`;
+    meta.appendChild(priority);
+  }
+  if (task.startDate) {
+    const start = document.createElement("span");
+    start.textContent = `Start: ${formatShortDate(task.startDate)}`;
+    meta.appendChild(start);
+  }
+  if (task.endDate) {
+    const end = document.createElement("span");
+    end.textContent = `Ende: ${formatShortDate(task.endDate)}`;
+    meta.appendChild(end);
+  }
+  if (task.dueDate) {
+    const due = document.createElement("span");
+    due.textContent = `Fällig: ${formatShortDate(task.dueDate) || task.dueDate}`;
+    meta.appendChild(due);
+  }
+  if (Array.isArray(task.dependencyIds) && task.dependencyIds.length) {
+    const deps = document.createElement("span");
+    deps.textContent = `Abhängigkeiten: ${task.dependencyIds.length}`;
+    meta.appendChild(deps);
+  }
+  if (meta.childNodes.length) {
+    item.appendChild(meta);
+  }
+
+  const blockingRow = taskMap ? buildBlockingRow(task, taskMap) : null;
+  if (blockingRow) {
+    item.appendChild(blockingRow);
+  }
+
+  if (showFields) {
+    const fields = document.createElement("div");
+    fields.className = "task-fields";
+    fields.appendChild(buildTagInput(task));
+    fields.appendChild(buildDueDateInput(task));
+    item.appendChild(fields);
+  }
+
+  if (showMaterials && taskHasMaterialsTag(task)) {
+    item.appendChild(buildMaterialsFields(task));
+  }
+
+  const controls = document.createElement("div");
+  controls.className = "task-controls";
+  controls.appendChild(buildStatusSelect(task));
+  controls.appendChild(buildAssigneeSelect(task));
+
+  const removeButton = document.createElement("button");
+  removeButton.type = "button";
+  removeButton.textContent = "Entfernen";
+  removeButton.addEventListener("click", () => removeTask(task.id));
+  controls.appendChild(removeButton);
+
+  item.appendChild(controls);
+  return item;
+};
+
+const renderRoomTasks = () => {
+  if (!elements.roomTasks) return;
+  elements.roomTasks.innerHTML = "";
+  if (!state.activeRoomId) {
+    if (elements.roomTasksEmpty) {
+      elements.roomTasksEmpty.textContent =
+        "Bitte zuerst einen Raum auswählen.";
+      elements.roomTasksEmpty.hidden = false;
+    }
+    return;
+  }
+
+  const tasks = state.tasks.filter(
+    (task) => task.roomId === state.activeRoomId,
+  );
+  if (!tasks.length) {
+    if (elements.roomTasksEmpty) {
+      elements.roomTasksEmpty.textContent =
+        "Noch keine Aufgaben für diesen Raum.";
+      elements.roomTasksEmpty.hidden = false;
+    }
+    return;
+  }
+
+  if (elements.roomTasksEmpty) {
+    elements.roomTasksEmpty.hidden = true;
+  }
+  const taskMap = buildTaskMap();
+  tasks.forEach((task) => {
+    elements.roomTasks.appendChild(buildTaskItem(task, { taskMap }));
+  });
+};
+
+const renderTaskList = () => {
+  if (!elements.taskList) return;
+  renderTaskFilters();
+  updateTaskViewButtons();
+  renderTaskBulkAssigneeOptions();
+  elements.taskList.innerHTML = "";
+
+  const filtered = applyTaskFilters(state.tasks);
+  const taskMap = buildTaskMap();
+  filtered.forEach((task) => {
+    elements.taskList.appendChild(
+      buildTaskItem(task, {
+        showRoom: true,
+        showSelection: true,
+        showFields: true,
+        showMaterials: true,
+        taskMap,
+      }),
+    );
+  });
+  updateTaskSelectionState(filtered);
+
+  if (elements.tasksEmpty) {
+    elements.tasksEmpty.textContent = state.tasks.length
+      ? "Keine Aufgaben für diese Filter."
+      : "Noch keine Aufgaben vorhanden.";
+    elements.tasksEmpty.hidden = filtered.length > 0;
+  }
+  if (elements.taskCount) {
+    const total = state.tasks.length;
+    const filteredCount = filtered.length;
+    if (filteredCount === total) {
+      elements.taskCount.textContent = `${filteredCount} ${
+        filteredCount === 1 ? "Aufgabe" : "Aufgaben"
+      }`;
+    } else {
+      elements.taskCount.textContent = `${filteredCount} von ${total} ${
+        total === 1 ? "Aufgabe" : "Aufgaben"
+      }`;
+    }
+  }
+  return filtered;
+};
+
+const renderTasksPanel = () => {
+  updateViewUI();
+  renderRoomTasks();
+  renderDecisionTaskOptions();
+  const filtered = renderTaskList();
+  renderTimeline(Array.isArray(filtered) ? filtered : state.tasks);
+};
+
+const openTaskModal = (taskId) => {
+  if (!elements.taskModal) return;
+  const task = state.tasks.find((item) => item.id === taskId);
+  if (!task) return;
+  taskModalState.taskId = taskId;
+  if (elements.taskModalTitle) {
+    elements.taskModalTitle.textContent = `Aufgabe planen: ${task.title}`;
+  }
+  if (elements.taskStartDate) {
+    elements.taskStartDate.value = task.startDate || "";
+  }
+  if (elements.taskEndDate) {
+    elements.taskEndDate.value = task.endDate || "";
+  }
+  renderDependencyOptions(task);
+  elements.taskModal.hidden = false;
+};
+
+const closeTaskModal = () => {
+  if (!elements.taskModal) return;
+  elements.taskModal.hidden = true;
+  taskModalState.taskId = null;
+};
+
+const renderDependencyOptions = (task) => {
+  if (!elements.taskDependencyList) return;
+  elements.taskDependencyList.innerHTML = "";
+  const candidates = state.tasks.filter((item) => item.id !== task.id);
+  if (!candidates.length) {
+    const note = document.createElement("p");
+    note.className = "helper";
+    note.textContent = "Keine weiteren Aufgaben verfügbar.";
+    elements.taskDependencyList.appendChild(note);
+    return;
+  }
+
+  const taskMap = buildTaskMap();
+  candidates.forEach((candidate) => {
+    const isChecked = task.dependencyIds?.includes(candidate.id);
+    const isDisabled =
+      !isChecked && wouldCreateCycle(task.id, candidate.id, taskMap);
+    const label = document.createElement("label");
+    label.className = "dependency-option";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = candidate.id;
+    checkbox.checked = Boolean(isChecked);
+    checkbox.disabled = Boolean(isDisabled);
+    const text = document.createElement("span");
+    text.textContent = candidate.title;
+    label.appendChild(checkbox);
+    label.appendChild(text);
+    if (isDisabled) {
+      const note = document.createElement("span");
+      note.className = "dependency-note";
+      note.textContent = "Zyklus";
+      label.appendChild(note);
+    }
+    elements.taskDependencyList.appendChild(label);
+  });
+};
+
+const handleTaskModalSubmit = (event) => {
+  event.preventDefault();
+  const taskId = taskModalState.taskId;
+  if (!taskId) return;
+  const task = state.tasks.find((item) => item.id === taskId);
+  if (!task) {
+    closeTaskModal();
+    return;
+  }
+
+  const nextStartValue = elements.taskStartDate?.value || "";
+  const nextEndValue = elements.taskEndDate?.value || "";
+  const selectedDependencies = Array.from(
+    elements.taskDependencyList?.querySelectorAll(
+      "input[type='checkbox']:checked",
+    ) || [],
+  ).map((input) => input.value);
+
+  const taskMap = buildTaskMap();
+  const validDependencyIds = Array.from(new Set(selectedDependencies)).filter(
+    (id) => id !== task.id && taskMap.has(id),
+  );
+
+  const previousDependencies = Array.isArray(task.dependencyIds)
+    ? task.dependencyIds
+    : [];
+  const addedDependencies = validDependencyIds.filter(
+    (id) => !previousDependencies.includes(id),
+  );
+  const createsCycle = addedDependencies.some((dependencyId) =>
+    wouldCreateCycle(task.id, dependencyId, taskMap),
+  );
+  if (createsCycle) {
+    window.alert("Diese Abhängigkeit würde einen Zyklus erzeugen.");
+    renderDependencyOptions(task);
+    return;
+  }
+
+  const nextStartDate = isValidDateInput(nextStartValue)
+    ? nextStartValue
+    : null;
+  const nextEndDate = isValidDateInput(nextEndValue) ? nextEndValue : null;
+  const dependenciesChanged =
+    previousDependencies.length !== validDependencyIds.length ||
+    previousDependencies.some((id) => !validDependencyIds.includes(id));
+
+  if (
+    task.startDate === nextStartDate &&
+    task.endDate === nextEndDate &&
+    !dependenciesChanged
+  ) {
+    closeTaskModal();
+    return;
+  }
+
+  task.startDate = nextStartDate;
+  task.endDate = nextEndDate;
+  task.dependencyIds = validDependencyIds;
+  task.updatedAt = new Date().toISOString();
+  logTaskUpdate(task, {
+    startDate: nextStartDate,
+    endDate: nextEndDate,
+    dependencies: validDependencyIds,
+  });
+  saveState();
+  renderTasksPanel();
+  closeTaskModal();
 };
 
 const renderArchitectPanel = () => {
@@ -2929,6 +4988,10 @@ const handleAddComment = (event) => {
   });
 
   state.isAddingComment = false;
+  logActivityEvent("comment_added", {
+    roomId: state.activeRoomId,
+    metadata: { text: commentText },
+  });
   saveState();
   renderFloorplan();
   renderComments(roomData);
@@ -2940,23 +5003,223 @@ const requireActiveRoom = (message) => {
   return false;
 };
 
-const handleChecklistSubmit = (event) => {
+const handleTaskSubmit = (event) => {
+  event.preventDefault();
+  if (!elements.taskInput) return;
+  if (!requireActiveRoom("Bitte zuerst einen Raum auswählen.")) {
+    return;
+  }
+  const rawValue = elements.taskInput.value.trim();
+  if (!rawValue) {
+    return;
+  }
+  const parsed = parseTaskInput(rawValue);
+  if (!parsed.title) {
+    return;
+  }
+  const extraTags = normalizeTaskTags(elements.taskTagsInput?.value || "");
+  const tags = Array.from(new Set([...(parsed.tags || []), ...extraTags]));
+  const selectedStatus = elements.taskStatusInput?.value || DEFAULT_TASK_STATUS;
+  const roomId = state.activeRoomId;
+  const task = createTask({
+    title: parsed.title,
+    tags,
+    status: normalizeTaskStatus(selectedStatus),
+    roomId,
+  });
+  state.tasks.unshift(task);
+  logActivityEvent("task_created", {
+    taskId: task.id,
+    roomId: task.roomId,
+    metadata: { title: task.title },
+  });
+  elements.taskInput.value = "";
+  if (elements.taskTagsInput) {
+    elements.taskTagsInput.value = "";
+  }
+  if (elements.taskStatusInput) {
+    elements.taskStatusInput.value = DEFAULT_TASK_STATUS;
+  }
+  saveState();
+  renderTasksPanel();
+};
+
+const handleTaskFilterChange = () => {
+  state.taskFilters.roomId = elements.taskFilterRoom?.value || "all";
+  state.taskFilters.status = elements.taskFilterStatus?.value || "all";
+  state.taskFilters.assignee = elements.taskFilterAssignee?.value || "all";
+  state.taskFilters.tag = elements.taskFilterTag?.value || "all";
+  state.taskFilters.query = elements.taskFilterSearch?.value || "";
+  clearTaskSelection();
+  renderTasksPanel();
+};
+
+const resetTaskFilters = () => {
+  state.taskFilters = { ...DEFAULT_TASK_FILTERS };
+  clearTaskSelection();
+  renderTasksPanel();
+};
+
+const getSelectedTasks = () =>
+  state.tasks.filter((task) => state.selectedTaskIds.has(task.id));
+
+const handleTaskSelectAll = (event) => {
+  const isChecked = event.target.checked;
+  const visibleTasks = applyTaskFilters(state.tasks);
+  visibleTasks.forEach((task) => {
+    if (isChecked) {
+      state.selectedTaskIds.add(task.id);
+    } else {
+      state.selectedTaskIds.delete(task.id);
+    }
+  });
+  if (elements.taskList) {
+    elements.taskList
+      .querySelectorAll("input[data-task-select]")
+      .forEach((input) => {
+        input.checked = isChecked;
+      });
+  }
+  updateTaskSelectionState(visibleTasks);
+};
+
+const handleTaskBulkDone = () => {
+  const selected = getSelectedTasks();
+  if (!selected.length) return;
+  const timestamp = new Date().toISOString();
+  selected.forEach((task) => {
+    const previousStatus = task.status;
+    const nextStatus = "Done";
+    if (previousStatus === nextStatus) return;
+    task.status = nextStatus;
+    task.updatedAt = timestamp;
+    updateTaskSearchIndex(task);
+    logActivityEvent("task_status_changed", {
+      taskId: task.id,
+      roomId: task.roomId,
+      metadata: {
+        title: task.title,
+        fromStatus: previousStatus,
+        toStatus: nextStatus,
+      },
+    });
+  });
+  clearTaskSelection();
+  saveState();
+  renderTasksPanel();
+};
+
+const handleTaskBulkAssign = () => {
+  const assignee = elements.taskBulkAssignee?.value?.trim();
+  if (!assignee) return;
+  const selected = getSelectedTasks();
+  if (!selected.length) return;
+  const timestamp = new Date().toISOString();
+  selected.forEach((task) => {
+    const previousAssignee = task.assignee || "";
+    if (previousAssignee === assignee) return;
+    task.assignee = assignee;
+    task.updatedAt = timestamp;
+    updateTaskSearchIndex(task);
+    logActivityEvent("task_assigned", {
+      taskId: task.id,
+      roomId: task.roomId,
+      metadata: {
+        title: task.title,
+        assignee,
+        previousAssignee: previousAssignee || null,
+      },
+    });
+  });
+  clearTaskSelection();
+  saveState();
+  renderTasksPanel();
+};
+
+const handleTaskBulkDueDate = () => {
+  const dueDate = elements.taskBulkDueDate?.value || "";
+  if (!dueDate) return;
+  const selected = getSelectedTasks();
+  if (!selected.length) return;
+  const timestamp = new Date().toISOString();
+  selected.forEach((task) => {
+    if (task.dueDate === dueDate) return;
+    task.dueDate = dueDate;
+    task.updatedAt = timestamp;
+    logTaskUpdate(task, { dueDate });
+  });
+  clearTaskSelection();
+  saveState();
+  renderTasksPanel();
+};
+
+const removeTask = (taskId) => {
+  const task = state.tasks.find((item) => item.id === taskId);
+  if (!task) return;
+  const confirmRemove = window.confirm(
+    `Aufgabe "${task.title}" wirklich entfernen?`,
+  );
+  if (!confirmRemove) return;
+  state.tasks = state.tasks.filter((item) => item.id !== taskId);
+  state.selectedTaskIds.delete(taskId);
+  state.tasks.forEach((item) => {
+    if (!Array.isArray(item.dependencyIds)) return;
+    item.dependencyIds = item.dependencyIds.filter((id) => id !== taskId);
+  });
+  saveState();
+  renderTasksPanel();
+};
+
+const handleDecisionSubmit = async (event) => {
   event.preventDefault();
   if (
     !requireActiveRoom(
-      "Bitte zuerst einen Raum auswählen, bevor Sie Aufgaben hinzufügen.",
+      "Bitte zuerst einen Raum auswählen, bevor Sie Entscheidungen hinzufügen.",
     )
   )
     return;
-  const value = elements.checklistInput.value.trim();
-  if (!value) {
+  if (!elements.decisionTitleInput || !elements.decisionBodyInput) return;
+  const title = elements.decisionTitleInput.value.trim();
+  const body = elements.decisionBodyInput.value.trim();
+  if (!title || !body) {
+    window.alert("Bitte Titel und Begründung eingeben.");
     return;
   }
+
   const roomData = ensureRoomData(state.activeRoomId);
-  roomData.checklist.unshift(value);
-  elements.checklistInput.value = "";
-  saveState();
-  renderChecklist(roomData);
+  const actor = getActivityActor();
+  const taskIds = Array.from(
+    elements.decisionTasks?.querySelectorAll(
+      "input[type='checkbox']:checked",
+    ) || [],
+  ).map((input) => input.value);
+  const decision = {
+    id: createDecisionId(),
+    title,
+    body,
+    actor,
+    userName: actor,
+    userEmail: authState.user?.email || "",
+    createdAt: new Date().toISOString(),
+    taskIds,
+  };
+  roomData.decisions.unshift(decision);
+  elements.decisionForm?.reset();
+  renderDecisions(roomData);
+  renderDecisionTaskOptions();
+  logActivityEvent("decision_created", {
+    roomId: state.activeRoomId,
+    metadata: { title, body, taskCount: taskIds.length },
+  });
+  saveStateLocal();
+  const apiSaved = await postEvidenceItem(
+    state.activeRoomId,
+    "decisions",
+    decision,
+  );
+  if (!apiSaved) {
+    saveState();
+  }
 };
 
 const buildPlaceholderImage = (text) =>
@@ -2975,6 +5238,58 @@ const setImageStatus = (text, isError = false) => {
   elements.imageStatus.textContent = text;
   elements.imageStatus.classList.toggle("status-line", true);
   elements.imageStatus.classList.toggle("error", isError);
+};
+
+const canUseEvidenceApi = () =>
+  window.location.protocol !== "file:" &&
+  Boolean(authState.session?.access_token);
+
+const postEvidenceItem = async (roomId, resource, item) => {
+  if (!roomId || !resource || !canUseEvidenceApi()) return false;
+  const token = authState.session?.access_token;
+  try {
+    const response = await fetch(
+      `/api/rooms/${encodeURIComponent(roomId)}/${resource}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          item,
+          state: buildStatePayload(),
+        }),
+      },
+    );
+
+    let data = {};
+    try {
+      data = await response.json();
+    } catch {
+      data = {};
+    }
+
+    if (!response.ok) {
+      throw new Error(data?.error || `HTTP ${response.status}`);
+    }
+
+    syncState.lastSavedAt = Date.now();
+    return true;
+  } catch (error) {
+    console.error("Evidence speichern fehlgeschlagen:", error);
+    return false;
+  }
+};
+
+const persistEvidenceFile = async (roomData, record) => {
+  roomData.images.unshift(record);
+  renderImages(roomData);
+  saveStateLocal();
+  const apiSaved = await postEvidenceItem(state.activeRoomId, "files", record);
+  if (!apiSaved) {
+    saveState();
+  }
 };
 
 const isLikelyNetworkBlock = (error) => {
@@ -3013,18 +5328,25 @@ const generateImageWithOpenAI = async (promptText, roomData) => {
   const requestId = `img-${Date.now()}`;
   const label = `ChatGPT-Anfrage: ${promptText}`;
 
-  const pushImage = (url) => {
-    roomData.images.unshift({
+  const pushImage = async (url) => {
+    const record = {
       id: requestId,
       label,
+      name: label,
       url,
-    });
-    saveState();
-    renderImages(roomData);
+      type: "image/png",
+      size: null,
+      createdAt: new Date().toISOString(),
+      userName: getActivityActor(),
+      userEmail: authState.user?.email || "",
+    };
+    await persistEvidenceFile(roomData, record);
   };
 
   if (window.location.protocol === "file:") {
-    pushImage(buildPlaceholderImage(promptText || "Idee ohne Beschreibung"));
+    await pushImage(
+      buildPlaceholderImage(promptText || "Idee ohne Beschreibung"),
+    );
     setImageStatus(
       "Bildgenerierung benötigt einen lokalen Server. Bitte über npm run serve öffnen.",
       true,
@@ -3071,11 +5393,13 @@ const generateImageWithOpenAI = async (promptText, roomData) => {
       throw error;
     }
 
-    pushImage(imageUrl);
+    await pushImage(imageUrl);
     setImageStatus("Bild wurde erzeugt.");
   } catch (error) {
     console.error("Bildgenerierung fehlgeschlagen:", error);
-    pushImage(buildPlaceholderImage(promptText || "Idee ohne Beschreibung"));
+    await pushImage(
+      buildPlaceholderImage(promptText || "Idee ohne Beschreibung"),
+    );
     const networkBlocked = isLikelyNetworkBlock(error);
     const message =
       error?.code === "missing_api_key"
@@ -3112,7 +5436,7 @@ const handleGenerateImage = () => {
 const handleUploadImage = (event) => {
   if (
     !requireActiveRoom(
-      "Bitte zuerst einen Raum auswählen, bevor Sie ein Foto hochladen.",
+      "Bitte zuerst einen Raum auswählen, bevor Sie ein Dokument hochladen.",
     )
   )
     return;
@@ -3122,17 +5446,58 @@ const handleUploadImage = (event) => {
   }
 
   const reader = new FileReader();
-  reader.onload = (loadEvent) => {
+  reader.onload = async (loadEvent) => {
     const roomData = ensureRoomData(state.activeRoomId);
-    roomData.images.unshift({
-      id: `img-${Date.now()}`,
+    const record = {
+      id: `file-${Date.now()}`,
       label: file.name,
+      name: file.name,
       url: loadEvent.target.result,
+      type: file.type || "",
+      size: file.size,
+      createdAt: new Date().toISOString(),
+      userName: getActivityActor(),
+      userEmail: authState.user?.email || "",
+    };
+    logActivityEvent("file_uploaded", {
+      roomId: state.activeRoomId,
+      metadata: { filename: file.name },
     });
-    saveState();
-    renderImages(roomData);
+    await persistEvidenceFile(roomData, record);
   };
   reader.readAsDataURL(file);
+  event.target.value = "";
+};
+
+const handleAddEvidenceLink = async () => {
+  if (
+    !requireActiveRoom(
+      "Bitte zuerst einen Raum auswählen, bevor Sie einen Link hinzufügen.",
+    )
+  )
+    return;
+  const url = window.prompt("Link zur Datei oder Referenz einfügen:");
+  if (!url) return;
+  const label = window.prompt("Titel für den Link:", url.trim()) || url.trim();
+  if (!label) return;
+
+  const roomData = ensureRoomData(state.activeRoomId);
+  const record = {
+    id: `file-${Date.now()}`,
+    label,
+    name: label,
+    url: url.trim(),
+    type: "link",
+    size: null,
+    createdAt: new Date().toISOString(),
+    userName: getActivityActor(),
+    userEmail: authState.user?.email || "",
+  };
+  logActivityEvent("file_uploaded", {
+    roomId: state.activeRoomId,
+    metadata: { filename: label },
+  });
+  await persistEvidenceFile(roomData, record);
 };
 
 const applyArchitectAdjustments = ({
@@ -3643,9 +6008,92 @@ const bindEvents = () => {
     });
   }
 
-  elements.checklistForm.addEventListener("submit", handleChecklistSubmit);
+  if (elements.viewButtons?.length) {
+    elements.viewButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const view = button.dataset.appView;
+        if (!view) return;
+        setActiveView(view);
+        renderTasksPanel();
+      });
+    });
+  }
+
+  if (elements.taskViewButtons?.length) {
+    elements.taskViewButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const view = button.dataset.taskView;
+        if (!view) return;
+        state.taskFilters.view = TASK_VIEW_PRESETS[view] ? view : "all";
+        clearTaskSelection();
+        renderTasksPanel();
+      });
+    });
+  }
+
+  if (elements.taskViewButtons?.length) {
+    elements.taskViewButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const view = button.dataset.taskView;
+        if (!view || !TASK_VIEW_PRESETS[view]) return;
+        if (state.taskFilters.view === view) return;
+        state.taskFilters.view = view;
+        clearTaskSelection();
+        renderTasksPanel();
+      });
+    });
+  }
+
+  if (elements.roomTabButtons?.length) {
+    elements.roomTabButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const tab = button.dataset.roomTab;
+        if (tab) {
+          setActiveRoomTab(tab);
+        }
+      });
+    });
+  }
+
+  elements.taskForm?.addEventListener("submit", handleTaskSubmit);
+  elements.taskFilterRoom?.addEventListener("change", handleTaskFilterChange);
+  elements.taskFilterStatus?.addEventListener("change", handleTaskFilterChange);
+  elements.taskFilterAssignee?.addEventListener(
+    "change",
+    handleTaskFilterChange,
+  );
+  elements.taskFilterTag?.addEventListener("change", handleTaskFilterChange);
+  elements.taskFilterSearch?.addEventListener("input", handleTaskFilterChange);
+  elements.tasksReset?.addEventListener("click", resetTaskFilters);
+  elements.taskSelectAll?.addEventListener("change", handleTaskSelectAll);
+  elements.taskBulkDone?.addEventListener("click", handleTaskBulkDone);
+  elements.taskBulkAssign?.addEventListener("click", handleTaskBulkAssign);
+  elements.taskBulkDueApply?.addEventListener("click", handleTaskBulkDueDate);
+  elements.taskBulkAssignee?.addEventListener("input", () =>
+    updateTaskSelectionState(),
+  );
+  elements.taskBulkAssignee?.addEventListener("change", () =>
+    updateTaskSelectionState(),
+  );
+  elements.taskBulkDueDate?.addEventListener("input", () =>
+    updateTaskSelectionState(),
+  );
+  elements.taskBulkDueDate?.addEventListener("change", () =>
+    updateTaskSelectionState(),
+  );
+  elements.taskModalForm?.addEventListener("submit", handleTaskModalSubmit);
+  elements.taskModalClose?.addEventListener("click", closeTaskModal);
+  elements.taskModalCancel?.addEventListener("click", closeTaskModal);
+  elements.taskModal?.addEventListener("click", (event) => {
+    if (event.target === elements.taskModal) {
+      closeTaskModal();
+    }
+  });
+
+  elements.decisionForm?.addEventListener("submit", handleDecisionSubmit);
   elements.generateImageBtn.addEventListener("click", handleGenerateImage);
   elements.uploadImageInput.addEventListener("change", handleUploadImage);
+  elements.addEvidenceLinkBtn?.addEventListener("click", handleAddEvidenceLink);
   elements.setApiKeyBtn?.addEventListener("click", handleSetApiKey);
   elements.loginForm?.addEventListener("submit", handleLogin);
   elements.signupForm?.addEventListener("submit", handleSignup);
@@ -3760,6 +6208,7 @@ const init = () => {
   renderFloorplan();
   renderRoomPanel();
   renderArchitectPanel();
+  renderTasksPanel();
   setArchitectMode(state.isArchitectMode);
   updateFloorButtons();
   if (elements.setApiKeyBtn) {
