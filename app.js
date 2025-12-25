@@ -758,6 +758,7 @@ const elements = {
   uploadImageInput: document.getElementById("upload-image"),
   generateImageBtn: document.getElementById("generate-image"),
   addEvidenceLinkBtn: document.getElementById("add-evidence-link"),
+  architectToggleLabel: document.getElementById("architect-toggle-label"),
   toggleArchitect: document.getElementById("toggle-architect"),
   helpButton: document.getElementById("help-button"),
   helpModal: document.getElementById("help-modal"),
@@ -2221,6 +2222,10 @@ const setActiveView = (viewId) => {
   if (state.activeView === "tasks" && state.activeRoomId) {
     syncTaskRoomFilter(state.activeRoomId);
   }
+  if (state.activeView === "tasks" && state.isArchitectMode) {
+    setArchitectMode(false);
+    return;
+  }
   updateViewUI();
 };
 
@@ -2260,6 +2265,21 @@ const updateViewUI = () => {
   const activeView = APP_VIEWS.includes(state.activeView)
     ? state.activeView
     : APP_VIEWS[0];
+  const hideArchitectToggle = activeView === "tasks";
+  if (elements.architectToggleLabel) {
+    elements.architectToggleLabel.hidden = hideArchitectToggle;
+    elements.architectToggleLabel.setAttribute(
+      "aria-hidden",
+      String(hideArchitectToggle),
+    );
+  }
+  if (elements.toggleArchitect) {
+    elements.toggleArchitect.disabled = hideArchitectToggle;
+    elements.toggleArchitect.setAttribute(
+      "aria-disabled",
+      String(hideArchitectToggle),
+    );
+  }
   document.body.classList.toggle(
     "tasks-view-active",
     !isArchitect && activeView === "tasks",
@@ -5857,6 +5877,9 @@ const resetDragState = ({ keepSuppressClick = false } = {}) => {
 
 const setArchitectMode = (isOn) => {
   state.isArchitectMode = isOn;
+  if (elements.toggleArchitect) {
+    elements.toggleArchitect.checked = isOn;
+  }
   if (!isOn && state.isExteriorMode) {
     state.isExteriorMode = false;
     document.body.classList.remove("exterior-mode");

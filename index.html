@@ -63,7 +63,7 @@
         <h1>Hausplaner</h1>
       </div>
       <div class="header-actions">
-        <label class="toggle">
+        <label class="toggle" id="architect-toggle-label">
           <input type="checkbox" id="toggle-architect" />
           <span>Architekt-Ansicht</span>
         </label>
@@ -87,6 +87,34 @@
     </header>
 
     <main class="app">
+      <div class="mobile-bar" aria-label="Mobile Navigation">
+        <label class="mobile-room-picker">
+          <span>Raum</span>
+          <select id="mobile-room-select" aria-label="Raum auswählen"></select>
+        </label>
+        <div
+          class="segmented-control mobile-view-toggle"
+          role="tablist"
+          aria-label="Ansicht wählen"
+        >
+          <button
+            class="segmented-option is-active"
+            type="button"
+            data-app-view="room"
+            id="mobile-view-room"
+          >
+            Raum
+          </button>
+          <button
+            class="segmented-option"
+            type="button"
+            data-app-view="tasks"
+            id="mobile-view-tasks"
+          >
+            Aufgaben
+          </button>
+        </div>
+      </div>
       <section class="floorplan" aria-label="Grundriss">
         <div class="floorplan-header">
           <div class="floorplan-copy">

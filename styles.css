@@ -22,6 +22,10 @@ body {
   margin: 0;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body.auth-locked {
   overflow: hidden;
 }
@@ -1086,6 +1090,7 @@ button {
 .tasks-board {
   display: grid;
   gap: 0.6rem;
+  min-width: 0;
 }
 
 .task-board {
@@ -1096,6 +1101,8 @@ button {
   overflow-x: auto;
   padding-bottom: 0.4rem;
   height: clamp(360px, 60vh, 620px);
+  min-width: 0;
+  width: 100%;
 }
 
 .kanban-column {
