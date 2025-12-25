@@ -116,7 +116,7 @@
             <span id="floor-label" class="floor-switch-value">Erdgeschoss</span>
           </div>
         </div>
-        <div class="floorplan-wrapper">
+        <div class="floorplan-wrapper" id="floorplan-wrapper">
           <svg
             id="floorplan"
             viewBox="0 0 800 520"
@@ -125,6 +125,19 @@
           >
             <title id="floorplan-title">Interaktiver Grundriss</title>
           </svg>
+          <div
+            id="comment-tooltip"
+            class="comment-tooltip"
+            role="status"
+            aria-hidden="true"
+            hidden
+          >
+            <div
+              id="comment-tooltip-author"
+              class="comment-tooltip-author"
+            ></div>
+            <div id="comment-tooltip-text" class="comment-tooltip-text"></div>
+          </div>
         </div>
         <div class="legend">
           <span class="legend-item">
@@ -229,92 +242,6 @@
             </div>
           </section>
 
-          <section
-            class="panel three-d-panel"
-            id="three-d-panel"
-            data-room-panel="overview"
-            hidden
-          >
-            <div class="panel-header">
-              <h3>3D-Ansicht</h3>
-              <button id="toggle-3d" type="button">Öffnen</button>
-            </div>
-            <p id="three-d-label" class="helper">3D-Ansicht für den Raum</p>
-            <div class="three-d-controls">
-              <div class="three-d-control">
-                <span class="three-d-control-label">Ansicht</span>
-                <div
-                  class="segmented-control"
-                  role="group"
-                  aria-label="3D-Ansicht wählen"
-                >
-                  <button
-                    class="segmented-option is-active"
-                    type="button"
-                    data-view="walkthrough"
-                  >
-                    Innen
-                  </button>
-                  <button
-                    class="segmented-option"
-                    type="button"
-                    data-view="dollhouse"
-                  >
-                    Modell
-                  </button>
-                </div>
-              </div>
-              <label class="three-d-control">
-                <span class="three-d-control-label">Stil</span>
-                <select id="three-d-style">
-                  <option value="soft-modern">Soft Modern</option>
-                  <option value="warm-minimal">Warm Minimal</option>
-                  <option value="urban-atelier">Urban Atelier</option>
-                  <option value="scandi-light">Scandi Light</option>
-                </select>
-              </label>
-              <label class="three-d-control">
-                <span class="three-d-control-label">Material</span>
-                <select id="three-d-floor">
-                  <option value="oak">Eiche</option>
-                  <option value="warm-oak">Räuchereiche</option>
-                  <option value="stone">Naturstein</option>
-                  <option value="tile">Feinsteinzeug</option>
-                  <option value="terrazzo">Terrazzo</option>
-                </select>
-              </label>
-              <label class="three-d-control">
-                <span class="three-d-control-label">Licht</span>
-                <select id="three-d-lighting">
-                  <option value="day">Tageslicht</option>
-                  <option value="golden">Goldene Stunde</option>
-                  <option value="evening">Abend</option>
-                  <option value="studio">Studio</option>
-                </select>
-              </label>
-              <button id="three-d-reset" type="button">
-                Ansicht zurücksetzen
-              </button>
-            </div>
-            <div class="three-d-viewer">
-              <div
-                class="three-d-stage"
-                id="three-d-stage"
-                data-view="walkthrough"
-              >
-                <div class="three-d-camera" id="three-d-camera">
-                  <div class="three-d-room" id="three-d-room"></div>
-                </div>
-              </div>
-              <div class="three-d-hud">
-                <span class="three-d-hint">
-                  Ziehen: Blick drehen · Scrollen: Zoom
-                </span>
-                <span id="three-d-readout" class="three-d-readout"></span>
-              </div>
-            </div>
-          </section>
-
           <section class="panel" id="room-tasks-panel" data-room-panel="tasks">
             <h3>Aufgaben</h3>
             <ul id="room-tasks" class="task-list"></ul>
@@ -409,6 +336,67 @@
             <h3>Aktivität im Raum</h3>
             <ul id="room-activity" class="activity-list"></ul>
             <p id="room-activity-empty" class="helper"></p>
+          </section>
+
+          <section
+            class="panel three-d-panel"
+            id="three-d-panel"
+            data-room-panel="overview"
+            hidden
+          >
+            <div class="panel-header">
+              <h3>3D-Ansicht</h3>
+              <button id="toggle-3d" type="button">Öffnen</button>
+            </div>
+            <p id="three-d-label" class="helper">3D-Ansicht für den Raum</p>
+            <div class="three-d-controls">
+              <div class="three-d-control">
+                <span class="three-d-control-label">Ansicht</span>
+                <div
+                  class="segmented-control"
+                  role="group"
+                  aria-label="3D-Ansicht wählen"
+                >
+                  <button
+                    class="segmented-option is-active"
+                    type="button"
+                    data-view="walkthrough"
+                  >
+                    Innen (Schnitt)
+                  </button>
+                  <button
+                    class="segmented-option"
+                    type="button"
+                    data-view="model"
+                  >
+                    Modell
+                  </button>
+                </div>
+                <span class="three-d-control-hint">
+                  Innen: Dach &amp; Frontwand geöffnet · Modell: Außenvolumen
+                </span>
+              </div>
+              <button id="three-d-reset" type="button">
+                Ansicht zurücksetzen
+              </button>
+            </div>
+            <div class="three-d-viewer">
+              <div
+                class="three-d-stage"
+                id="three-d-stage"
+                data-view="walkthrough"
+              >
+                <div class="three-d-camera" id="three-d-camera">
+                  <div class="three-d-room" id="three-d-room"></div>
+                </div>
+              </div>
+              <div class="three-d-hud">
+                <span class="three-d-hint">
+                  Ziehen: Blick drehen · Scrollen: Zoom
+                </span>
+                <span id="three-d-readout" class="three-d-readout"></span>
+              </div>
+            </div>
           </section>
         </div>
 
@@ -783,8 +771,7 @@
         </div>
         <div class="help-content">
           <p class="helper">
-            Kurz erklärt: Die Bereiche aus den letzten Prompts (A-E) in
-            Klartext.
+            Kurz erklärt: Die wichtigsten Bereiche der App in Klartext.
           </p>
           <div class="help-grid">
             <section class="help-card">
@@ -850,9 +837,22 @@
       </div>
     </div>
 
-    <footer class="app-footer">
-      <p>Große Schaltflächen, klare Sprache und ein Raum nach dem anderen.</p>
-    </footer>
+    <div
+      id="comment-context-menu"
+      class="comment-context-menu"
+      role="menu"
+      aria-label="Kommentaraktionen"
+      aria-hidden="true"
+      hidden
+    >
+      <button type="button" data-action="edit">Kommentar bearbeiten</button>
+      <button type="button" data-action="resolve">
+        Als erledigt markieren
+      </button>
+      <button type="button" class="danger" data-action="delete">
+        Kommentar löschen
+      </button>
+    </div>
 
     <script src="config.js"></script>
     <script type="module" src="app.js"></script>

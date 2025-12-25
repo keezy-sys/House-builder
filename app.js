@@ -21,133 +21,18 @@ const DEFAULT_FLOORPLAN_HINT =
 
 const THREE_D_DEFAULT_SCENE = {
   view: "walkthrough",
-  style: "soft-modern",
-  floor: "oak",
-  lighting: "day",
 };
 
 const THREE_D_VIEW_PRESETS = {
   walkthrough: {
-    yaw: -22,
-    pitch: 14,
-    distanceFactor: 1.05,
-  },
-  dollhouse: {
     yaw: -32,
-    pitch: 26,
-    distanceFactor: 1.4,
+    pitch: 18,
+    distanceFactor: 1.1,
   },
-};
-
-const THREE_D_STYLE_PRESETS = {
-  "soft-modern": {
-    wall: "#f5efe7",
-    wallShade: "#efe3d6",
-    ceiling: "#fbf8f4",
-    trim: "#e3d6c8",
-    accent: "#a16207",
-    glass: "rgba(191, 219, 254, 0.7)",
-    shadowSoft: "rgba(15, 23, 42, 0.18)",
-    shadowDeep: "rgba(15, 23, 42, 0.28)",
-  },
-  "warm-minimal": {
-    wall: "#f6efe4",
-    wallShade: "#e7d7c4",
-    ceiling: "#fcf7f2",
-    trim: "#e2d0bf",
-    accent: "#b45309",
-    glass: "rgba(191, 219, 254, 0.65)",
-    shadowSoft: "rgba(15, 23, 42, 0.2)",
-    shadowDeep: "rgba(15, 23, 42, 0.3)",
-  },
-  "urban-atelier": {
-    wall: "#e7e5e4",
-    wallShade: "#d6d3d1",
-    ceiling: "#f5f5f4",
-    trim: "#cbd5e1",
-    accent: "#0f172a",
-    glass: "rgba(148, 163, 184, 0.65)",
-    shadowSoft: "rgba(15, 23, 42, 0.22)",
-    shadowDeep: "rgba(15, 23, 42, 0.35)",
-  },
-  "scandi-light": {
-    wall: "#f8fafc",
-    wallShade: "#e2e8f0",
-    ceiling: "#ffffff",
-    trim: "#dbe2ea",
-    accent: "#2563eb",
-    glass: "rgba(191, 219, 254, 0.75)",
-    shadowSoft: "rgba(15, 23, 42, 0.18)",
-    shadowDeep: "rgba(15, 23, 42, 0.28)",
-  },
-};
-
-const THREE_D_FLOOR_PRESETS = {
-  oak: {
-    base: "#d5b186",
-    shade: "#b98f63",
-    pattern:
-      "repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0 16px, rgba(64, 49, 35, 0.18) 16px 18px)",
-    patternSize: "32px",
-  },
-  "warm-oak": {
-    base: "#c2926e",
-    shade: "#a87552",
-    pattern:
-      "repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0 14px, rgba(64, 49, 35, 0.18) 14px 16px)",
-    patternSize: "30px",
-  },
-  stone: {
-    base: "#d6d3d1",
-    shade: "#a8a29e",
-    pattern:
-      "radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.35) 0 2px, transparent 3px), radial-gradient(circle at 70% 60%, rgba(120, 113, 108, 0.35) 0 2px, transparent 3px)",
-    patternSize: "22px",
-  },
-  tile: {
-    base: "#dbeafe",
-    shade: "#bfdbfe",
-    pattern:
-      "linear-gradient(90deg, rgba(15, 23, 42, 0.16) 1px, transparent 1px), linear-gradient(180deg, rgba(15, 23, 42, 0.16) 1px, transparent 1px)",
-    patternSize: "38px",
-  },
-  terrazzo: {
-    base: "#e7e5e4",
-    shade: "#d6d3d1",
-    pattern:
-      "radial-gradient(circle at 30% 30%, rgba(248, 250, 252, 0.7) 0 2px, transparent 3px), radial-gradient(circle at 70% 50%, rgba(120, 113, 108, 0.35) 0 2px, transparent 3px)",
-    patternSize: "26px",
-  },
-};
-
-const THREE_D_LIGHTING_PRESETS = {
-  day: {
-    skyTop: "#e0f2fe",
-    skyMid: "#fef3c7",
-    skyBottom: "#f8fafc",
-    filter: "brightness(1) saturate(1)",
-    glow: "rgba(255, 255, 255, 0.35)",
-  },
-  golden: {
-    skyTop: "#fde68a",
-    skyMid: "#fbcfe8",
-    skyBottom: "#fff7ed",
-    filter: "brightness(1.05) saturate(1.12)",
-    glow: "rgba(251, 191, 36, 0.35)",
-  },
-  evening: {
-    skyTop: "#1e293b",
-    skyMid: "#0f172a",
-    skyBottom: "#1f2937",
-    filter: "brightness(0.9) saturate(0.9)",
-    glow: "rgba(59, 130, 246, 0.25)",
-  },
-  studio: {
-    skyTop: "#f1f5f9",
-    skyMid: "#e2e8f0",
-    skyBottom: "#f8fafc",
-    filter: "brightness(1.05) saturate(0.95)",
-    glow: "rgba(255, 255, 255, 0.4)",
+  model: {
+    yaw: -42,
+    pitch: 28,
+    distanceFactor: 1.55,
   },
 };
 
@@ -743,6 +628,17 @@ const imageMaskState = {
   lastPoint: null,
 };
 
+const commentTooltipState = {
+  commentId: null,
+  roomId: null,
+};
+
+const commentContextState = {
+  commentId: null,
+  roomId: null,
+  isOpen: false,
+};
+
 const dragState = {
   active: false,
   didMove: false,
@@ -764,8 +660,8 @@ const threeDState = {
   activeRoomId: null,
   activeView: null,
   camera: {
-    yaw: -22,
-    pitch: 14,
+    yaw: -32,
+    pitch: 18,
     distance: -420,
   },
   bounds: {
@@ -782,6 +678,7 @@ const threeDState = {
 
 const elements = {
   floorplan: document.getElementById("floorplan"),
+  floorplanWrapper: document.getElementById("floorplan-wrapper"),
   floorSwitch: document.getElementById("floor-toggle"),
   floorSwitchValue: document.getElementById("floor-label"),
   floorplanTitle: document.getElementById("floorplan-title"),
@@ -797,6 +694,10 @@ const elements = {
   roomTasks: document.getElementById("room-tasks"),
   roomTasksEmpty: document.getElementById("room-tasks-empty"),
   comments: document.getElementById("comments"),
+  commentTooltip: document.getElementById("comment-tooltip"),
+  commentTooltipAuthor: document.getElementById("comment-tooltip-author"),
+  commentTooltipText: document.getElementById("comment-tooltip-text"),
+  commentContextMenu: document.getElementById("comment-context-menu"),
   decisionList: document.getElementById("decision-list"),
   decisionForm: document.getElementById("decision-form"),
   decisionTitleInput: document.getElementById("decision-title"),
@@ -840,9 +741,6 @@ const elements = {
   threeDStage: document.getElementById("three-d-stage"),
   threeDCamera: document.getElementById("three-d-camera"),
   threeDRoom: document.getElementById("three-d-room"),
-  threeDStyle: document.getElementById("three-d-style"),
-  threeDFloor: document.getElementById("three-d-floor"),
-  threeDLighting: document.getElementById("three-d-lighting"),
   threeDReadout: document.getElementById("three-d-readout"),
   threeDReset: document.getElementById("three-d-reset"),
   threeDViewButtons: Array.from(
@@ -926,6 +824,9 @@ const createActivityId = () =>
 
 const createDecisionId = () =>
   `decision-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const createCommentId = () =>
+  `comment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 const isValidDateInput = (value) =>
   typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
@@ -1249,6 +1150,36 @@ const normalizeDecisions = (decisions) => {
   return normalized;
 };
 
+const normalizeComments = (comments) => {
+  if (!Array.isArray(comments)) return [];
+  const seed = Date.now();
+  return comments
+    .map((comment, index) => {
+      if (!comment || typeof comment !== "object") return null;
+      if (typeof comment.id !== "string" || !comment.id.trim()) {
+        comment.id = `comment-${seed}-${index}`;
+      }
+      if (typeof comment.text !== "string") {
+        comment.text = String(comment.text ?? "");
+      }
+      if (!Number.isFinite(comment.x)) {
+        comment.x = 0;
+      }
+      if (!Number.isFinite(comment.y)) {
+        comment.y = 0;
+      }
+      comment.resolved = comment.resolved === true;
+      if (comment.resolved && !comment.resolvedAt) {
+        comment.resolvedAt = new Date().toISOString();
+      }
+      if (!comment.resolved && comment.resolvedAt) {
+        comment.resolvedAt = null;
+      }
+      return comment;
+    })
+    .filter(Boolean);
+};
+
 const normalizeActivityEvents = (events) => {
   if (!Array.isArray(events)) return [];
   return events
@@ -1421,6 +1352,7 @@ const ensureRoomData = (roomId) => {
   if (!Array.isArray(roomData.images)) roomData.images = [];
   if (!Array.isArray(roomData.comments)) roomData.comments = [];
   if (!Array.isArray(roomData.decisions)) roomData.decisions = [];
+  roomData.comments = normalizeComments(roomData.comments);
   roomData.decisions = normalizeDecisions(roomData.decisions);
   if (roomData.scene === undefined) roomData.scene = null;
   return roomData;
@@ -1500,6 +1432,11 @@ const wouldCreateCycle = (taskId, dependencyId, taskMap) =>
 
 const getTaskScheduleDate = (task) => {
   const candidate = task.startDate || task.dueDate;
+  return isValidDateInput(candidate) ? candidate : null;
+};
+
+const getTaskDeliveryDate = (task) => {
+  const candidate = task?.materials?.deliveryDate;
   return isValidDateInput(candidate) ? candidate : null;
 };
 
@@ -2590,6 +2527,7 @@ const createOpeningGroup = (opening, room, floorId, isSelected) => {
 
 const renderFloorplan = () => {
   elements.floorplan.innerHTML = "";
+  hideCommentTooltip();
   const floor = getActiveFloor();
   if (!floor) return;
 
@@ -2724,6 +2662,7 @@ const renderFloorplan = () => {
   floor.rooms.forEach((room) => {
     const roomData = ensureRoomData(room.id);
     roomData.comments.forEach((comment) => {
+      if (comment.resolved) return;
       const marker = document.createElementNS(
         "http://www.w3.org/2000/svg",
         "circle",
@@ -2733,6 +2672,7 @@ const renderFloorplan = () => {
       marker.setAttribute("r", 6);
       marker.setAttribute("class", "comment-marker");
       marker.dataset.roomId = room.id;
+      marker.dataset.commentId = comment.id;
       elements.floorplan.appendChild(marker);
     });
   });
@@ -2803,12 +2743,200 @@ const renderRoomPanel = () => {
   updateRoomTabs();
 };
 
+const getCommentAuthorLabel = (comment) => {
+  const userName =
+    typeof comment?.userName === "string" ? comment.userName.trim() : "";
+  if (userName) return userName;
+  const email =
+    typeof comment?.userEmail === "string" ? comment.userEmail.trim() : "";
+  return email || "Unbekannt";
+};
+
+const getCommentText = (comment) => String(comment?.text ?? "Kommentar");
+
+const isCommentAuthor = (comment) =>
+  Boolean(authState.user?.id) && comment?.userId === authState.user.id;
+
+const getCommentById = (roomId, commentId) => {
+  if (!roomId || !commentId) return null;
+  const roomData = ensureRoomData(roomId);
+  return roomData.comments.find((comment) => comment.id === commentId) || null;
+};
+
+const getCommentTooltipPosition = (comment) => {
+  if (!elements.floorplan || !elements.floorplanWrapper) return null;
+  const floorRect = elements.floorplan.getBoundingClientRect();
+  const wrapperRect = elements.floorplanWrapper.getBoundingClientRect();
+  const x =
+    (comment.x / floorplanSize.width) * floorRect.width +
+    (floorRect.left - wrapperRect.left);
+  const y =
+    (comment.y / floorplanSize.height) * floorRect.height +
+    (floorRect.top - wrapperRect.top);
+  return { x, y };
+};
+
+const showCommentTooltip = (comment, roomId) => {
+  if (!elements.commentTooltip) return;
+  const position = getCommentTooltipPosition(comment);
+  if (!position) return;
+  if (elements.commentTooltipAuthor) {
+    elements.commentTooltipAuthor.textContent = getCommentAuthorLabel(comment);
+  }
+  if (elements.commentTooltipText) {
+    elements.commentTooltipText.textContent = getCommentText(comment);
+  }
+  elements.commentTooltip.style.left = `${position.x}px`;
+  elements.commentTooltip.style.top = `${position.y}px`;
+  elements.commentTooltip.hidden = false;
+  elements.commentTooltip.setAttribute("aria-hidden", "false");
+  commentTooltipState.commentId = comment.id;
+  commentTooltipState.roomId = roomId;
+};
+
+const hideCommentTooltip = () => {
+  if (!elements.commentTooltip) return;
+  elements.commentTooltip.hidden = true;
+  elements.commentTooltip.setAttribute("aria-hidden", "true");
+  commentTooltipState.commentId = null;
+  commentTooltipState.roomId = null;
+};
+
+const showCommentTooltipForMarker = (marker) => {
+  if (!marker) return;
+  const commentId = marker.dataset.commentId;
+  const roomId = marker.dataset.roomId;
+  if (!commentId || !roomId) {
+    hideCommentTooltip();
+    return;
+  }
+  if (
+    commentTooltipState.commentId === commentId &&
+    commentTooltipState.roomId === roomId
+  ) {
+    return;
+  }
+  const comment = getCommentById(roomId, commentId);
+  if (!comment) {
+    hideCommentTooltip();
+    return;
+  }
+  showCommentTooltip(comment, roomId);
+};
+
+const positionCommentContextMenu = (clientX, clientY) => {
+  if (!elements.commentContextMenu) return;
+  const menu = elements.commentContextMenu;
+  menu.style.left = `${clientX}px`;
+  menu.style.top = `${clientY}px`;
+  const rect = menu.getBoundingClientRect();
+  const margin = 12;
+  const maxX = Math.max(margin, window.innerWidth - rect.width - margin);
+  const maxY = Math.max(margin, window.innerHeight - rect.height - margin);
+  const x = clamp(clientX, margin, maxX);
+  const y = clamp(clientY, margin, maxY);
+  menu.style.left = `${x}px`;
+  menu.style.top = `${y}px`;
+};
+
+const updateCommentContextMenu = (comment) => {
+  if (!elements.commentContextMenu) return;
+  const menu = elements.commentContextMenu;
+  const canEdit = isCommentAuthor(comment);
+  const canDelete = isCommentAuthor(comment);
+  const editBtn = menu.querySelector("button[data-action='edit']");
+  const resolveBtn = menu.querySelector("button[data-action='resolve']");
+  const deleteBtn = menu.querySelector("button[data-action='delete']");
+  if (editBtn) {
+    editBtn.disabled = !canEdit;
+    editBtn.setAttribute("aria-disabled", String(!canEdit));
+  }
+  if (deleteBtn) {
+    deleteBtn.disabled = !canDelete;
+    deleteBtn.setAttribute("aria-disabled", String(!canDelete));
+  }
+  if (resolveBtn) {
+    resolveBtn.textContent = comment.resolved
+      ? "Als offen markieren"
+      : "Als erledigt markieren";
+  }
+};
+
+const openCommentContextMenu = (event, comment, roomId) => {
+  if (!elements.commentContextMenu) return;
+  updateCommentContextMenu(comment);
+  elements.commentContextMenu.hidden = false;
+  elements.commentContextMenu.setAttribute("aria-hidden", "false");
+  commentContextState.commentId = comment.id;
+  commentContextState.roomId = roomId;
+  commentContextState.isOpen = true;
+  positionCommentContextMenu(event.clientX, event.clientY);
+};
+
+const closeCommentContextMenu = () => {
+  if (!elements.commentContextMenu || !commentContextState.isOpen) return;
+  elements.commentContextMenu.hidden = true;
+  elements.commentContextMenu.setAttribute("aria-hidden", "true");
+  commentContextState.commentId = null;
+  commentContextState.roomId = null;
+  commentContextState.isOpen = false;
+};
+
+const handleCommentContextAction = (action) => {
+  const roomId = commentContextState.roomId;
+  const commentId = commentContextState.commentId;
+  if (!roomId || !commentId) return;
+  const roomData = ensureRoomData(roomId);
+  const commentIndex = roomData.comments.findIndex(
+    (item) => item.id === commentId,
+  );
+  if (commentIndex < 0) return;
+  const comment = roomData.comments[commentIndex];
+  if (!comment) return;
+
+  if (action === "edit") {
+    if (!isCommentAuthor(comment)) return;
+    const nextText = window.prompt("Kommentar bearbeiten:", comment.text || "");
+    if (nextText === null) return;
+    const trimmed = nextText.trim();
+    if (!trimmed) {
+      window.alert("Kommentar darf nicht leer sein.");
+      return;
+    }
+    comment.text = trimmed;
+    comment.updatedAt = new Date().toISOString();
+  } else if (action === "delete") {
+    if (!isCommentAuthor(comment)) return;
+    const confirmed = window.confirm("Kommentar wirklich löschen?");
+    if (!confirmed) return;
+    roomData.comments.splice(commentIndex, 1);
+  } else if (action === "resolve") {
+    const nextResolved = !comment.resolved;
+    comment.resolved = nextResolved;
+    comment.resolvedAt = nextResolved ? new Date().toISOString() : null;
+    comment.resolvedBy = nextResolved ? authState.user?.id || null : null;
+  }
+
+  saveState();
+  hideCommentTooltip();
+  renderFloorplan();
+  if (state.activeRoomId === roomId) {
+    renderComments(roomData);
+  }
+};
+
 const renderComments = (roomData) => {
   elements.comments.innerHTML = "";
   roomData.comments.forEach((comment) => {
     const li = document.createElement("li");
-    const author = comment.userName || comment.userEmail || "Unbekannt";
-    li.textContent = `${author}: ${comment.text}`;
+    li.dataset.commentId = comment.id;
+    if (state.activeRoomId) {
+      li.dataset.roomId = state.activeRoomId;
+    }
+    li.classList.toggle("is-resolved", comment.resolved);
+    const author = getCommentAuthorLabel(comment);
+    const text = getCommentText(comment);
+    appendCommentMessage(li, { author, text });
     elements.comments.appendChild(li);
   });
 };
@@ -3152,6 +3280,20 @@ const formatActivitySummary = (event) => {
   }
 };
 
+const appendCommentMessage = (container, { author, text }) => {
+  container.textContent = "";
+  const authorSpan = document.createElement("span");
+  authorSpan.className = "comment-author";
+  authorSpan.textContent = author;
+  const verbSpan = document.createElement("span");
+  verbSpan.className = "comment-verb";
+  verbSpan.textContent = " hat einen Kommentar hinzugefügt: ";
+  const textSpan = document.createElement("span");
+  textSpan.className = "comment-text";
+  textSpan.textContent = text;
+  container.append(authorSpan, verbSpan, textSpan);
+};
+
 const formatActivityTimestamp = (value) => {
   const parsed = value ? new Date(value) : null;
   if (!parsed || Number.isNaN(parsed.getTime())) return "";
@@ -3180,7 +3322,13 @@ const buildActivityItem = (event, { showRoom = true } = {}) => {
   chip.textContent = getActivityLabel(category);
   const summary = document.createElement("span");
   summary.className = "activity-summary";
-  summary.textContent = formatActivitySummary(event);
+  if (event.type === "comment_added") {
+    const actor = event.actor || "Jemand";
+    const text = truncateText(event.metadata?.text || "Kommentar", 90);
+    appendCommentMessage(summary, { author: actor, text });
+  } else {
+    summary.textContent = formatActivitySummary(event);
+  }
   main.appendChild(chip);
   main.appendChild(summary);
   item.appendChild(main);
@@ -3386,7 +3534,20 @@ const renderTaskBulkAssigneeOptions = () => {
   );
 };
 
+const updateTaskTagFilterVisibility = () => {
+  const tagField = elements.taskFilterTag?.closest("label");
+  if (!tagField) return;
+  const isAllView = state.taskFilters.view === "all";
+  tagField.hidden = !isAllView;
+  if (elements.taskFilterTag) {
+    elements.taskFilterTag.disabled = !isAllView;
+  }
+};
+
 const renderTaskFilters = () => {
+  state.taskFilters.view = TASK_VIEW_PRESETS[state.taskFilters.view]
+    ? state.taskFilters.view
+    : "all";
   state.taskFilters.roomId = setSelectOptions(
     elements.taskFilterRoom,
     buildRoomFilterOptions(),
@@ -3410,6 +3571,7 @@ const renderTaskFilters = () => {
   if (elements.taskFilterSearch) {
     elements.taskFilterSearch.value = state.taskFilters.query;
   }
+  updateTaskTagFilterVisibility();
 };
 
 const applyTaskFilters = (tasks) => {
@@ -3434,7 +3596,9 @@ const applyTaskFilters = (tasks) => {
         return false;
       }
     }
-    if (tag !== "all" && !task.tags?.includes(tag)) return false;
+    if (view === "all" && tag !== "all" && !task.tags?.includes(tag)) {
+      return false;
+    }
     if (search) {
       const haystack =
         typeof task.searchIndex === "string"
@@ -3777,10 +3941,22 @@ const getTaskMetaText = (task) => {
     parts.push(`Fällig: ${formatShortDate(task.dueDate)}`);
   }
   if (task.assignee) {
-    parts.push(`Zuständig: ${task.assignee}`);
+    parts.push(`Zuständig: ${formatAssigneeLabel(task.assignee)}`);
   }
   if (Array.isArray(task.dependencyIds) && task.dependencyIds.length) {
     parts.push(`${task.dependencyIds.length} Abhängigkeit(en)`);
+  }
+  return parts.join(" · ");
+};
+
+const getDeliveryMetaText = (task) => {
+  const parts = [];
+  const deliveryDate = getTaskDeliveryDate(task);
+  if (deliveryDate) {
+    parts.push(`Lieferung: ${formatShortDate(deliveryDate)}`);
+  }
+  if (task.materials?.vendor) {
+    parts.push(`Lieferant: ${task.materials.vendor}`);
   }
   return parts.join(" · ");
 };
@@ -3834,6 +4010,31 @@ const buildTimelineItem = (task, taskMap) => {
   return item;
 };
 
+const buildTimelineDeliveryItem = (task) => {
+  const item = document.createElement("li");
+  item.className = "timeline-item is-delivery";
+
+  const title = document.createElement("div");
+  title.className = "task-title";
+  title.textContent = `Lieferung: ${task.title}`;
+  item.appendChild(title);
+
+  const metaText = getDeliveryMetaText(task);
+  if (metaText) {
+    const meta = document.createElement("div");
+    meta.className = "timeline-meta";
+    meta.textContent = metaText;
+    item.appendChild(meta);
+  }
+
+  return item;
+};
+
+const buildTimelineEntry = (entry, taskMap) =>
+  entry.type === "delivery"
+    ? buildTimelineDeliveryItem(entry.task)
+    : buildTimelineItem(entry.task, taskMap);
+
 const renderTimeline = (tasks = state.tasks) => {
   if (!elements.timelineList) return;
   elements.timelineList.innerHTML = "";
@@ -3855,9 +4056,17 @@ const renderTimeline = (tasks = state.tasks) => {
     const parsed = parseDateInput(dateKey);
     if (!parsed) {
       unscheduled.push(task);
-      return;
+    } else {
+      scheduled.push({ task, date: parsed, type: "task" });
     }
-    scheduled.push({ task, date: parsed });
+
+    const deliveryDate = getTaskDeliveryDate(task);
+    if (deliveryDate) {
+      const deliveryParsed = parseDateInput(deliveryDate);
+      if (deliveryParsed) {
+        scheduled.push({ task, date: deliveryParsed, type: "delivery" });
+      }
+    }
   });
 
   scheduled.sort((a, b) => a.date - b.date);
@@ -3879,10 +4088,10 @@ const renderTimeline = (tasks = state.tasks) => {
     if (!group.weeks.has(weekKey)) {
       group.weeks.set(weekKey, {
         date: weekStart,
-        tasks: [],
+        entries: [],
       });
     }
-    group.weeks.get(weekKey).tasks.push(entry.task);
+    group.weeks.get(weekKey).entries.push(entry);
   });
 
   const orderedMonths = Array.from(monthGroups.values()).sort(
@@ -3911,8 +4120,8 @@ const renderTimeline = (tasks = state.tasks) => {
 
       const list = document.createElement("ul");
       list.className = "timeline-items";
-      weekGroup.tasks.forEach((task) => {
-        list.appendChild(buildTimelineItem(task, taskMap));
+      weekGroup.entries.forEach((entry) => {
+        list.appendChild(buildTimelineEntry(entry, taskMap));
       });
       weekSection.appendChild(list);
       section.appendChild(weekSection);
@@ -4626,131 +4835,26 @@ const getRoomCategory = (room) => {
   return "default";
 };
 
-const buildDefaultScene = (room) => {
-  const name = room?.name?.toLowerCase() || "";
-  if (name.includes("wohn")) {
-    return {
-      ...THREE_D_DEFAULT_SCENE,
-      style: "warm-minimal",
-      floor: "warm-oak",
-      lighting: "golden",
-    };
-  }
-  if (name.includes("schlaf")) {
-    return {
-      ...THREE_D_DEFAULT_SCENE,
-      style: "scandi-light",
-      floor: "oak",
-      lighting: "day",
-    };
-  }
-  if (name.includes("küche") || name.includes("kueche")) {
-    return {
-      ...THREE_D_DEFAULT_SCENE,
-      style: "urban-atelier",
-      floor: "tile",
-      lighting: "day",
-    };
-  }
-  if (name.includes("bad")) {
-    return {
-      ...THREE_D_DEFAULT_SCENE,
-      style: "scandi-light",
-      floor: "tile",
-      lighting: "studio",
-    };
-  }
-  if (name.includes("arbeits")) {
-    return {
-      ...THREE_D_DEFAULT_SCENE,
-      style: "soft-modern",
-      floor: "oak",
-      lighting: "day",
-    };
-  }
-  if (name.includes("flur") || name.includes("treppe")) {
-    return {
-      ...THREE_D_DEFAULT_SCENE,
-      style: "soft-modern",
-      floor: "stone",
-      lighting: "day",
-    };
-  }
-  return { ...THREE_D_DEFAULT_SCENE };
-};
+const buildDefaultScene = () => ({ ...THREE_D_DEFAULT_SCENE });
 
 const ensureRoomScene = (roomData, room) => {
   if (!roomData.scene || typeof roomData.scene !== "object") {
     roomData.scene = buildDefaultScene(room);
   }
   const scene = roomData.scene;
-  scene.view = THREE_D_VIEW_PRESETS[scene.view]
-    ? scene.view
+  const normalizedView = scene.view === "dollhouse" ? "model" : scene.view;
+  scene.view = THREE_D_VIEW_PRESETS[normalizedView]
+    ? normalizedView
     : THREE_D_DEFAULT_SCENE.view;
-  scene.style = THREE_D_STYLE_PRESETS[scene.style]
-    ? scene.style
-    : THREE_D_DEFAULT_SCENE.style;
-  scene.floor = THREE_D_FLOOR_PRESETS[scene.floor]
-    ? scene.floor
-    : THREE_D_DEFAULT_SCENE.floor;
-  scene.lighting = THREE_D_LIGHTING_PRESETS[scene.lighting]
-    ? scene.lighting
-    : THREE_D_DEFAULT_SCENE.lighting;
   return scene;
 };
 
 const syncThreeDControls = (scene) => {
-  if (elements.threeDStyle && elements.threeDStyle.value !== scene.style) {
-    elements.threeDStyle.value = scene.style;
-  }
-  if (elements.threeDFloor && elements.threeDFloor.value !== scene.floor) {
-    elements.threeDFloor.value = scene.floor;
-  }
-  if (
-    elements.threeDLighting &&
-    elements.threeDLighting.value !== scene.lighting
-  ) {
-    elements.threeDLighting.value = scene.lighting;
-  }
   if (elements.threeDViewButtons?.length) {
     elements.threeDViewButtons.forEach((button) => {
       button.classList.toggle("is-active", button.dataset.view === scene.view);
     });
   }
-};
-
-const applyThreeDTheme = (scene) => {
-  if (!elements.threeDStage) return;
-  const style =
-    THREE_D_STYLE_PRESETS[scene.style] ||
-    THREE_D_STYLE_PRESETS[THREE_D_DEFAULT_SCENE.style];
-  const floor =
-    THREE_D_FLOOR_PRESETS[scene.floor] ||
-    THREE_D_FLOOR_PRESETS[THREE_D_DEFAULT_SCENE.floor];
-  const lighting =
-    THREE_D_LIGHTING_PRESETS[scene.lighting] ||
-    THREE_D_LIGHTING_PRESETS[THREE_D_DEFAULT_SCENE.lighting];
-  elements.threeDStage.style.setProperty("--wall-color", style.wall);
-  elements.threeDStage.style.setProperty("--wall-shade", style.wallShade);
-  elements.threeDStage.style.setProperty("--ceiling-color", style.ceiling);
-  elements.threeDStage.style.setProperty("--trim-color", style.trim);
-  elements.threeDStage.style.setProperty("--accent-color", style.accent);
-  elements.threeDStage.style.setProperty("--glass-color", style.glass);
-  elements.threeDStage.style.setProperty("--shadow-soft", style.shadowSoft);
-  elements.threeDStage.style.setProperty("--shadow-deep", style.shadowDeep);
-  elements.threeDStage.style.setProperty("--floor-base", floor.base);
-  elements.threeDStage.style.setProperty("--floor-shade", floor.shade);
-  elements.threeDStage.style.setProperty("--floor-pattern", floor.pattern);
-  elements.threeDStage.style.setProperty(
-    "--floor-pattern-size",
-    floor.patternSize,
-  );
-  elements.threeDStage.style.setProperty("--sky-top", lighting.skyTop);
-  elements.threeDStage.style.setProperty("--sky-mid", lighting.skyMid);
-  elements.threeDStage.style.setProperty("--sky-bottom", lighting.skyBottom);
-  elements.threeDStage.style.setProperty("--room-filter", lighting.filter);
-  elements.threeDStage.style.setProperty("--glow-spot", lighting.glow);
-  elements.threeDStage.dataset.view = scene.view;
 };
 
 const createRoomSurface = (className) => {
@@ -4969,15 +5073,15 @@ const update3DScene = (roomId, { resetCamera = false } = {}) => {
   const roomData = ensureRoomData(roomId);
   const scene = ensureRoomScene(roomData, room);
   syncThreeDControls(scene);
-  applyThreeDTheme(scene);
+  elements.threeDStage.dataset.view = scene.view;
 
   const measurement = getRoomMeasurements(room);
-  const maxWidth = 320;
-  const maxDepth = 240;
+  const maxWidth = 340;
+  const maxDepth = 260;
   const scale = clamp(
     Math.min(maxWidth / measurement.width, maxDepth / measurement.length),
-    0.04,
-    0.09,
+    0.045,
+    0.11,
   );
   const roomSize = {
     width: Math.round(measurement.width * scale),
@@ -5236,13 +5340,14 @@ const handleAddComment = (event) => {
   const userName = getDisplayName(authState.user);
   const roomData = ensureRoomData(state.activeRoomId);
   roomData.comments.unshift({
-    id: `comment-${Date.now()}`,
+    id: createCommentId(),
     userId: authState.user.id,
     userName,
     userEmail: authState.user.email || "",
     text: commentText,
     x,
     y,
+    resolved: false,
   });
 
   state.isAddingComment = false;
@@ -6807,6 +6912,18 @@ const bindEvents = () => {
   );
   elements.floorplan.addEventListener("pointerup", finishArchitectDrag);
   elements.floorplan.addEventListener("pointercancel", finishArchitectDrag);
+  elements.floorplan.addEventListener("pointermove", (event) => {
+    const target = event.target;
+    const marker = target?.closest?.(".comment-marker");
+    if (marker) {
+      showCommentTooltipForMarker(marker);
+      return;
+    }
+    hideCommentTooltip();
+  });
+  elements.floorplan.addEventListener("pointerleave", () => {
+    hideCommentTooltip();
+  });
 
   elements.floorplan.addEventListener("mouseover", (event) => {
     if (!state.isArchitectMode) return;
@@ -6837,6 +6954,27 @@ const bindEvents = () => {
     }
     window.alert("Klicken Sie in den Raum, um den Kommentar zu platzieren.");
     state.isAddingComment = true;
+  });
+
+  elements.comments?.addEventListener("contextmenu", (event) => {
+    const target = event.target;
+    const item = target?.closest?.("li");
+    if (!item?.dataset?.commentId) return;
+    const roomId = item.dataset.roomId || state.activeRoomId;
+    const comment = getCommentById(roomId, item.dataset.commentId);
+    if (!comment) return;
+    event.preventDefault();
+    openCommentContextMenu(event, comment, roomId);
+  });
+
+  elements.commentContextMenu?.addEventListener("click", (event) => {
+    const target = event.target;
+    const actionButton = target?.closest?.("button[data-action]");
+    if (!actionButton || actionButton.disabled) return;
+    const action = actionButton.dataset.action;
+    if (!action) return;
+    handleCommentContextAction(action);
+    closeCommentContextMenu();
   });
 
   elements.clearSelectionBtn.addEventListener("click", () => {
@@ -6993,10 +7131,21 @@ const bindEvents = () => {
     removeImage(imageModalState.imageId, imageModalState.roomId);
   });
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && imageModalState.isOpen) {
+    if (event.key !== "Escape") return;
+    if (commentContextState.isOpen) {
+      closeCommentContextMenu();
+    }
+    if (imageModalState.isOpen) {
       closeImageModal();
     }
   });
+  document.addEventListener("click", (event) => {
+    if (!commentContextState.isOpen) return;
+    if (elements.commentContextMenu?.contains(event.target)) return;
+    closeCommentContextMenu();
+  });
+  window.addEventListener("resize", closeCommentContextMenu);
+  window.addEventListener("scroll", closeCommentContextMenu, true);
 
   elements.decisionForm?.addEventListener("submit", handleDecisionSubmit);
   elements.generateImageBtn.addEventListener("click", handleGenerateImage);
@@ -7040,18 +7189,6 @@ const bindEvents = () => {
       });
     });
   }
-
-  elements.threeDStyle?.addEventListener("change", (event) => {
-    updateActiveRoomScene({ style: event.target.value });
-  });
-
-  elements.threeDFloor?.addEventListener("change", (event) => {
-    updateActiveRoomScene({ floor: event.target.value });
-  });
-
-  elements.threeDLighting?.addEventListener("change", (event) => {
-    updateActiveRoomScene({ lighting: event.target.value });
-  });
 
   elements.threeDReset?.addEventListener("click", () => {
     if (!state.activeRoomId) return;

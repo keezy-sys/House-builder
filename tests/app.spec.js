@@ -43,16 +43,14 @@ test("3D-Ansicht zeigt Raum und Ansichtswechsel", async ({ page }) => {
 
   await expect(page.locator("#three-d-stage")).toBeVisible();
 
-  const dollhouseButton = page.locator(
-    ".segmented-option[data-view='dollhouse']",
-  );
-  await dollhouseButton.click();
+  const modelButton = page.locator(".segmented-option[data-view='model']");
+  await modelButton.click();
 
   await expect(page.locator("#three-d-stage")).toHaveAttribute(
     "data-view",
-    "dollhouse",
+    "model",
   );
-  await expect(dollhouseButton).toHaveClass(/is-active/);
+  await expect(modelButton).toHaveClass(/is-active/);
 });
 
 test("Aufgaben erstellen, filtern und erledigen", async ({ page }) => {
