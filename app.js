@@ -1,8 +1,27 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 const DEFAULT_VIEWBOX = { x: 0, y: 0, width: 800, height: 520 };
-const EXTERIOR_VIEWBOX = { x: -120, y: -120, width: 1040, height: 760 };
 const OUTER_WALL_BOUNDS = { x: 30, y: 30, width: 740, height: 460 };
+const EXTERIOR_SCALE = 2.5;
+const EXTERIOR_TERRACE_DEPTH_PX = Math.round(80 * EXTERIOR_SCALE);
+const EXTERIOR_CORRIDOR_DEPTH_PX = Math.round(40 * EXTERIOR_SCALE);
+const EXTERIOR_STAIRS_DEPTH_PX = Math.round(80 * EXTERIOR_SCALE);
+const EXTERIOR_STAIRS_HEIGHT_PX = 170;
+const EXTERIOR_STAIRS_Y_PX = 320;
+const EXTERIOR_OG_TERRACE_HEIGHT_PX = 300;
+const EXTERIOR_OG_TERRACE_Y_PX = 190;
+const EXTERIOR_VIEWBOX = {
+  x: OUTER_WALL_BOUNDS.x - EXTERIOR_TERRACE_DEPTH_PX,
+  y: OUTER_WALL_BOUNDS.y - EXTERIOR_TERRACE_DEPTH_PX,
+  width:
+    OUTER_WALL_BOUNDS.width +
+    EXTERIOR_TERRACE_DEPTH_PX +
+    EXTERIOR_STAIRS_DEPTH_PX,
+  height:
+    OUTER_WALL_BOUNDS.height +
+    EXTERIOR_TERRACE_DEPTH_PX +
+    EXTERIOR_CORRIDOR_DEPTH_PX,
+};
 const floorBounds = { x: 50, y: 50, width: 680, height: 400 };
 const MM_PER_PX = 20;
 const WALL_HEIGHT_MM = 2800;
@@ -161,6 +180,7 @@ const TASK_VIEW_PRESETS = {
 
 const ROOM_TABS = ["overview", "tasks", "inspiration", "decisions"];
 const APP_VIEWS = ["room", "tasks"];
+const MOBILE_MEDIA_QUERY = window.matchMedia("(max-width: 720px)");
 const IMAGE_PIN_SURFACE_LABELS = {
   "wall-north": "Wand Nord",
   "wall-south": "Wand Süd",
@@ -192,41 +212,45 @@ const LEGACY_UPPER_LAYOUT = [
   { id: "upper-storage", x: 610, y: 360, width: 120, height: 90 },
 ];
 
-const EXTERIOR_FEATURES = {
+const EXTERIOR_ROOMS = {
   ground: [
     {
-      id: "ground-terrace-north",
-      type: "terrace",
+      id: "ground-terrace",
+      name: "Terrasse unten",
+      exteriorType: "terrace",
       x: OUTER_WALL_BOUNDS.x,
-      y: OUTER_WALL_BOUNDS.y - 80,
+      y: OUTER_WALL_BOUNDS.y - EXTERIOR_TERRACE_DEPTH_PX,
       width: OUTER_WALL_BOUNDS.width,
-      height: 80,
+      height: EXTERIOR_TERRACE_DEPTH_PX,
     },
     {
-      id: "ground-stairs-east",
-      type: "stairs",
+      id: "ground-stairs",
+      name: "Aussentreppe",
+      exteriorType: "stairs",
       x: OUTER_WALL_BOUNDS.x + OUTER_WALL_BOUNDS.width,
-      y: 320,
-      width: 80,
-      height: 170,
+      y: EXTERIOR_STAIRS_Y_PX,
+      width: EXTERIOR_STAIRS_DEPTH_PX,
+      height: EXTERIOR_STAIRS_HEIGHT_PX,
     },
   ],
   upper: [
     {
-      id: "upper-terrace-west",
-      type: "terrace",
-      x: OUTER_WALL_BOUNDS.x - 80,
-      y: 190,
-      width: 80,
-      height: 300,
+      id: "upper-terrace",
+      name: "Terrasse oben",
+      exteriorType: "terrace",
+      x: OUTER_WALL_BOUNDS.x - EXTERIOR_TERRACE_DEPTH_PX,
+      y: EXTERIOR_OG_TERRACE_Y_PX,
+      width: EXTERIOR_TERRACE_DEPTH_PX,
+      height: EXTERIOR_OG_TERRACE_HEIGHT_PX,
     },
     {
-      id: "upper-corridor-south",
-      type: "corridor",
+      id: "upper-corridor",
+      name: "Durchgang",
+      exteriorType: "corridor",
       x: OUTER_WALL_BOUNDS.x,
       y: OUTER_WALL_BOUNDS.y + OUTER_WALL_BOUNDS.height,
       width: OUTER_WALL_BOUNDS.width,
-      height: 40,
+      height: EXTERIOR_CORRIDOR_DEPTH_PX,
     },
   ],
 };
@@ -639,6 +663,7 @@ const state = {
   activeFloorId: "ground",
   activeView: "room",
   activeRoomTab: "overview",
+  isMobileView: false,
   isAddingComment: false,
   isArchitectMode: false,
   isExteriorMode: false,
@@ -729,6 +754,7 @@ const elements = {
   floorSwitchValue: document.getElementById("floor-label"),
   floorplanTitle: document.getElementById("floorplan-title"),
   floorplanHint: document.getElementById("floorplan-hint"),
+  mobileRoomSelect: document.getElementById("mobile-room-select"),
   roomTitle: document.getElementById("room-title"),
   roomSubtitle: document.getElementById("room-subtitle"),
   roomTabButtons: Array.from(document.querySelectorAll("[data-room-tab]")),
@@ -2203,6 +2229,29 @@ const refreshUI = () => {
   updateFloorplanHint();
   updateInteriorControls();
   updateArchitectToolUI();
+  renderMobileRoomSelect();
+};
+
+const updateMobileLayout = ({ force = false } = {}) => {
+  const isMobile = MOBILE_MEDIA_QUERY.matches;
+  if (!force && state.isMobileView === isMobile) return;
+  state.isMobileView = isMobile;
+  document.body.classList.toggle("is-mobile", isMobile);
+  if (isMobile) {
+    if (state.isArchitectMode) {
+      setArchitectMode(false);
+    }
+    if (state.isExteriorMode) {
+      setExteriorMode(false);
+    }
+    if (state.show3d) {
+      state.show3d = false;
+    }
+    clearTaskSelection();
+  }
+  renderMobileRoomSelect();
+  renderTasksPanel();
+  renderRoomPanel();
 };
 
 const syncTaskRoomFilter = (roomId, { shouldRender = false } = {}) => {
@@ -2954,7 +3003,7 @@ const renderRoomPanel = () => {
   elements.roomSubtitle.textContent =
     "Aufgaben, Inspirationen und Entscheidungen für den Raum verwalten.";
   elements.threeDLabel.textContent = `3D-Ansicht für ${room.name}`;
-  const canShowThreeD = !state.isExteriorMode;
+  const canShowThreeD = !state.isExteriorMode && !state.isMobileView;
   if (!canShowThreeD) {
     state.show3d = false;
   }
@@ -3853,6 +3902,69 @@ const renderRoomActivity = () => {
       buildActivityItem(event, { showRoom: false }),
     );
   });
+};
+
+const getRoomHintLabel = (roomId) => {
+  if (!roomId) return "";
+  const normalized = roomId.toLowerCase();
+  if (normalized.includes("left")) return "links";
+  if (normalized.includes("right")) return "rechts";
+  return "";
+};
+
+const getRoomSelectLabel = (room, floor) => {
+  const base = room?.name ? room.name : "Raum";
+  const hint = getRoomHintLabel(room?.id);
+  if (hint) return `${base} (${hint})`;
+  const rooms = floor?.rooms || [];
+  const duplicates = rooms.filter((item) => item.name === room?.name);
+  if (duplicates.length > 1) {
+    const index = duplicates.findIndex((item) => item.id === room?.id) + 1;
+    if (index > 0) {
+      return `${base} ${index}`;
+    }
+  }
+  return base;
+};
+
+const getFloorIdForRoom = (roomId) => {
+  if (!roomId) return null;
+  for (const [floorId, floor] of Object.entries(state.floorPlans)) {
+    if (floor.rooms.some((room) => room.id === roomId)) {
+      return floorId;
+    }
+  }
+  return null;
+};
+
+const renderMobileRoomSelect = () => {
+  if (!elements.mobileRoomSelect) return;
+  const select = elements.mobileRoomSelect;
+  select.innerHTML = "";
+
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Raum auswählen";
+  select.appendChild(placeholder);
+
+  const roomValues = new Set();
+  Object.values(state.floorPlans).forEach((floor) => {
+    const group = document.createElement("optgroup");
+    group.label = floor.name || "Etage";
+    floor.rooms.forEach((room) => {
+      const option = document.createElement("option");
+      option.value = room.id;
+      option.textContent = getRoomSelectLabel(room, floor);
+      group.appendChild(option);
+      roomValues.add(room.id);
+    });
+    select.appendChild(group);
+  });
+
+  const nextValue = roomValues.has(state.activeRoomId)
+    ? state.activeRoomId
+    : "";
+  select.value = nextValue;
 };
 
 const getRoomLabel = (roomId) => {
@@ -4839,6 +4951,31 @@ const renderRoomTasks = () => {
   });
 };
 
+const buildTaskListGroup = (status, tasks, taskMap) => {
+  const group = document.createElement("section");
+  group.className = "task-list-group";
+  group.dataset.status = status;
+
+  const header = document.createElement("div");
+  header.className = "task-list-group-header";
+  const title = document.createElement("span");
+  title.textContent = TASK_STATUS_LABELS[status] || status;
+  const count = document.createElement("span");
+  count.className = "task-list-group-count";
+  count.textContent = String(tasks.length);
+  header.appendChild(title);
+  header.appendChild(count);
+  group.appendChild(header);
+
+  const list = document.createElement("ul");
+  list.className = "task-list";
+  tasks.forEach((task) => {
+    list.appendChild(buildTaskItem(task, { showRoom: true, taskMap }));
+  });
+  group.appendChild(list);
+  return group;
+};
+
 const buildKanbanColumn = (status, tasks, taskMap) => {
   const column = document.createElement("section");
   column.className = "kanban-column";
@@ -4894,6 +5031,9 @@ const renderTaskList = () => {
 
   const filtered = applyTaskFilters(state.tasks);
   const taskMap = buildTaskMap();
+  const isMobile = state.isMobileView;
+  elements.taskList.classList.toggle("task-board", !isMobile);
+  elements.taskList.classList.toggle("task-list-mobile", isMobile);
   const statusFilter = state.taskFilters.status;
   const statuses =
     statusFilter === "all"
@@ -4908,11 +5048,21 @@ const renderTaskList = () => {
       tasksByStatus.get(normalized).push(task);
     }
   });
-  statuses.forEach((status) => {
-    elements.taskList.appendChild(
-      buildKanbanColumn(status, tasksByStatus.get(status) || [], taskMap),
-    );
-  });
+  if (isMobile) {
+    statuses.forEach((status) => {
+      const tasksForStatus = tasksByStatus.get(status) || [];
+      if (!tasksForStatus.length) return;
+      elements.taskList.appendChild(
+        buildTaskListGroup(status, tasksForStatus, taskMap),
+      );
+    });
+  } else {
+    statuses.forEach((status) => {
+      elements.taskList.appendChild(
+        buildKanbanColumn(status, tasksByStatus.get(status) || [], taskMap),
+      );
+    });
+  }
   updateTaskSelectionState(filtered);
 
   if (elements.tasksEmpty) {
@@ -4942,7 +5092,11 @@ const renderTasksPanel = () => {
   renderRoomTasks();
   renderDecisionTaskOptions();
   const filtered = renderTaskList();
-  renderTimeline(Array.isArray(filtered) ? filtered : state.tasks);
+  if (!state.isMobileView) {
+    renderTimeline(Array.isArray(filtered) ? filtered : state.tasks);
+  } else if (elements.timelineList) {
+    elements.timelineList.innerHTML = "";
+  }
 };
 
 const openTaskModal = (taskId) => {
@@ -5951,6 +6105,7 @@ const setActiveFloor = (floorId) => {
   renderArchitectPanel();
   updateFloorButtons();
   updateFloorplanHint();
+  renderMobileRoomSelect();
 };
 
 const selectRoom = (roomId) => {
@@ -5964,6 +6119,7 @@ const selectRoom = (roomId) => {
   renderRoomPanel();
   renderArchitectPanel();
   syncTaskRoomFilter(roomId, { shouldRender: true });
+  renderMobileRoomSelect();
 };
 
 const selectArchitectElement = (target) => {
@@ -7929,6 +8085,21 @@ const bindEvents = () => {
     });
   }
 
+  if (elements.mobileRoomSelect) {
+    elements.mobileRoomSelect.addEventListener("change", (event) => {
+      const roomId = event.target.value;
+      if (!roomId) {
+        selectRoom(null);
+        return;
+      }
+      const floorId = getFloorIdForRoom(roomId);
+      if (floorId && floorId !== state.activeFloorId) {
+        setActiveFloor(floorId);
+      }
+      selectRoom(roomId);
+    });
+  }
+
   if (elements.viewButtons?.length) {
     elements.viewButtons.forEach((button) => {
       button.addEventListener("click", () => {
@@ -8204,14 +8375,21 @@ const bindEvents = () => {
     event.preventDefault();
     applyArchitectAdjustments({ commit: true, refreshPanel: true });
   });
+
+  MOBILE_MEDIA_QUERY.addEventListener("change", () => {
+    updateMobileLayout();
+  });
 };
 
 const init = () => {
   hydrateStateFromLocal();
+  state.isMobileView = MOBILE_MEDIA_QUERY.matches;
+  document.body.classList.toggle("is-mobile", state.isMobileView);
   renderFloorplan();
   renderRoomPanel();
   renderArchitectPanel();
   renderTasksPanel();
+  renderMobileRoomSelect();
   setArchitectMode(state.isArchitectMode);
   updateFloorButtons();
   updateInteriorControls();

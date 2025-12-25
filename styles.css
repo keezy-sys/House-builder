@@ -206,6 +206,53 @@ body.auth-locked {
   align-items: start;
 }
 
+.mobile-bar {
+  display: none;
+  grid-column: 1 / -1;
+  align-self: start;
+  position: sticky;
+  top: 1rem;
+  z-index: 8;
+  background: #fffaf4;
+  border: 1px solid #eadfce;
+  border-radius: 1rem;
+  padding: 0.8rem 1rem;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+  gap: 0.8rem;
+}
+
+.mobile-room-picker {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.mobile-room-picker span {
+  font-size: 0.65rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #7d6956;
+  font-weight: 700;
+}
+
+.mobile-room-picker select {
+  padding: 0.6rem 0.7rem;
+  border-radius: 0.7rem;
+  border: 1px solid #e4d4c0;
+  background: #fffaf4;
+  font-weight: 600;
+  color: #3b3127;
+}
+
+.mobile-view-toggle {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.mobile-view-toggle .segmented-option {
+  flex: 1 1 50%;
+  text-align: center;
+}
+
 .floorplan {
   background: radial-gradient(circle at 22% 18%, #fffaf4, #f4e9dc);
   padding: 1.5rem;
@@ -1103,6 +1150,40 @@ button {
   height: clamp(360px, 60vh, 620px);
   min-width: 0;
   width: 100%;
+}
+
+.task-list-mobile {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.task-list-group {
+  border-radius: 0.9rem;
+  border: 1px solid #eadfce;
+  background: #fff6ea;
+  padding: 0.8rem;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.task-list-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 700;
+  color: #3b3127;
+}
+
+.task-list-group-count {
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: #f3e7d8;
+  color: #7d6956;
+  font-size: 0.75rem;
+}
+
+.task-list-group .task-list {
+  margin: 0;
 }
 
 .kanban-column {
@@ -2514,5 +2595,100 @@ button {
 
   .architect-tools .segmented-option {
     flex: 1 1 100%;
+  }
+}
+
+@media (max-width: 720px) {
+  .app-header {
+    padding: 1rem 1.2rem;
+    gap: 0.8rem;
+    align-items: flex-start;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
+    gap: 0.8rem;
+    flex-wrap: wrap;
+  }
+
+  .header-actions .toggle {
+    display: none;
+  }
+
+  .app {
+    padding: 1rem;
+    gap: 1rem;
+  }
+
+  .mobile-bar {
+    display: grid;
+  }
+
+  .view-toggle {
+    display: none;
+  }
+
+  .floorplan {
+    display: none;
+  }
+
+  .sidebar {
+    gap: 0.8rem;
+  }
+
+  .panel {
+    padding: 1rem;
+  }
+
+  .room-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .room-tabs::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  .room-tabs::-webkit-scrollbar-thumb {
+    background: #e4d4c0;
+    border-radius: 999px;
+  }
+
+  .task-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .task-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .task-bulk-actions {
+    display: none;
+  }
+
+  .tasks-layout .timeline-panel {
+    display: none;
+  }
+
+  .task-list {
+    margin-top: 0.6rem;
+  }
+
+  .tasks-view-active .mobile-room-picker {
+    display: none;
+  }
+
+  .architect-view {
+    display: none;
+  }
+
+  #three-d-panel {
+    display: none;
+  }
+
+  .activity-page {
+    margin: 0 1rem 1rem;
   }
 }

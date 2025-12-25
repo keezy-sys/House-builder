@@ -136,7 +136,7 @@ test("Aufgaben erstellen, filtern und erledigen", async ({ page }) => {
   await page.locator("#task-input").press("Enter");
   await expect(page.locator("#room-tasks")).toContainText("Aufgabe Bad");
 
-  await page.locator("[data-app-view='tasks']").click();
+  await page.locator("#view-tasks").click();
   await page.selectOption("#task-filter-room", firstRoomId);
 
   const taskList = page.locator("#task-list");
@@ -245,4 +245,39 @@ test("bulk actions setzen Status, Zuweisung und Faelligkeit", async ({
 
   await expect(taskA.locator("input[data-task-due]")).toHaveValue("2024-10-01");
   await expect(taskB.locator("input[data-task-due]")).toHaveValue("2024-10-01");
+});
+
+test.describe("mobile view", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("mobile navigation und Aufgabenliste sind vereinfacht", async ({
+    page,
+  }) => {
+    await preparePage(page);
+
+    await expect(page.locator(".floorplan")).toBeHidden();
+    await expect(page.locator("#toggle-architect")).toBeHidden();
+
+    const roomSelect = page.locator("#mobile-room-select");
+    await expect(roomSelect).toBeVisible();
+
+    const firstRoomId = await roomSelect.evaluate((select) => {
+      const options = Array.from(select.querySelectorAll("option"));
+      const match = options.find((option) => option.value);
+      return match ? match.value : "";
+    });
+    expect(firstRoomId).toBeTruthy();
+    await roomSelect.selectOption(firstRoomId);
+
+    await page.locator("[data-room-tab='inspiration']").click();
+    await expect(page.locator("#three-d-panel")).toBeHidden();
+
+    await page.locator("[data-room-tab='tasks']").click();
+    await page.locator("#task-input").fill("Mobile Aufgabe");
+    await page.locator("#task-input").press("Enter");
+
+    await page.locator(".mobile-bar button[data-app-view='tasks']").click();
+    await expect(page.locator("#task-list .task-list-group")).toHaveCount(1);
+    await expect(page.locator("#task-list .kanban-column")).toHaveCount(0);
+  });
 });
