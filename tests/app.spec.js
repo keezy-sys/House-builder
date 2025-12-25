@@ -1,9 +1,12 @@
 import { test, expect } from "@playwright/test";
 
-const preparePage = async (page) => {
-  await page.addInitScript(() => {
+const preparePage = async (page, { state } = {}) => {
+  await page.addInitScript((payload) => {
     localStorage.clear();
-  });
+    if (payload && typeof payload === "object") {
+      localStorage.setItem("house-builder-state", JSON.stringify(payload));
+    }
+  }, state);
   await page.goto("/");
   await page.addStyleTag({
     content:
@@ -19,6 +22,42 @@ const preparePage = async (page) => {
     document.body.classList.remove("auth-locked");
   });
 };
+
+const TINY_IMAGE =
+  "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+
+const buildPinnedRoomState = (roomId) => ({
+  roomData: {
+    [roomId]: {
+      images: [
+        {
+          id: "img-wall",
+          label: "Pin Wand",
+          name: "Pin Wand",
+          url: TINY_IMAGE,
+          type: "image/gif",
+          pin: { surface: "wall-north", x: 0.5, y: 0.4, scale: 0.35 },
+        },
+        {
+          id: "img-floor",
+          label: "Pin Boden",
+          name: "Pin Boden",
+          url: TINY_IMAGE,
+          type: "image/gif",
+          pin: { surface: "floor", x: 0.4, y: 0.6, scale: 0.4 },
+        },
+        {
+          id: "img-ceiling",
+          label: "Pin Decke",
+          name: "Pin Decke",
+          url: TINY_IMAGE,
+          type: "image/gif",
+          pin: { surface: "ceiling", x: 0.6, y: 0.3, scale: 0.4 },
+        },
+      ],
+    },
+  },
+});
 
 const addTasks = async (page, tasks) => {
   await page.locator(".room-hit").first().click();
@@ -39,6 +78,7 @@ test("app loads ohne Absturz", async ({ page }) => {
 test("3D-Ansicht zeigt Raum und Ansichtswechsel", async ({ page }) => {
   await preparePage(page);
   await page.locator(".room-hit").first().click();
+  await page.locator("[data-room-tab='inspiration']").click();
   await page.locator("#toggle-3d").click();
 
   await expect(page.locator("#three-d-stage")).toBeVisible();
@@ -51,6 +91,27 @@ test("3D-Ansicht zeigt Raum und Ansichtswechsel", async ({ page }) => {
     "model",
   );
   await expect(modelButton).toHaveClass(/is-active/);
+});
+
+test("Pinned images erscheinen auf Waenden, Boden und Decke in 3D", async ({
+  page,
+}) => {
+  const roomId = "ground-bedroom-left";
+  await preparePage(page, { state: buildPinnedRoomState(roomId) });
+  await page.locator(`.room-hit[data-room-id='${roomId}']`).click();
+  await page.locator("[data-room-tab='inspiration']").click();
+  await page.locator("#toggle-3d").click();
+
+  await expect(page.locator("#three-d-stage")).toBeVisible();
+  await expect(
+    page.locator(".room-surface.wall-north .pinned-image"),
+  ).toHaveCount(1);
+  await expect(page.locator(".room-surface.floor .pinned-image")).toHaveCount(
+    1,
+  );
+  await expect(page.locator(".room-surface.ceiling .pinned-image")).toHaveCount(
+    1,
+  );
 });
 
 test("Aufgaben erstellen, filtern und erledigen", async ({ page }) => {

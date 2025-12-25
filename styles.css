@@ -197,6 +197,11 @@ body.auth-locked {
   padding: 2rem;
 }
 
+.tasks-view-active .app {
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+  align-items: start;
+}
+
 .floorplan {
   background: radial-gradient(circle at 22% 18%, #fffaf4, #f4e9dc);
   padding: 1.5rem;
@@ -391,8 +396,8 @@ svg {
 }
 
 .comment-tooltip-author {
-  font-weight: 700;
-  color: #0f172a;
+  font-weight: 400;
+  color: var(--user-color, #0ea5e9);
   margin-bottom: 0.2rem;
 }
 
@@ -477,7 +482,15 @@ svg {
     stroke-opacity 0.12s ease;
 }
 
+.architect-mode .comment-marker {
+  cursor: grab;
+}
+
 .architect-dragging .architect-hit {
+  cursor: grabbing;
+}
+
+.architect-dragging .comment-marker {
   cursor: grabbing;
 }
 
@@ -581,6 +594,23 @@ svg {
   stroke: var(--opening-ink-light);
   stroke-width: 1.2;
   stroke-linecap: round;
+}
+
+.tasks-view-active .floorplan {
+  padding: 1rem;
+  position: sticky;
+  top: 1.5rem;
+}
+
+.tasks-view-active #floorplan-hint,
+.tasks-view-active .legend,
+.tasks-view-active .floorplan-actions {
+  display: none;
+}
+
+.tasks-view-active .floorplan-wrapper {
+  margin: 0.8rem 0;
+  padding: 0.7rem;
 }
 
 .sidebar {
@@ -698,6 +728,26 @@ svg {
   margin-top: 1rem;
   padding-top: 1rem;
   border-top: 1px solid #eadfce;
+}
+
+.tasks-layout .timeline-panel {
+  margin-top: 0;
+  padding: 0.9rem;
+  border-top: none;
+  border: 1px solid #eadfce;
+  border-radius: 0.9rem;
+  background: #fffaf4;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+  height: clamp(360px, 60vh, 620px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0.6rem;
+}
+
+.tasks-layout .timeline-list {
+  margin-top: 0;
+  overflow-y: auto;
+  padding-right: 0.2rem;
 }
 
 .timeline-month {
@@ -923,15 +973,18 @@ button {
   border: 1px solid #eadfce;
 }
 
+.user-name,
 .comment-author {
-  color: #0ea5e9;
+  color: var(--user-color, #0ea5e9);
   font-weight: 400;
 }
 
+.activity-verb,
 .comment-verb {
   font-weight: 400;
 }
 
+.activity-detail,
 .comment-text {
   font-style: italic;
   font-weight: 400;
@@ -944,6 +997,7 @@ button {
   opacity: 0.7;
 }
 
+.comments li.is-resolved .user-name,
 .comments li.is-resolved .comment-author {
   color: #94a3b8;
 }
@@ -1019,6 +1073,89 @@ button {
   margin: 0.8rem 0 0;
   display: grid;
   gap: 0.7rem;
+}
+
+.tasks-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+  gap: 1rem;
+  align-items: start;
+  margin-top: 0.8rem;
+}
+
+.tasks-board {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.task-board {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(240px, 1fr);
+  gap: 1rem;
+  overflow-x: auto;
+  padding-bottom: 0.4rem;
+  height: clamp(360px, 60vh, 620px);
+}
+
+.kanban-column {
+  background: #fff6ea;
+  border: 1px solid #eadfce;
+  border-radius: 0.8rem;
+  padding: 0.7rem;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0.6rem;
+  height: 100%;
+  min-width: 220px;
+}
+
+.kanban-column.is-dragover {
+  border-color: #c76b2b;
+  box-shadow: 0 0 0 2px rgba(199, 107, 43, 0.18);
+}
+
+.kanban-column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-weight: 700;
+  color: #3b3127;
+}
+
+.kanban-column-title {
+  font-size: 0.85rem;
+}
+
+.kanban-column-count {
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: #f3e7d8;
+  color: #7d6956;
+  font-size: 0.75rem;
+}
+
+.kanban-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.7rem;
+  overflow-y: auto;
+  min-height: 2.5rem;
+}
+
+.task-drag-handle {
+  cursor: grab;
+}
+
+.task-drag-handle:active {
+  cursor: grabbing;
+}
+
+.task-item.is-dragging {
+  opacity: 0.6;
 }
 
 .task-item {
@@ -1731,10 +1868,6 @@ button {
 }
 
 .activity-summary {
-  font-weight: 600;
-}
-
-.activity-item[data-category="comment"] .activity-summary {
   font-weight: 400;
 }
 
@@ -1961,7 +2094,6 @@ button {
   width: var(--room-width);
   height: var(--room-height);
   transform-style: preserve-3d;
-  filter: var(--room-filter);
 }
 
 .room-surface {
@@ -2164,25 +2296,20 @@ button {
 }
 
 .architect-view {
-  padding: 2rem;
-  background: #fffaf4;
-  margin: 0 2rem 2rem;
-  border-radius: 1rem;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 .architect-panel {
-  margin-top: 1rem;
-  background: #fdf2e6;
-  padding: 1rem;
-  border-radius: 0.8rem;
-  border: 1px solid #eadfce;
+  display: grid;
+  gap: 0.8rem;
 }
 
 .measurement-form {
   display: grid;
   gap: 0.8rem;
-  max-width: 320px;
+  max-width: 100%;
 }
 
 .measurement-group {
@@ -2278,6 +2405,57 @@ button {
   font-weight: 600;
 }
 
+.architect-toggle {
+  margin-top: 0.4rem;
+}
+
+.architect-tools {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.architect-tools-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #7d6956;
+  font-weight: 700;
+}
+
+.architect-tools .segmented-control {
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.architect-tools .segmented-option {
+  flex: 1 1 48%;
+  text-align: center;
+}
+
+.exterior-area {
+  fill: #e2f4e2;
+  stroke: #c7ddc7;
+  stroke-width: 1.2;
+}
+
+.exterior-area.exterior-corridor,
+.exterior-area.exterior-stairs {
+  fill: #e5e7eb;
+  stroke: #cbd5e1;
+}
+
+.room-draft {
+  fill: rgba(198, 90, 46, 0.12);
+  stroke: var(--architect-accent);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  pointer-events: none;
+}
+
+.exterior-mode #floorplan {
+  cursor: not-allowed;
+}
+
 .app-footer {
   text-align: center;
   padding: 1.5rem;
@@ -2287,6 +2465,31 @@ button {
 @media (max-width: 900px) {
   .app {
     grid-template-columns: 1fr;
+  }
+
+  .tasks-view-active .floorplan {
+    position: relative;
+    top: auto;
+  }
+
+  .tasks-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .task-board {
+    height: auto;
+  }
+
+  .kanban-column {
+    height: auto;
+  }
+
+  .kanban-list {
+    max-height: none;
+  }
+
+  .tasks-layout .timeline-panel {
+    height: auto;
   }
 
   .activity-page {
@@ -2302,7 +2505,7 @@ button {
     display: flex;
   }
 
-  .architect-view {
-    margin: 0 1rem 1.5rem;
+  .architect-tools .segmented-option {
+    flex: 1 1 100%;
   }
 }

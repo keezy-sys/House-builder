@@ -1,6 +1,8 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
-const floorplanSize = { width: 800, height: 520 };
+const DEFAULT_VIEWBOX = { x: 0, y: 0, width: 800, height: 520 };
+const EXTERIOR_VIEWBOX = { x: -120, y: -120, width: 1040, height: 760 };
+const OUTER_WALL_BOUNDS = { x: 30, y: 30, width: 740, height: 460 };
 const floorBounds = { x: 50, y: 50, width: 680, height: 400 };
 const MM_PER_PX = 20;
 const WALL_HEIGHT_MM = 2800;
@@ -15,6 +17,8 @@ const MIN_OPENING_SIZE_PX = 30;
 const DRAG_THRESHOLD_PX = 4;
 const OPENING_INSET_PX = 8;
 const WINDOW_GAP_PX = 4;
+const DEFAULT_DOOR_WIDTH_PX = 60;
+const DEFAULT_WINDOW_WIDTH_PX = 120;
 const SVG_NS = "http://www.w3.org/2000/svg";
 const DEFAULT_FLOORPLAN_HINT =
   "Bewegen Sie die Maus über einen Raum, um ihn hervorzuheben.";
@@ -187,6 +191,45 @@ const LEGACY_UPPER_LAYOUT = [
   { id: "upper-hallway", x: 280, y: 360, width: 330, height: 90 },
   { id: "upper-storage", x: 610, y: 360, width: 120, height: 90 },
 ];
+
+const EXTERIOR_FEATURES = {
+  ground: [
+    {
+      id: "ground-terrace-north",
+      type: "terrace",
+      x: OUTER_WALL_BOUNDS.x,
+      y: OUTER_WALL_BOUNDS.y - 80,
+      width: OUTER_WALL_BOUNDS.width,
+      height: 80,
+    },
+    {
+      id: "ground-stairs-east",
+      type: "stairs",
+      x: OUTER_WALL_BOUNDS.x + OUTER_WALL_BOUNDS.width,
+      y: 320,
+      width: 80,
+      height: 170,
+    },
+  ],
+  upper: [
+    {
+      id: "upper-terrace-west",
+      type: "terrace",
+      x: OUTER_WALL_BOUNDS.x - 80,
+      y: 190,
+      width: 80,
+      height: 300,
+    },
+    {
+      id: "upper-corridor-south",
+      type: "corridor",
+      x: OUTER_WALL_BOUNDS.x,
+      y: OUTER_WALL_BOUNDS.y + OUTER_WALL_BOUNDS.height,
+      width: OUTER_WALL_BOUNDS.width,
+      height: 40,
+    },
+  ],
+};
 
 const getDefaultOpeningHeightMm = (type) =>
   type === "door" ? DEFAULT_DOOR_HEIGHT_MM : DEFAULT_WINDOW_HEIGHT_MM;
@@ -554,7 +597,7 @@ const SHARED_STATE_TABLE = "house_state";
 const SHARED_STATE_ID = "default";
 const SAVE_DEBOUNCE_MS = 800;
 const ACTIVITY_EVENT_LIMIT = 200;
-const ACTIVITY_FEED_LIMIT = 40;
+const ACTIVITY_FEED_LIMIT = 15;
 const ROOM_ACTIVITY_LIMIT = 12;
 
 const isPlaceholder = (value) =>
@@ -598,6 +641,9 @@ const state = {
   activeRoomTab: "overview",
   isAddingComment: false,
   isArchitectMode: false,
+  isExteriorMode: false,
+  architectTool: "select",
+  roomDraft: null,
   floorPlans: buildDefaultFloorPlans(),
   roomData: {},
   tasks: [],
@@ -719,6 +765,14 @@ const elements = {
   architectView: document.getElementById("architect-view"),
   architectTitle: document.getElementById("architect-title"),
   architectHelp: document.getElementById("architect-help"),
+  architectToolButtons: Array.from(
+    document.querySelectorAll("[data-architect-tool]"),
+  ),
+  architectToolHint: document.getElementById("architect-tool-hint"),
+  exteriorToggle: document.getElementById("toggle-exterior"),
+  architectHiddenPanels: Array.from(
+    document.querySelectorAll("[data-architect-hidden]"),
+  ),
   measurementForm: document.getElementById("measurement-form"),
   measurementAxis: document.getElementById("measure-axis"),
   measurementAxisNumber: document.getElementById("measure-axis-number"),
@@ -827,6 +881,10 @@ const createDecisionId = () =>
 
 const createCommentId = () =>
   `comment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const createRoomId = (floorId) =>
+  `room-${floorId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const createOpeningId = () =>
+  `opening-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 const isValidDateInput = (value) =>
   typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
@@ -1082,6 +1140,7 @@ const normalizeDecision = (decision, fallbackText) => {
       title: fallbackText || text,
       body: text,
       actor: "Unbekannt",
+      userId: null,
       createdAt: new Date().toISOString(),
       taskIds: [],
       taskLinks: [],
@@ -1121,6 +1180,10 @@ const normalizeDecision = (decision, fallbackText) => {
         : typeof decision.userEmail === "string" && decision.userEmail.trim()
           ? decision.userEmail.trim()
           : "Unbekannt";
+  const userId =
+    typeof decision.userId === "string" && decision.userId.trim()
+      ? decision.userId.trim()
+      : null;
   const createdAt =
     typeof decision.createdAt === "string" && decision.createdAt.trim()
       ? decision.createdAt.trim()
@@ -1133,6 +1196,7 @@ const normalizeDecision = (decision, fallbackText) => {
     title: resolvedTitle,
     body: resolvedBody || "",
     actor,
+    userId,
     createdAt,
     taskIds,
     taskLinks,
@@ -1202,6 +1266,14 @@ const normalizeActivityEvents = (events) => {
           typeof event.actor === "string" && event.actor.trim()
             ? event.actor.trim()
             : "Unbekannt",
+        actorId:
+          typeof event.actorId === "string" && event.actorId.trim()
+            ? event.actorId.trim()
+            : null,
+        actorEmail:
+          typeof event.actorEmail === "string" && event.actorEmail.trim()
+            ? event.actorEmail.trim()
+            : null,
         roomId:
           typeof event.roomId === "string" && event.roomId.trim()
             ? event.roomId.trim()
@@ -1486,15 +1558,52 @@ const findRoomById = (roomId) => {
   return null;
 };
 
+const getNextRoomName = (floor) => {
+  const base = "Neuer Raum";
+  if (!floor || !Array.isArray(floor.rooms)) return base;
+  const names = floor.rooms.map((room) => room.name);
+  if (!names.includes(base)) return base;
+  let index = 2;
+  while (names.includes(`${base} ${index}`)) {
+    index += 1;
+  }
+  return `${base} ${index}`;
+};
+
 const toMm = (px) => Math.round(px * MM_PER_PX);
 const toPx = (mm) => Number(mm) / MM_PER_PX;
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+const getFloorplanViewBox = () => {
+  const base = elements.floorplan?.viewBox?.baseVal;
+  if (base && Number.isFinite(base.width) && Number.isFinite(base.height)) {
+    return { x: base.x, y: base.y, width: base.width, height: base.height };
+  }
+  return { ...DEFAULT_VIEWBOX };
+};
 const getFloorplanPoint = (event) => {
   const bounds = elements.floorplan.getBoundingClientRect();
+  const viewBox = getFloorplanViewBox();
   return {
-    x: ((event.clientX - bounds.left) / bounds.width) * floorplanSize.width,
-    y: ((event.clientY - bounds.top) / bounds.height) * floorplanSize.height,
+    x:
+      ((event.clientX - bounds.left) / bounds.width) * viewBox.width +
+      viewBox.x,
+    y:
+      ((event.clientY - bounds.top) / bounds.height) * viewBox.height +
+      viewBox.y,
   };
+};
+const setFloorplanViewBox = (viewBox) => {
+  if (!elements.floorplan) return;
+  const target = viewBox || DEFAULT_VIEWBOX;
+  elements.floorplan.setAttribute(
+    "viewBox",
+    `${target.x} ${target.y} ${target.width} ${target.height}`,
+  );
+};
+const updateFloorplanViewBox = () => {
+  setFloorplanViewBox(
+    state.isExteriorMode ? EXTERIOR_VIEWBOX : DEFAULT_VIEWBOX,
+  );
 };
 const getInputNumber = (primary, fallback) => {
   const raw = primary?.value;
@@ -2029,6 +2138,8 @@ const logActivityEvent = (
     id: createActivityId(),
     type,
     actor: getActivityActor(),
+    actorId: authState.user?.id || null,
+    actorEmail: authState.user?.email || null,
     roomId,
     taskId,
     metadata: metadata && typeof metadata === "object" ? metadata : {},
@@ -2068,6 +2179,16 @@ const updateAuthUI = () => {
   }
   if (elements.authUserName) {
     elements.authUserName.textContent = isAuthed ? authState.displayName : "";
+    if (isAuthed) {
+      elements.authUserName.classList.add("user-name");
+      applyUserColor(elements.authUserName, {
+        id: authState.user?.id,
+        email: authState.user?.email,
+        name: authState.displayName,
+      });
+    } else {
+      elements.authUserName.classList.remove("user-name");
+    }
   }
 };
 
@@ -2078,11 +2199,28 @@ const refreshUI = () => {
   renderTasksPanel();
   renderActivityFeed();
   updateFloorButtons();
+  updateFloorplanHint();
+  updateInteriorControls();
+  updateArchitectToolUI();
+};
+
+const syncTaskRoomFilter = (roomId, { shouldRender = false } = {}) => {
+  if (state.isArchitectMode || state.activeView !== "tasks") return;
+  const nextRoomId = roomId || "all";
+  if (state.taskFilters.roomId === nextRoomId) return;
+  state.taskFilters.roomId = nextRoomId;
+  clearTaskSelection();
+  if (shouldRender) {
+    renderTasksPanel();
+  }
 };
 
 const setActiveView = (viewId) => {
   const normalized = String(viewId || "").trim();
   state.activeView = APP_VIEWS.includes(normalized) ? normalized : APP_VIEWS[0];
+  if (state.activeView === "tasks" && state.activeRoomId) {
+    syncTaskRoomFilter(state.activeRoomId);
+  }
   updateViewUI();
 };
 
@@ -2118,9 +2256,27 @@ const updateRoomTabs = () => {
 };
 
 const updateViewUI = () => {
+  const isArchitect = state.isArchitectMode;
   const activeView = APP_VIEWS.includes(state.activeView)
     ? state.activeView
     : APP_VIEWS[0];
+  document.body.classList.toggle(
+    "tasks-view-active",
+    !isArchitect && activeView === "tasks",
+  );
+  if (elements.architectView) {
+    elements.architectView.hidden = !isArchitect;
+    elements.architectView.setAttribute("aria-hidden", String(!isArchitect));
+  }
+  if (elements.architectHiddenPanels?.length) {
+    elements.architectHiddenPanels.forEach((panel) => {
+      panel.hidden = isArchitect;
+      panel.setAttribute("aria-hidden", String(isArchitect));
+    });
+  }
+  if (isArchitect) {
+    return;
+  }
   state.activeView = activeView;
   const isRoomView = activeView === "room";
   if (elements.roomView) {
@@ -2395,6 +2551,45 @@ const createSvgCircle = (cx, cy, r, className) => {
   return circle;
 };
 
+const renderExteriorFeatures = (floor) => {
+  if (!state.isExteriorMode || !floor) return;
+  const features = EXTERIOR_FEATURES[floor.id] || [];
+  features.forEach((feature) => {
+    const rect = createSvgElement("rect");
+    rect.setAttribute("x", feature.x);
+    rect.setAttribute("y", feature.y);
+    rect.setAttribute("width", feature.width);
+    rect.setAttribute("height", feature.height);
+    rect.setAttribute("class", `exterior-area exterior-${feature.type}`);
+    elements.floorplan.appendChild(rect);
+  });
+};
+
+const getRoomDraftRect = (draft) => {
+  if (!draft) return null;
+  const start = {
+    x: clamp(draft.startX, floorBounds.x, floorBounds.x + floorBounds.width),
+    y: clamp(draft.startY, floorBounds.y, floorBounds.y + floorBounds.height),
+  };
+  const current = {
+    x: clamp(draft.currentX, floorBounds.x, floorBounds.x + floorBounds.width),
+    y: clamp(draft.currentY, floorBounds.y, floorBounds.y + floorBounds.height),
+  };
+  let x = Math.min(start.x, current.x);
+  let y = Math.min(start.y, current.y);
+  let width = Math.abs(current.x - start.x);
+  let height = Math.abs(current.y - start.y);
+
+  width = Math.max(width, MIN_ROOM_SIZE_PX);
+  height = Math.max(height, MIN_ROOM_SIZE_PX);
+
+  x = clamp(x, floorBounds.x, floorBounds.x + floorBounds.width - width);
+  y = clamp(y, floorBounds.y, floorBounds.y + floorBounds.height - height);
+  width = Math.min(width, floorBounds.x + floorBounds.width - x);
+  height = Math.min(height, floorBounds.y + floorBounds.height - y);
+  return { x, y, width, height };
+};
+
 const getOpeningRenderData = (opening, room) => {
   const meta = getOpeningMeta(opening);
   const wallSide = resolveOpeningWallSide(opening, room, meta);
@@ -2528,17 +2723,17 @@ const createOpeningGroup = (opening, room, floorId, isSelected) => {
 const renderFloorplan = () => {
   elements.floorplan.innerHTML = "";
   hideCommentTooltip();
+  updateFloorplanViewBox();
   const floor = getActiveFloor();
   if (!floor) return;
 
-  const outline = document.createElementNS(
-    "http://www.w3.org/2000/svg",
-    "rect",
-  );
-  outline.setAttribute("x", 30);
-  outline.setAttribute("y", 30);
-  outline.setAttribute("width", 740);
-  outline.setAttribute("height", 460);
+  renderExteriorFeatures(floor);
+
+  const outline = createSvgElement("rect");
+  outline.setAttribute("x", OUTER_WALL_BOUNDS.x);
+  outline.setAttribute("y", OUTER_WALL_BOUNDS.y);
+  outline.setAttribute("width", OUTER_WALL_BOUNDS.width);
+  outline.setAttribute("height", OUTER_WALL_BOUNDS.height);
   outline.setAttribute("class", "outer-wall");
   elements.floorplan.appendChild(outline);
 
@@ -2659,6 +2854,19 @@ const renderFloorplan = () => {
     );
   });
 
+  if (state.roomDraft) {
+    const draftRect = getRoomDraftRect(state.roomDraft);
+    if (draftRect) {
+      const preview = createSvgElement("rect");
+      preview.setAttribute("x", draftRect.x);
+      preview.setAttribute("y", draftRect.y);
+      preview.setAttribute("width", draftRect.width);
+      preview.setAttribute("height", draftRect.height);
+      preview.setAttribute("class", "room-draft");
+      elements.floorplan.appendChild(preview);
+    }
+  }
+
   floor.rooms.forEach((room) => {
     const roomData = ensureRoomData(room.id);
     roomData.comments.forEach((comment) => {
@@ -2726,13 +2934,24 @@ const renderRoomPanel = () => {
   elements.roomSubtitle.textContent =
     "Aufgaben, Inspirationen und Entscheidungen für den Raum verwalten.";
   elements.threeDLabel.textContent = `3D-Ansicht für ${room.name}`;
+  const canShowThreeD = !state.isExteriorMode;
+  if (!canShowThreeD) {
+    state.show3d = false;
+  }
   if (elements.threeDPanel) {
-    elements.threeDPanel.classList.toggle("open", state.show3d);
+    elements.threeDPanel.hidden = !canShowThreeD;
+    elements.threeDPanel.classList.toggle(
+      "open",
+      canShowThreeD && state.show3d,
+    );
   }
   if (elements.threeDButton) {
     elements.threeDButton.textContent = state.show3d ? "Schließen" : "Öffnen";
+    elements.threeDButton.disabled = !canShowThreeD;
   }
-  update3DScene(room.id);
+  if (canShowThreeD) {
+    update3DScene(room.id);
+  }
 
   renderRoomTasks();
   renderComments(roomData);
@@ -2763,15 +2982,28 @@ const getCommentById = (roomId, commentId) => {
   return roomData.comments.find((comment) => comment.id === commentId) || null;
 };
 
+const getCommentDragData = (marker) => {
+  if (!marker) return null;
+  const commentId = marker.dataset.commentId;
+  const roomId = marker.dataset.roomId;
+  if (!commentId || !roomId) return null;
+  const room = findRoomById(roomId);
+  if (!room) return null;
+  const comment = getCommentById(roomId, commentId);
+  if (!comment || comment.resolved) return null;
+  return { roomId, room, comment };
+};
+
 const getCommentTooltipPosition = (comment) => {
   if (!elements.floorplan || !elements.floorplanWrapper) return null;
   const floorRect = elements.floorplan.getBoundingClientRect();
   const wrapperRect = elements.floorplanWrapper.getBoundingClientRect();
+  const viewBox = getFloorplanViewBox();
   const x =
-    (comment.x / floorplanSize.width) * floorRect.width +
+    ((comment.x - viewBox.x) / viewBox.width) * floorRect.width +
     (floorRect.left - wrapperRect.left);
   const y =
-    (comment.y / floorplanSize.height) * floorRect.height +
+    ((comment.y - viewBox.y) / viewBox.height) * floorRect.height +
     (floorRect.top - wrapperRect.top);
   return { x, y };
 };
@@ -2781,7 +3013,13 @@ const showCommentTooltip = (comment, roomId) => {
   const position = getCommentTooltipPosition(comment);
   if (!position) return;
   if (elements.commentTooltipAuthor) {
-    elements.commentTooltipAuthor.textContent = getCommentAuthorLabel(comment);
+    const authorLabel = getCommentAuthorLabel(comment);
+    elements.commentTooltipAuthor.textContent = authorLabel;
+    applyUserColor(elements.commentTooltipAuthor, {
+      id: comment.userId,
+      email: comment.userEmail,
+      name: authorLabel,
+    });
   }
   if (elements.commentTooltipText) {
     elements.commentTooltipText.textContent = getCommentText(comment);
@@ -2936,7 +3174,19 @@ const renderComments = (roomData) => {
     li.classList.toggle("is-resolved", comment.resolved);
     const author = getCommentAuthorLabel(comment);
     const text = getCommentText(comment);
-    appendCommentMessage(li, { author, text });
+    appendActivityMessage(
+      li,
+      buildActivityMessageParts(
+        {
+          type: "comment_added",
+          actor: author,
+          actorId: comment.userId || null,
+          actorEmail: comment.userEmail || null,
+          metadata: { text },
+        },
+        { truncateDetail: false },
+      ),
+    );
     elements.comments.appendChild(li);
   });
 };
@@ -3103,7 +3353,21 @@ const renderDecisions = (roomData) => {
     const actor =
       decision.actor || decision.userName || decision.userEmail || "Unbekannt";
     const time = formatActivityTimestamp(decision.createdAt);
-    meta.textContent = time ? `${actor} · ${time}` : actor;
+    meta.appendChild(
+      createUserSpan({
+        label: actor,
+        id: decision.userId,
+        email: decision.userEmail,
+      }),
+    );
+    if (time) {
+      const separator = document.createElement("span");
+      separator.textContent = " · ";
+      const timeLabel = document.createElement("span");
+      timeLabel.textContent = time;
+      meta.appendChild(separator);
+      meta.appendChild(timeLabel);
+    }
     item.appendChild(meta);
 
     const taskIds = Array.isArray(decision.taskIds) ? decision.taskIds : [];
@@ -3204,6 +3468,235 @@ const truncateText = (value, max = 90) => {
   return `${text.slice(0, Math.max(0, max - 3))}...`;
 };
 
+const USER_COLOR_PALETTE = [
+  "#0ea5e9",
+  "#f97316",
+  "#22c55e",
+  "#a855f7",
+  "#ec4899",
+  "#14b8a6",
+  "#eab308",
+  "#6366f1",
+];
+
+const userColorCache = new Map();
+
+const hashString = (value) => {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash << 5) - hash + value.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+};
+
+const normalizeUserToken = (value) =>
+  typeof value === "string" ? value.trim() : "";
+
+const getUserColorKey = ({ id, email, name } = {}) =>
+  normalizeUserToken(email) ||
+  normalizeUserToken(id) ||
+  normalizeUserToken(name) ||
+  "";
+
+const isCurrentUser = ({ id, email, name } = {}) => {
+  const currentId = authState.user?.id;
+  const currentEmail = authState.user?.email;
+  const currentName = authState.displayName;
+  return Boolean(
+    (id && currentId && id === currentId) ||
+    (email && currentEmail && email === currentEmail) ||
+    (name && currentName && name === currentName),
+  );
+};
+
+const getUserColor = ({ id, email, name } = {}) => {
+  const key = getUserColorKey({ id, email, name });
+  if (!key) return USER_COLOR_PALETTE[0];
+  if (isCurrentUser({ id, email, name })) {
+    return USER_COLOR_PALETTE[0];
+  }
+  if (userColorCache.has(key)) {
+    return userColorCache.get(key);
+  }
+  const palette =
+    USER_COLOR_PALETTE.length > 1
+      ? USER_COLOR_PALETTE.slice(1)
+      : USER_COLOR_PALETTE;
+  const color =
+    palette[hashString(key) % palette.length] || USER_COLOR_PALETTE[0];
+  userColorCache.set(key, color);
+  return color;
+};
+
+const applyUserColor = (element, { id, email, name } = {}) => {
+  if (!element) return;
+  const color = getUserColor({ id, email, name });
+  element.style.setProperty("--user-color", color);
+};
+
+const createUserSpan = ({ label, id, email } = {}) => {
+  const span = document.createElement("span");
+  span.className = "user-name";
+  span.textContent = label || "Unbekannt";
+  applyUserColor(span, { id, email, name: label });
+  return span;
+};
+
+const appendActivityMessage = (container, parts) => {
+  if (!container) return;
+  container.textContent = "";
+  parts.forEach((part) => {
+    if (!part) return;
+    if (part.type === "user") {
+      container.appendChild(
+        createUserSpan({
+          label: part.label,
+          id: part.id || null,
+          email: part.email || null,
+        }),
+      );
+      return;
+    }
+    const span = document.createElement("span");
+    span.className =
+      part.type === "detail" ? "activity-detail" : "activity-verb";
+    span.textContent = part.text || "";
+    container.appendChild(span);
+  });
+};
+
+const resolveActivityDetail = (value, fallback, truncateDetail) => {
+  const raw = String(value ?? fallback ?? "").trim();
+  if (!raw) return fallback || "";
+  return truncateDetail ? truncateText(raw, 90) : raw;
+};
+
+const buildActivityMessageParts = (event, { truncateDetail = true } = {}) => {
+  const actor = event.actor || "Jemand";
+  const actorId = event.actorId || null;
+  const actorEmail = event.actorEmail || null;
+  const metadata = event.metadata || {};
+  const parts = [
+    {
+      type: "user",
+      label: actor,
+      id: actorId,
+      email: actorEmail,
+    },
+  ];
+
+  switch (event.type) {
+    case "task_created": {
+      const title = resolveActivityDetail(
+        metadata.title || metadata.text,
+        "Aufgabe",
+        truncateDetail,
+      );
+      parts.push(
+        { type: "text", text: " hat eine Aufgabe erstellt: " },
+        { type: "detail", text: title },
+      );
+      return parts;
+    }
+    case "task_updated": {
+      const title = resolveActivityDetail(
+        metadata.title || metadata.text,
+        "Aufgabe",
+        truncateDetail,
+      );
+      parts.push(
+        { type: "text", text: " hat eine Aufgabe aktualisiert: " },
+        { type: "detail", text: title },
+      );
+      return parts;
+    }
+    case "task_status_changed": {
+      const fromStatus = formatTaskStatus(metadata.fromStatus);
+      const toStatus = formatTaskStatus(metadata.toStatus);
+      const title = resolveActivityDetail(
+        metadata.title || metadata.text,
+        "Aufgabe",
+        truncateDetail,
+      );
+      parts.push(
+        {
+          type: "text",
+          text: ` hat den Status geändert (${fromStatus} -> ${toStatus}): `,
+        },
+        { type: "detail", text: title },
+      );
+      return parts;
+    }
+    case "task_assigned": {
+      const title = resolveActivityDetail(
+        metadata.title || metadata.text,
+        "Aufgabe",
+        truncateDetail,
+      );
+      const assignee = metadata.assignee;
+      if (assignee) {
+        parts.push(
+          { type: "text", text: " hat " },
+          { type: "detail", text: title },
+          { type: "text", text: " an " },
+          {
+            type: "user",
+            label: formatAssigneeLabel(assignee),
+            id: assignee,
+          },
+          { type: "text", text: " zugewiesen." },
+        );
+        return parts;
+      }
+      parts.push(
+        { type: "text", text: " hat die Zuweisung entfernt: " },
+        { type: "detail", text: title },
+      );
+      return parts;
+    }
+    case "comment_added": {
+      const text = resolveActivityDetail(
+        metadata.text,
+        "Kommentar",
+        truncateDetail,
+      );
+      parts.push(
+        { type: "text", text: " hat einen Kommentar hinzugefügt: " },
+        { type: "detail", text },
+      );
+      return parts;
+    }
+    case "file_uploaded": {
+      const label = resolveActivityDetail(
+        metadata.filename || metadata.label,
+        "Datei",
+        truncateDetail,
+      );
+      parts.push(
+        { type: "text", text: " hat eine Datei hochgeladen: " },
+        { type: "detail", text: label },
+      );
+      return parts;
+    }
+    case "decision_created": {
+      const text = resolveActivityDetail(
+        metadata.title || metadata.text,
+        "Entscheidung",
+        truncateDetail,
+      );
+      parts.push(
+        { type: "text", text: " hat eine Entscheidung festgehalten: " },
+        { type: "detail", text },
+      );
+      return parts;
+    }
+    default:
+      parts.push({ type: "text", text: " hat ein Update erfasst." });
+      return parts;
+  }
+};
+
 const formatTaskStatus = (status) => {
   const normalized = normalizeTaskStatus(status);
   return TASK_STATUS_LABELS[normalized] || "Offen";
@@ -3233,67 +3726,6 @@ const getActivityCategory = (type) =>
 const getActivityLabel = (category) =>
   ACTIVITY_LABELS[category] || ACTIVITY_LABELS.activity;
 
-const formatActivitySummary = (event) => {
-  const actor = event.actor || "Jemand";
-  const metadata = event.metadata || {};
-  const title = truncateText(metadata.title || metadata.text || "Aufgabe", 90);
-
-  switch (event.type) {
-    case "task_created":
-      return `${actor} hat eine Aufgabe erstellt: ${title}`;
-    case "task_updated":
-      return `${actor} hat eine Aufgabe aktualisiert: ${title}`;
-    case "task_status_changed": {
-      const fromStatus = formatTaskStatus(metadata.fromStatus);
-      const toStatus = formatTaskStatus(metadata.toStatus);
-      return `${actor} hat den Status geändert (${fromStatus} -> ${toStatus}): ${title}`;
-    }
-    case "task_assigned": {
-      const assignee = metadata.assignee;
-      if (assignee) {
-        return `${actor} hat ${title} an ${formatAssigneeLabel(
-          assignee,
-        )} zugewiesen.`;
-      }
-      return `${actor} hat die Zuweisung entfernt: ${title}`;
-    }
-    case "comment_added": {
-      const text = truncateText(metadata.text || "Kommentar", 90);
-      return `${actor} hat einen Kommentar hinzugefügt: ${text}`;
-    }
-    case "file_uploaded": {
-      const label = truncateText(
-        metadata.filename || metadata.label || "Datei",
-        90,
-      );
-      return `${actor} hat eine Datei hochgeladen: ${label}`;
-    }
-    case "decision_created": {
-      const text = truncateText(
-        metadata.title || metadata.text || "Entscheidung",
-        90,
-      );
-      return `${actor} hat eine Entscheidung festgehalten: ${text}`;
-    }
-    default:
-      return `${actor} hat ein Update erfasst.`;
-  }
-};
-
-const appendCommentMessage = (container, { author, text }) => {
-  container.textContent = "";
-  const authorSpan = document.createElement("span");
-  authorSpan.className = "comment-author";
-  authorSpan.textContent = author;
-  const verbSpan = document.createElement("span");
-  verbSpan.className = "comment-verb";
-  verbSpan.textContent = " hat einen Kommentar hinzugefügt: ";
-  const textSpan = document.createElement("span");
-  textSpan.className = "comment-text";
-  textSpan.textContent = text;
-  container.append(authorSpan, verbSpan, textSpan);
-};
-
 const formatActivityTimestamp = (value) => {
   const parsed = value ? new Date(value) : null;
   if (!parsed || Number.isNaN(parsed.getTime())) return "";
@@ -3322,13 +3754,7 @@ const buildActivityItem = (event, { showRoom = true } = {}) => {
   chip.textContent = getActivityLabel(category);
   const summary = document.createElement("span");
   summary.className = "activity-summary";
-  if (event.type === "comment_added") {
-    const actor = event.actor || "Jemand";
-    const text = truncateText(event.metadata?.text || "Kommentar", 90);
-    appendCommentMessage(summary, { author: actor, text });
-  } else {
-    summary.textContent = formatActivitySummary(event);
-  }
+  appendActivityMessage(summary, buildActivityMessageParts(event));
   main.appendChild(chip);
   main.appendChild(summary);
   item.appendChild(main);
@@ -3670,6 +4096,29 @@ const updateTaskSelectionState = (
   }
 };
 
+const updateTaskStatus = (
+  task,
+  nextStatus,
+  timestamp = new Date().toISOString(),
+) => {
+  const previousStatus = task.status;
+  const normalized = normalizeTaskStatus(nextStatus);
+  if (previousStatus === normalized) return false;
+  task.status = normalized;
+  task.updatedAt = timestamp;
+  updateTaskSearchIndex(task);
+  logActivityEvent("task_status_changed", {
+    taskId: task.id,
+    roomId: task.roomId,
+    metadata: {
+      title: task.title,
+      fromStatus: previousStatus,
+      toStatus: normalized,
+    },
+  });
+  return true;
+};
+
 const buildStatusSelect = (task) => {
   const select = document.createElement("select");
   select.className = "task-select";
@@ -3682,21 +4131,7 @@ const buildStatusSelect = (task) => {
   });
   select.value = normalizeTaskStatus(task.status);
   select.addEventListener("change", (event) => {
-    const previousStatus = task.status;
-    const nextStatus = normalizeTaskStatus(event.target.value);
-    if (previousStatus === nextStatus) return;
-    task.status = nextStatus;
-    task.updatedAt = new Date().toISOString();
-    updateTaskSearchIndex(task);
-    logActivityEvent("task_status_changed", {
-      taskId: task.id,
-      roomId: task.roomId,
-      metadata: {
-        title: task.title,
-        fromStatus: previousStatus,
-        toStatus: nextStatus,
-      },
-    });
+    if (!updateTaskStatus(task, event.target.value)) return;
     saveState();
     renderTasksPanel();
   });
@@ -3980,6 +4415,53 @@ const buildBlockingRow = (task, taskMap) => {
   return row;
 };
 
+const handleTaskDragStart = (event) => {
+  const card = event.currentTarget?.closest?.(".task-item");
+  if (!card || !event.dataTransfer) return;
+  const taskId = card.dataset.taskId;
+  if (!taskId) return;
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("text/plain", taskId);
+  card.classList.add("is-dragging");
+};
+
+const handleTaskDragEnd = (event) => {
+  const card = event.currentTarget?.closest?.(".task-item");
+  if (card) {
+    card.classList.remove("is-dragging");
+  }
+};
+
+const handleKanbanDragOver = (event) => {
+  event.preventDefault();
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = "move";
+  }
+  const column = event.currentTarget;
+  column.classList.add("is-dragover");
+};
+
+const handleKanbanDragLeave = (event) => {
+  const column = event.currentTarget;
+  if (!column.contains(event.relatedTarget)) {
+    column.classList.remove("is-dragover");
+  }
+};
+
+const handleKanbanDrop = (event) => {
+  event.preventDefault();
+  const column = event.currentTarget;
+  column.classList.remove("is-dragover");
+  const taskId = event.dataTransfer?.getData("text/plain");
+  const status = column.dataset.status;
+  if (!taskId || !status) return;
+  const task = state.tasks.find((item) => item.id === taskId);
+  if (!task) return;
+  if (!updateTaskStatus(task, status)) return;
+  saveState();
+  renderTasksPanel();
+};
+
 const buildTimelineItem = (task, taskMap) => {
   const item = document.createElement("li");
   item.className = "timeline-item";
@@ -4155,6 +4637,7 @@ const buildTaskItem = (
     showMaterials = false,
     showCosts = false,
     showFields = false,
+    enableDrag = false,
   } = {},
 ) => {
   const item = document.createElement("li");
@@ -4169,6 +4652,13 @@ const buildTaskItem = (
 
   const header = document.createElement("div");
   header.className = "task-header";
+  if (enableDrag) {
+    header.classList.add("task-drag-handle");
+    header.draggable = true;
+    header.title = "Ziehen, um den Status zu ändern";
+    header.addEventListener("dragstart", handleTaskDragStart);
+    header.addEventListener("dragend", handleTaskDragEnd);
+  }
 
   if (showSelection) {
     const selection = document.createElement("label");
@@ -4329,6 +4819,52 @@ const renderRoomTasks = () => {
   });
 };
 
+const buildKanbanColumn = (status, tasks, taskMap) => {
+  const column = document.createElement("section");
+  column.className = "kanban-column";
+  column.dataset.status = status;
+  column.addEventListener("dragover", handleKanbanDragOver);
+  column.addEventListener("dragleave", handleKanbanDragLeave);
+  column.addEventListener("drop", handleKanbanDrop);
+
+  const header = document.createElement("div");
+  header.className = "kanban-column-header";
+  const title = document.createElement("span");
+  title.className = "kanban-column-title";
+  title.textContent = TASK_STATUS_LABELS[status] || status;
+  const count = document.createElement("span");
+  count.className = "kanban-column-count";
+  count.textContent = String(tasks.length);
+  header.appendChild(title);
+  header.appendChild(count);
+  column.appendChild(header);
+
+  const list = document.createElement("ul");
+  list.className = "kanban-list";
+  if (!tasks.length) {
+    const empty = document.createElement("li");
+    empty.className = "task-empty";
+    empty.textContent = "Keine Aufgaben";
+    list.appendChild(empty);
+  } else {
+    tasks.forEach((task) => {
+      list.appendChild(
+        buildTaskItem(task, {
+          showRoom: true,
+          showSelection: true,
+          showFields: true,
+          showMaterials: true,
+          showCosts: true,
+          taskMap,
+          enableDrag: true,
+        }),
+      );
+    });
+  }
+  column.appendChild(list);
+  return column;
+};
+
 const renderTaskList = () => {
   if (!elements.taskList) return;
   renderTaskFilters();
@@ -4338,16 +4874,23 @@ const renderTaskList = () => {
 
   const filtered = applyTaskFilters(state.tasks);
   const taskMap = buildTaskMap();
+  const statusFilter = state.taskFilters.status;
+  const statuses =
+    statusFilter === "all"
+      ? TASK_STATUSES
+      : TASK_STATUSES.includes(statusFilter)
+        ? [statusFilter]
+        : TASK_STATUSES;
+  const tasksByStatus = new Map(statuses.map((status) => [status, []]));
   filtered.forEach((task) => {
+    const normalized = normalizeTaskStatus(task.status);
+    if (tasksByStatus.has(normalized)) {
+      tasksByStatus.get(normalized).push(task);
+    }
+  });
+  statuses.forEach((status) => {
     elements.taskList.appendChild(
-      buildTaskItem(task, {
-        showRoom: true,
-        showSelection: true,
-        showFields: true,
-        showMaterials: true,
-        showCosts: true,
-        taskMap,
-      }),
+      buildKanbanColumn(status, tasksByStatus.get(status) || [], taskMap),
     );
   });
   updateTaskSelectionState(filtered);
@@ -4525,11 +5068,28 @@ const handleTaskModalSubmit = (event) => {
 };
 
 const renderArchitectPanel = () => {
-  if (!state.isArchitectMode || !state.selectedElement) {
-    elements.architectTitle.textContent = "Element wählen";
+  if (!state.isArchitectMode) {
+    return;
+  }
+  if (state.isExteriorMode) {
+    elements.architectTitle.textContent = "Außenbereiche aktiv";
     if (elements.architectHelp) {
       elements.architectHelp.textContent =
-        "Raum, Wand, Tür oder Fenster im Grundriss ziehen, um zu starten.";
+        "Innenbereich ist gesperrt. Schalten Sie auf Innenansicht, um zu bearbeiten.";
+    }
+    elements.measurementForm.hidden = true;
+    return;
+  }
+  if (!state.selectedElement) {
+    elements.architectTitle.textContent =
+      state.architectTool === "select"
+        ? "Element wählen"
+        : "Neues Element platzieren";
+    if (elements.architectHelp) {
+      elements.architectHelp.textContent =
+        state.architectTool === "select"
+          ? "Raum, Wand, Tür oder Fenster im Grundriss ziehen, um zu starten."
+          : "Werkzeug aktiv. Zum Bearbeiten auf Auswahl wechseln.";
     }
     elements.measurementForm.hidden = true;
     return;
@@ -4821,6 +5381,56 @@ const renderArchitectPanel = () => {
   }
 
   elements.measurementForm.hidden = false;
+};
+
+const updateArchitectToolUI = () => {
+  if (elements.architectToolButtons?.length) {
+    elements.architectToolButtons.forEach((button) => {
+      const tool = button.dataset.architectTool;
+      const isActive = tool === state.architectTool;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-selected", String(isActive));
+      button.disabled = state.isExteriorMode;
+      button.setAttribute("aria-disabled", String(state.isExteriorMode));
+    });
+  }
+  if (elements.architectToolHint) {
+    let hint = "";
+    if (state.isExteriorMode) {
+      hint = "Außenansicht aktiv. Innenbereich ist gesperrt.";
+    } else if (state.architectTool === "door") {
+      hint = "Tür platzieren: Im Grundriss an eine Wand klicken.";
+    } else if (state.architectTool === "window") {
+      hint = "Fenster platzieren: Im Grundriss an eine Wand klicken.";
+    } else if (state.architectTool === "room") {
+      hint = state.roomDraft
+        ? "Zweite Ecke klicken, um den Raum abzuschließen."
+        : "Erste Ecke klicken, dann Maus ziehen und erneut klicken.";
+    } else {
+      hint = "Auswahl aktiv: Element anklicken, dann Maße rechts anpassen.";
+    }
+    elements.architectToolHint.textContent = hint;
+  }
+};
+
+const setArchitectTool = (tool) => {
+  const normalized = ["select", "door", "window", "room"].includes(tool)
+    ? tool
+    : "select";
+  if (state.architectTool === normalized) return;
+  state.architectTool = normalized;
+  state.isAddingComment = false;
+  if (normalized !== "room") {
+    state.roomDraft = null;
+  }
+  if (normalized !== "select") {
+    state.selectedElement = null;
+  }
+  resetDragState();
+  clearHoverState();
+  renderFloorplan();
+  renderArchitectPanel();
+  updateArchitectToolUI();
 };
 
 const getRoomCategory = (room) => {
@@ -5194,6 +5804,30 @@ const setArchitectDragging = (isDragging) => {
   document.body.classList.toggle("architect-dragging", isDragging);
 };
 
+const updateFloorplanHint = () => {
+  if (!elements.floorplanHint) return;
+  if (state.isExteriorMode) {
+    elements.floorplanHint.textContent =
+      "Außenbereiche aktiv: Innenbereich ist gesperrt.";
+    return;
+  }
+  elements.floorplanHint.textContent = state.isArchitectMode
+    ? "Architekt-Ansicht: Räume, Wände, Türen und Fenster im Grundriss ziehen."
+    : DEFAULT_FLOORPLAN_HINT;
+};
+
+const updateInteriorControls = () => {
+  const isLocked = state.isExteriorMode;
+  if (elements.addCommentBtn) {
+    elements.addCommentBtn.disabled = isLocked;
+    elements.addCommentBtn.setAttribute("aria-disabled", String(isLocked));
+  }
+  if (elements.clearSelectionBtn) {
+    elements.clearSelectionBtn.disabled = isLocked;
+    elements.clearSelectionBtn.setAttribute("aria-disabled", String(isLocked));
+  }
+};
+
 const resetDragState = ({ keepSuppressClick = false } = {}) => {
   if (dragState.pointerId !== null) {
     try {
@@ -5223,18 +5857,50 @@ const resetDragState = ({ keepSuppressClick = false } = {}) => {
 
 const setArchitectMode = (isOn) => {
   state.isArchitectMode = isOn;
-  elements.architectView.hidden = !isOn;
+  if (!isOn && state.isExteriorMode) {
+    state.isExteriorMode = false;
+    document.body.classList.remove("exterior-mode");
+    if (elements.exteriorToggle) {
+      elements.exteriorToggle.checked = false;
+    }
+  }
   state.selectedElement = null;
+  state.isAddingComment = false;
+  state.roomDraft = null;
+  state.architectTool = "select";
+  updateViewUI();
   document.body.classList.toggle("architect-mode", isOn);
   resetDragState();
   clearHoverState();
   renderFloorplan();
-  if (elements.floorplanHint) {
-    elements.floorplanHint.textContent = isOn
-      ? "Architekt-Ansicht: Räume, Wände, Türen und Fenster im Grundriss ziehen."
-      : DEFAULT_FLOORPLAN_HINT;
-  }
+  updateFloorplanHint();
+  updateArchitectToolUI();
+  updateInteriorControls();
   renderArchitectPanel();
+};
+
+const setExteriorMode = (isOn) => {
+  state.isExteriorMode = Boolean(isOn);
+  document.body.classList.toggle("exterior-mode", state.isExteriorMode);
+  if (elements.exteriorToggle) {
+    elements.exteriorToggle.checked = state.isExteriorMode;
+  }
+  if (state.isExteriorMode) {
+    state.isAddingComment = false;
+    state.selectedElement = null;
+    state.roomDraft = null;
+    state.show3d = false;
+    resetDragState();
+    clearHoverState();
+    hideCommentTooltip();
+  }
+  updateFloorplanViewBox();
+  updateFloorplanHint();
+  updateArchitectToolUI();
+  updateInteriorControls();
+  renderFloorplan();
+  renderArchitectPanel();
+  renderRoomPanel();
 };
 
 const updateFloorButtons = () => {
@@ -5256,10 +5922,12 @@ const setActiveFloor = (floorId) => {
   state.activeRoomId = null;
   state.selectedElement = null;
   state.isAddingComment = false;
+  state.roomDraft = null;
   renderFloorplan();
   renderRoomPanel();
   renderArchitectPanel();
   updateFloorButtons();
+  updateFloorplanHint();
 };
 
 const selectRoom = (roomId) => {
@@ -5272,9 +5940,11 @@ const selectRoom = (roomId) => {
   renderFloorplan();
   renderRoomPanel();
   renderArchitectPanel();
+  syncTaskRoomFilter(roomId, { shouldRender: true });
 };
 
 const selectArchitectElement = (target) => {
+  if (state.isExteriorMode) return;
   const hitTarget = target?.closest?.(".architect-hit") || target;
   if (!hitTarget) return;
   const roomId = hitTarget.dataset.roomId;
@@ -5307,7 +5977,7 @@ const selectArchitectElement = (target) => {
 };
 
 const handleAddComment = (event) => {
-  if (!state.activeRoomId || !state.isAddingComment) {
+  if (!state.activeRoomId || !state.isAddingComment || state.isExteriorMode) {
     return;
   }
 
@@ -5450,24 +6120,17 @@ const handleTaskBulkDone = () => {
   const selected = getSelectedTasks();
   if (!selected.length) return;
   const timestamp = new Date().toISOString();
+  let didUpdate = false;
   selected.forEach((task) => {
-    const previousStatus = task.status;
-    const nextStatus = "Done";
-    if (previousStatus === nextStatus) return;
-    task.status = nextStatus;
-    task.updatedAt = timestamp;
-    updateTaskSearchIndex(task);
-    logActivityEvent("task_status_changed", {
-      taskId: task.id,
-      roomId: task.roomId,
-      metadata: {
-        title: task.title,
-        fromStatus: previousStatus,
-        toStatus: nextStatus,
-      },
-    });
+    if (updateTaskStatus(task, "Done", timestamp)) {
+      didUpdate = true;
+    }
   });
   clearTaskSelection();
+  if (!didUpdate) {
+    renderTasksPanel();
+    return;
+  }
   saveState();
   renderTasksPanel();
 };
@@ -5561,6 +6224,7 @@ const handleDecisionSubmit = async (event) => {
     title,
     body,
     actor,
+    userId: authState.user?.id || null,
     userName: actor,
     userEmail: authState.user?.email || "",
     createdAt: new Date().toISOString(),
@@ -5617,6 +6281,7 @@ const buildImageHistoryEntry = ({
   prompt,
   url,
   createdAt,
+  userId,
   userName,
   userEmail,
   source,
@@ -5625,6 +6290,7 @@ const buildImageHistoryEntry = ({
   prompt: prompt || "Bild",
   url,
   createdAt: createdAt || new Date().toISOString(),
+  userId: userId || authState.user?.id || null,
   userName: userName || getActivityActor(),
   userEmail: userEmail || authState.user?.email || "",
   source: source || "openai",
@@ -5635,6 +6301,7 @@ const buildInitialHistoryEntry = (file) =>
     prompt: file.prompt || file.label || file.name || "Original",
     url: file.url,
     createdAt: file.createdAt || new Date().toISOString(),
+    userId: file.userId,
     userName: file.userName || "",
     userEmail: file.userEmail || "",
     source: file.source || "upload",
@@ -5795,6 +6462,7 @@ const buildImageRecord = ({ url, prompt, source = "openai" }) => {
     type: "image/png",
     size: null,
     createdAt: timestamp,
+    userId: authState.user?.id || null,
     userName: getActivityActor(),
     userEmail: authState.user?.email || "",
     prompt,
@@ -5807,6 +6475,7 @@ const buildImageRecord = ({ url, prompt, source = "openai" }) => {
       prompt: prompt || label,
       url,
       createdAt: timestamp,
+      userId: record.userId,
       userName: record.userName,
       userEmail: record.userEmail,
       source,
@@ -5864,9 +6533,21 @@ const updateImageModalMeta = (file) => {
   const created = formatActivityTimestamp(file.createdAt);
   if (author || created) {
     const meta = document.createElement("div");
-    meta.textContent = [author || "Unbekannt", created]
-      .filter(Boolean)
-      .join(" · ");
+    meta.appendChild(
+      createUserSpan({
+        label: author || "Unbekannt",
+        id: file.userId,
+        email: file.userEmail,
+      }),
+    );
+    if (created) {
+      const separator = document.createElement("span");
+      separator.textContent = " · ";
+      const timeLabel = document.createElement("span");
+      timeLabel.textContent = created;
+      meta.appendChild(separator);
+      meta.appendChild(timeLabel);
+    }
     elements.imageModalMeta.appendChild(meta);
   }
 
@@ -5920,11 +6601,25 @@ const renderImageThread = (file) => {
     body.appendChild(prompt);
     const meta = document.createElement("div");
     meta.className = "image-thread-meta";
-    const metaParts = [
-      entry.userName || entry.userEmail || "",
-      formatActivityTimestamp(entry.createdAt),
-    ].filter(Boolean);
-    meta.textContent = metaParts.join(" · ");
+    const author = entry.userName || entry.userEmail || "";
+    const created = formatActivityTimestamp(entry.createdAt);
+    if (author || created) {
+      meta.appendChild(
+        createUserSpan({
+          label: author || "Unbekannt",
+          id: entry.userId,
+          email: entry.userEmail,
+        }),
+      );
+      if (created) {
+        const separator = document.createElement("span");
+        separator.textContent = " · ";
+        const timeLabel = document.createElement("span");
+        timeLabel.textContent = created;
+        meta.appendChild(separator);
+        meta.appendChild(timeLabel);
+      }
+    }
     body.appendChild(meta);
     item.appendChild(body);
 
@@ -6375,6 +7070,7 @@ const handleUploadImage = (event) => {
       type: file.type || "",
       size: file.size,
       createdAt: new Date().toISOString(),
+      userId: authState.user?.id || null,
       userName: getActivityActor(),
       userEmail: authState.user?.email || "",
       source: "upload",
@@ -6386,6 +7082,7 @@ const handleUploadImage = (event) => {
           prompt: file.name,
           url: record.url,
           createdAt: record.createdAt,
+          userId: record.userId,
           userName: record.userName,
           userEmail: record.userEmail,
           source: "upload",
@@ -6423,6 +7120,7 @@ const handleAddEvidenceLink = async () => {
     type: "link",
     size: null,
     createdAt: new Date().toISOString(),
+    userId: authState.user?.id || null,
     userName: getActivityActor(),
     userEmail: authState.user?.email || "",
     source: "link",
@@ -6434,6 +7132,7 @@ const handleAddEvidenceLink = async () => {
         prompt: label,
         url: record.url,
         createdAt: record.createdAt,
+        userId: record.userId,
         userName: record.userName,
         userEmail: record.userEmail,
         source: "link",
@@ -6451,7 +7150,7 @@ const applyArchitectAdjustments = ({
   commit = false,
   refreshPanel = false,
 } = {}) => {
-  if (!state.selectedElement) return;
+  if (!state.selectedElement || state.isExteriorMode) return;
 
   if (state.selectedElement.elementType === "wall") {
     const wallData = getWallSelectionData(state.selectedElement);
@@ -6627,6 +7326,9 @@ const applyArchitectAdjustments = ({
   const heightChanged = Math.abs(newHeight - opening.heightMm) > 0.5;
   if (heightChanged) {
     opening.heightMm = newHeight;
+    if (state.show3d && opening.roomId) {
+      update3DScene(opening.roomId);
+    }
   }
   if (refreshPanel) {
     renderArchitectPanel();
@@ -6636,10 +7338,123 @@ const applyArchitectAdjustments = ({
   }
 };
 
+const addOpeningAtPoint = (type, point) => {
+  const floor = getActiveFloor();
+  if (!floor) return;
+  const defaultLength =
+    type === "door" ? DEFAULT_DOOR_WIDTH_PX : DEFAULT_WINDOW_WIDTH_PX;
+  const targetWall = getClosestWallForPointInFloor(floor, point, defaultLength);
+  if (!targetWall) {
+    window.alert(
+      "Bitte näher an eine Wand klicken, um eine Öffnung zu setzen.",
+    );
+    return;
+  }
+  const bounds = getOpeningBoundsForWall(
+    targetWall.room,
+    targetWall.side,
+    targetWall.axis,
+  );
+  const span = Math.max(0, bounds.end - bounds.start);
+  const length = clamp(defaultLength, MIN_OPENING_SIZE_PX, span);
+  const positionBounds = getOpeningPositionBounds(bounds, length);
+  const axisValue = targetWall.axis === "x" ? point.x : point.y;
+  const center = clamp(axisValue, positionBounds.min, positionBounds.max);
+  const opening = {
+    id: createOpeningId(),
+    type,
+    roomId: targetWall.room.id,
+    label: type === "door" ? "Neue Tür" : "Neues Fenster",
+    heightMm: getDefaultOpeningHeightMm(type),
+  };
+  if (type === "door") {
+    opening.showSwing = false;
+  }
+  setOpeningOnWall(
+    opening,
+    targetWall.axis,
+    targetWall.position,
+    center,
+    length,
+  );
+  floor.openings.push(opening);
+  ensureRoomData(targetWall.room.id);
+  state.activeRoomId = targetWall.room.id;
+  state.selectedElement = {
+    roomId: targetWall.room.id,
+    floorId: floor.id,
+    elementType: type,
+    wallSide: targetWall.side,
+    openingId: opening.id,
+    label: opening.label,
+  };
+  renderFloorplan();
+  renderArchitectPanel();
+  renderRoomPanel();
+  saveState();
+};
+
+const beginRoomDraft = (point) => {
+  state.roomDraft = {
+    startX: point.x,
+    startY: point.y,
+    currentX: point.x,
+    currentY: point.y,
+  };
+  updateArchitectToolUI();
+  renderFloorplan();
+};
+
+const updateRoomDraft = (point) => {
+  if (!state.roomDraft) return;
+  state.roomDraft.currentX = point.x;
+  state.roomDraft.currentY = point.y;
+  updateArchitectToolUI();
+  renderFloorplan();
+};
+
+const commitRoomDraft = () => {
+  const draftRect = getRoomDraftRect(state.roomDraft);
+  const floor = getActiveFloor();
+  if (!draftRect || !floor) {
+    state.roomDraft = null;
+    updateArchitectToolUI();
+    renderFloorplan();
+    return;
+  }
+  const room = {
+    id: createRoomId(floor.id),
+    name: getNextRoomName(floor),
+    x: draftRect.x,
+    y: draftRect.y,
+    width: draftRect.width,
+    height: draftRect.height,
+  };
+  floor.rooms.push(room);
+  ensureRoomData(room.id);
+  state.activeRoomId = room.id;
+  state.selectedElement = {
+    roomId: room.id,
+    floorId: floor.id,
+    elementType: "room",
+    wallSide: null,
+    openingId: null,
+    label: `${room.name} – Raum`,
+  };
+  state.roomDraft = null;
+  updateArchitectToolUI();
+  renderFloorplan();
+  renderArchitectPanel();
+  renderRoomPanel();
+  saveState();
+};
+
 const startArchitectDrag = (event, target) => {
   const hitTarget = target?.closest?.(".architect-hit") || target;
   if (
     !state.isArchitectMode ||
+    state.isExteriorMode ||
+    state.architectTool !== "select" ||
     !hitTarget?.classList?.contains("architect-hit")
   ) {
     return;
@@ -6705,7 +7520,42 @@ const startArchitectDrag = (event, target) => {
   setArchitectDragging(true);
 };
 
+const startCommentDrag = (event, marker) => {
+  if (!state.isArchitectMode) return;
+  const data = getCommentDragData(marker);
+  if (!data) return;
+  const pointer = getFloorplanPoint(event);
+  dragState.active = true;
+  dragState.type = "comment";
+  dragState.axis = null;
+  dragState.startPointerX = pointer.x;
+  dragState.startPointerY = pointer.y;
+  dragState.context = {
+    ...data,
+    offsetX: pointer.x - data.comment.x,
+    offsetY: pointer.y - data.comment.y,
+  };
+  dragState.startClientX = event.clientX;
+  dragState.startClientY = event.clientY;
+  dragState.didMove = false;
+  dragState.pointerId = event.pointerId;
+  dragState.suppressClick = false;
+  elements.floorplan.setPointerCapture(event.pointerId);
+  hideCommentTooltip();
+  setArchitectDragging(true);
+};
+
 const handleArchitectPointerMove = (event) => {
+  if (state.isExteriorMode) return;
+  if (
+    state.isArchitectMode &&
+    state.architectTool === "room" &&
+    state.roomDraft &&
+    !dragState.active
+  ) {
+    updateRoomDraft(getFloorplanPoint(event));
+    return;
+  }
   if (!dragState.active || event.pointerId !== dragState.pointerId) return;
 
   const pointer = getFloorplanPoint(event);
@@ -6802,6 +7652,16 @@ const handleArchitectPointerMove = (event) => {
     dragState.axis = targetWall.axis;
     dragState.lastPosition = newCenter;
     dragState.context.length = length;
+  } else if (dragState.type === "comment") {
+    const { comment, room, offsetX, offsetY } = dragState.context || {};
+    if (!comment || !room) return;
+    const newX = clamp(pointer.x - offsetX, room.x, room.x + room.width);
+    const newY = clamp(pointer.y - offsetY, room.y, room.y + room.height);
+    if (Math.abs(newX - comment.x) < 0.1 && Math.abs(newY - comment.y) < 0.1) {
+      return;
+    }
+    comment.x = newX;
+    comment.y = newY;
   }
 
   renderFloorplan();
@@ -6880,7 +7740,29 @@ const bindEvents = () => {
       dragState.suppressClick = false;
       return;
     }
+    if (state.isExteriorMode) {
+      return;
+    }
     if (state.isArchitectMode) {
+      const point = getFloorplanPoint(event);
+      if (state.architectTool === "door") {
+        addOpeningAtPoint("door", point);
+        return;
+      }
+      if (state.architectTool === "window") {
+        addOpeningAtPoint("window", point);
+        return;
+      }
+      if (state.architectTool === "room") {
+        if (state.roomDraft) {
+          state.roomDraft.currentX = point.x;
+          state.roomDraft.currentY = point.y;
+          commitRoomDraft();
+        } else {
+          beginRoomDraft(point);
+        }
+        return;
+      }
       if (hitTarget) {
         selectArchitectElement(hitTarget);
         return;
@@ -6898,8 +7780,15 @@ const bindEvents = () => {
   });
 
   elements.floorplan.addEventListener("pointerdown", (event) => {
-    if (!state.isArchitectMode) return;
+    if (state.isExteriorMode) return;
     const target = event.target;
+    const marker = target?.closest?.(".comment-marker");
+    if (marker) {
+      event.preventDefault();
+      startCommentDrag(event, marker);
+      return;
+    }
+    if (!state.isArchitectMode || state.architectTool !== "select") return;
     const hitTarget = target?.closest?.(".architect-hit");
     if (!hitTarget) return;
     event.preventDefault();
@@ -6913,6 +7802,10 @@ const bindEvents = () => {
   elements.floorplan.addEventListener("pointerup", finishArchitectDrag);
   elements.floorplan.addEventListener("pointercancel", finishArchitectDrag);
   elements.floorplan.addEventListener("pointermove", (event) => {
+    if (state.isExteriorMode) {
+      hideCommentTooltip();
+      return;
+    }
     const target = event.target;
     const marker = target?.closest?.(".comment-marker");
     if (marker) {
@@ -6924,9 +7817,28 @@ const bindEvents = () => {
   elements.floorplan.addEventListener("pointerleave", () => {
     hideCommentTooltip();
   });
+  elements.floorplan.addEventListener("contextmenu", (event) => {
+    if (state.isExteriorMode) return;
+    const target = event.target;
+    const marker = target?.closest?.(".comment-marker");
+    if (!marker) return;
+    const roomId = marker.dataset.roomId;
+    const commentId = marker.dataset.commentId;
+    if (!roomId || !commentId) return;
+    const comment = getCommentById(roomId, commentId);
+    if (!comment) return;
+    event.preventDefault();
+    hideCommentTooltip();
+    openCommentContextMenu(event, comment, roomId);
+  });
 
   elements.floorplan.addEventListener("mouseover", (event) => {
-    if (!state.isArchitectMode) return;
+    if (
+      !state.isArchitectMode ||
+      state.isExteriorMode ||
+      state.architectTool !== "select"
+    )
+      return;
     const target = event.target;
     const hitTarget = target?.closest?.(".architect-hit");
     if (hitTarget) {
@@ -6936,7 +7848,12 @@ const bindEvents = () => {
   });
 
   elements.floorplan.addEventListener("mouseout", (event) => {
-    if (!state.isArchitectMode) return;
+    if (
+      !state.isArchitectMode ||
+      state.isExteriorMode ||
+      state.architectTool !== "select"
+    )
+      return;
     const target = event.target;
     const hitTarget = target?.closest?.(".architect-hit");
     if (hitTarget && !hitTarget.contains(event.relatedTarget)) {
@@ -6945,6 +7862,7 @@ const bindEvents = () => {
   });
 
   elements.addCommentBtn.addEventListener("click", () => {
+    if (state.isExteriorMode) return;
     if (
       !requireActiveRoom(
         "Bitte wählen Sie einen Raum aus, um einen Kommentar zu platzieren.",
@@ -7160,7 +8078,24 @@ const bindEvents = () => {
     setArchitectMode(event.target.checked);
   });
 
+  if (elements.exteriorToggle) {
+    elements.exteriorToggle.addEventListener("change", (event) => {
+      setExteriorMode(event.target.checked);
+    });
+  }
+
+  if (elements.architectToolButtons?.length) {
+    elements.architectToolButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const tool = button.dataset.architectTool;
+        if (!tool) return;
+        setArchitectTool(tool);
+      });
+    });
+  }
+
   elements.threeDButton.addEventListener("click", () => {
+    if (state.isExteriorMode) return;
     state.show3d = !state.show3d;
     elements.threeDPanel.classList.toggle("open", state.show3d);
     elements.threeDButton.textContent = state.show3d ? "Schließen" : "Öffnen";
@@ -7256,6 +8191,7 @@ const init = () => {
   renderTasksPanel();
   setArchitectMode(state.isArchitectMode);
   updateFloorButtons();
+  updateInteriorControls();
   if (elements.setApiKeyBtn) {
     elements.setApiKeyBtn.hidden = !isLocalHost;
   }

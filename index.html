@@ -61,9 +61,6 @@
     <header class="app-header">
       <div>
         <h1>Hausplaner</h1>
-        <p class="subtitle">
-          Einfacher Grundriss, klare Aufgaben und gute Zusammenarbeit.
-        </p>
       </div>
       <div class="header-actions">
         <label class="toggle">
@@ -82,7 +79,7 @@
         <div class="auth-info" id="auth-info" hidden>
           <div class="auth-user">
             <span class="auth-label">Angemeldet als</span>
-            <span id="auth-user-name"></span>
+            <span id="auth-user-name" class="user-name"></span>
           </div>
           <button id="sign-out" type="button">Abmelden</button>
         </div>
@@ -134,7 +131,7 @@
           >
             <div
               id="comment-tooltip-author"
-              class="comment-tooltip-author"
+              class="comment-tooltip-author user-name"
             ></div>
             <div id="comment-tooltip-text" class="comment-tooltip-text"></div>
           </div>
@@ -172,7 +169,7 @@
       </section>
 
       <aside class="sidebar" aria-label="Raumdetails">
-        <section class="panel view-toggle">
+        <section class="panel view-toggle" data-architect-hidden>
           <div class="panel-header">
             <h3>Ansicht</h3>
           </div>
@@ -200,7 +197,7 @@
           </div>
         </section>
 
-        <div class="view-stack is-active" id="room-view">
+        <div class="view-stack is-active" id="room-view" data-architect-hidden>
           <section class="panel" id="room-panel">
             <h2 id="room-title">Bitte wählen Sie einen Raum</h2>
             <p id="room-subtitle">
@@ -290,59 +287,10 @@
             </div>
           </section>
 
-          <section class="panel" data-room-panel="decisions">
-            <h3>Entscheidungen</h3>
-            <p class="helper">
-              Halten Sie fest, was beschlossen wurde und warum. Optional mit
-              Aufgaben verknüpfen.
-            </p>
-            <ul id="decision-list" class="decision-list"></ul>
-            <form id="decision-form" class="decision-form">
-              <label>
-                Titel
-                <input
-                  type="text"
-                  id="decision-title"
-                  name="decision-title"
-                  required
-                />
-              </label>
-              <label>
-                Begründung
-                <textarea
-                  id="decision-body"
-                  name="decision-body"
-                  rows="4"
-                  required
-                ></textarea>
-              </label>
-              <fieldset class="decision-links">
-                <legend>Mit Aufgaben verknüpfen (optional)</legend>
-                <div id="decision-tasks" class="decision-task-list"></div>
-                <p id="decision-tasks-empty" class="helper"></p>
-              </fieldset>
-              <button class="primary" type="submit">
-                Entscheidung speichern
-              </button>
-            </form>
-          </section>
-
-          <section class="panel" data-room-panel="overview">
-            <h3>Kommentare</h3>
-            <ul id="comments" class="comments"></ul>
-          </section>
-
-          <section class="panel" data-room-panel="overview">
-            <h3>Aktivität im Raum</h3>
-            <ul id="room-activity" class="activity-list"></ul>
-            <p id="room-activity-empty" class="helper"></p>
-          </section>
-
           <section
             class="panel three-d-panel"
             id="three-d-panel"
-            data-room-panel="overview"
-            hidden
+            data-room-panel="inspiration"
           >
             <div class="panel-header">
               <h3>3D-Ansicht</h3>
@@ -398,9 +346,57 @@
               </div>
             </div>
           </section>
+
+          <section class="panel" data-room-panel="decisions">
+            <h3>Entscheidungen</h3>
+            <p class="helper">
+              Halten Sie fest, was beschlossen wurde und warum. Optional mit
+              Aufgaben verknüpfen.
+            </p>
+            <ul id="decision-list" class="decision-list"></ul>
+            <form id="decision-form" class="decision-form">
+              <label>
+                Titel
+                <input
+                  type="text"
+                  id="decision-title"
+                  name="decision-title"
+                  required
+                />
+              </label>
+              <label>
+                Begründung
+                <textarea
+                  id="decision-body"
+                  name="decision-body"
+                  rows="4"
+                  required
+                ></textarea>
+              </label>
+              <fieldset class="decision-links">
+                <legend>Mit Aufgaben verknüpfen (optional)</legend>
+                <div id="decision-tasks" class="decision-task-list"></div>
+                <p id="decision-tasks-empty" class="helper"></p>
+              </fieldset>
+              <button class="primary" type="submit">
+                Entscheidung speichern
+              </button>
+            </form>
+          </section>
+
+          <section class="panel" data-room-panel="overview">
+            <h3>Kommentare</h3>
+            <ul id="comments" class="comments"></ul>
+          </section>
+
+          <section class="panel" data-room-panel="overview">
+            <h3>Aktivität im Raum</h3>
+            <ul id="room-activity" class="activity-list"></ul>
+            <p id="room-activity-empty" class="helper"></p>
+          </section>
         </div>
 
-        <div class="view-stack" id="tasks-view" hidden>
+        <div class="view-stack" id="tasks-view" data-architect-hidden hidden>
           <section class="panel" id="tasks-panel">
             <div class="panel-header">
               <div class="panel-title">
@@ -504,16 +500,182 @@
                 </div>
               </div>
             </div>
-            <ul id="task-list" class="task-list"></ul>
-            <p id="tasks-empty" class="helper" hidden>
-              Keine Aufgaben für diese Filter.
-            </p>
-            <div class="timeline-panel">
-              <h3>Timeline</h3>
-              <div id="timeline-list" class="timeline-list"></div>
+            <div class="tasks-layout">
+              <div class="tasks-board">
+                <section
+                  id="task-list"
+                  class="task-board"
+                  aria-label="Aufgaben nach Status"
+                ></section>
+                <p id="tasks-empty" class="helper" hidden>
+                  Keine Aufgaben für diese Filter.
+                </p>
+              </div>
+              <div class="timeline-panel">
+                <h3>Timeline</h3>
+                <div id="timeline-list" class="timeline-list"></div>
+              </div>
             </div>
           </section>
         </div>
+
+        <section id="architect-view" class="architect-view" hidden>
+          <section class="panel architect-panel">
+            <div class="panel-header">
+              <h3>Architekt-Ansicht</h3>
+            </div>
+            <p class="helper">
+              Elemente platzieren oder auswählen, um Maße präzise zu steuern.
+            </p>
+            <label class="toggle architect-toggle">
+              <input type="checkbox" id="toggle-exterior" />
+              <span>Außenbereiche anzeigen</span>
+            </label>
+            <div class="architect-tools">
+              <span class="architect-tools-label">Werkzeuge</span>
+              <div
+                class="segmented-control"
+                role="tablist"
+                aria-label="Werkzeug wählen"
+              >
+                <button
+                  class="segmented-option is-active"
+                  type="button"
+                  data-architect-tool="select"
+                  aria-selected="true"
+                >
+                  Auswahl
+                </button>
+                <button
+                  class="segmented-option"
+                  type="button"
+                  data-architect-tool="door"
+                  aria-selected="false"
+                >
+                  Tür
+                </button>
+                <button
+                  class="segmented-option"
+                  type="button"
+                  data-architect-tool="window"
+                  aria-selected="false"
+                >
+                  Fenster
+                </button>
+                <button
+                  class="segmented-option"
+                  type="button"
+                  data-architect-tool="room"
+                  aria-selected="false"
+                >
+                  Raum
+                </button>
+              </div>
+              <p id="architect-tool-hint" class="helper"></p>
+            </div>
+          </section>
+
+          <section class="panel architect-panel">
+            <h3 id="architect-title">Element wählen</h3>
+            <form id="measurement-form" class="measurement-form" hidden>
+              <div
+                class="measurement-group"
+                role="group"
+                aria-labelledby="measure-axis-label"
+              >
+                <span id="measure-axis-label" class="measurement-label">
+                  X-Position der Wand (mm)
+                </span>
+                <div class="measurement-row">
+                  <input
+                    type="range"
+                    id="measure-axis"
+                    min="0"
+                    max="10000"
+                    aria-labelledby="measure-axis-label"
+                  />
+                  <input
+                    type="number"
+                    id="measure-axis-number"
+                    min="0"
+                    max="10000"
+                    step="20"
+                    required
+                    aria-labelledby="measure-axis-label"
+                  />
+                </div>
+              </div>
+              <div
+                class="measurement-group"
+                role="group"
+                aria-labelledby="measure-span-label"
+              >
+                <span id="measure-span-label" class="measurement-label">
+                  Y-Länge der Wand (mm)
+                </span>
+                <div class="measurement-row">
+                  <input
+                    type="range"
+                    id="measure-span"
+                    min="0"
+                    max="10000"
+                    aria-labelledby="measure-span-label"
+                  />
+                  <input
+                    type="number"
+                    id="measure-span-number"
+                    min="0"
+                    max="10000"
+                    step="20"
+                    required
+                    aria-labelledby="measure-span-label"
+                  />
+                </div>
+              </div>
+              <div
+                id="measure-height-row"
+                class="measurement-group"
+                role="group"
+                aria-labelledby="measure-height-label"
+              >
+                <span id="measure-height-label" class="measurement-label">
+                  Öffnungshöhe (mm)
+                </span>
+                <div class="measurement-row">
+                  <input
+                    type="range"
+                    id="measure-height"
+                    min="0"
+                    max="3000"
+                    aria-labelledby="measure-height-label"
+                  />
+                  <input
+                    type="number"
+                    id="measure-height-number"
+                    min="0"
+                    max="3000"
+                    step="10"
+                    required
+                    aria-labelledby="measure-height-label"
+                  />
+                </div>
+              </div>
+              <label id="measure-swing-row" class="measurement-toggle">
+                <input type="checkbox" id="measure-swing" />
+                Schwenkbogen anzeigen
+              </label>
+              <label id="measure-lock-row" class="measurement-toggle">
+                <input type="checkbox" id="measure-lock" checked />
+                Angrenzende Räume koppeln
+              </label>
+              <p id="measure-note" class="helper">Wandhöhe fix: 2800 mm.</p>
+              <button type="submit" class="visually-hidden">
+                Werte übernehmen
+              </button>
+            </form>
+            <p id="architect-help" class="helper"></p>
+          </section>
+        </section>
       </aside>
     </main>
 
@@ -529,116 +691,6 @@
       </div>
       <ul id="activity-feed" class="activity-list"></ul>
       <p id="activity-empty" class="helper">Noch keine Aktivität vorhanden.</p>
-    </section>
-
-    <section id="architect-view" class="architect-view" hidden>
-      <h2>Architekt-Ansicht</h2>
-      <p>
-        Ziehen Sie Räume, Wände, Türen und Fenster direkt im Grundriss.
-        Öffnungen rasten an Wänden ein. Klicken Sie ein Element, um Maße
-        feinzujustieren.
-      </p>
-
-      <div class="architect-panel">
-        <h3 id="architect-title">Element wählen</h3>
-        <form id="measurement-form" class="measurement-form" hidden>
-          <div
-            class="measurement-group"
-            role="group"
-            aria-labelledby="measure-axis-label"
-          >
-            <span id="measure-axis-label" class="measurement-label">
-              X-Position der Wand (mm)
-            </span>
-            <div class="measurement-row">
-              <input
-                type="range"
-                id="measure-axis"
-                min="0"
-                max="10000"
-                aria-labelledby="measure-axis-label"
-              />
-              <input
-                type="number"
-                id="measure-axis-number"
-                min="0"
-                max="10000"
-                step="20"
-                required
-                aria-labelledby="measure-axis-label"
-              />
-            </div>
-          </div>
-          <div
-            class="measurement-group"
-            role="group"
-            aria-labelledby="measure-span-label"
-          >
-            <span id="measure-span-label" class="measurement-label">
-              Y-Länge der Wand (mm)
-            </span>
-            <div class="measurement-row">
-              <input
-                type="range"
-                id="measure-span"
-                min="0"
-                max="10000"
-                aria-labelledby="measure-span-label"
-              />
-              <input
-                type="number"
-                id="measure-span-number"
-                min="0"
-                max="10000"
-                step="20"
-                required
-                aria-labelledby="measure-span-label"
-              />
-            </div>
-          </div>
-          <div
-            id="measure-height-row"
-            class="measurement-group"
-            role="group"
-            aria-labelledby="measure-height-label"
-          >
-            <span id="measure-height-label" class="measurement-label">
-              Öffnungshöhe (mm)
-            </span>
-            <div class="measurement-row">
-              <input
-                type="range"
-                id="measure-height"
-                min="0"
-                max="3000"
-                aria-labelledby="measure-height-label"
-              />
-              <input
-                type="number"
-                id="measure-height-number"
-                min="0"
-                max="3000"
-                step="10"
-                required
-                aria-labelledby="measure-height-label"
-              />
-            </div>
-          </div>
-          <label id="measure-swing-row" class="measurement-toggle">
-            <input type="checkbox" id="measure-swing" />
-            Schwenkbogen anzeigen
-          </label>
-          <label id="measure-lock-row" class="measurement-toggle">
-            <input type="checkbox" id="measure-lock" checked />
-            Angrenzende Räume koppeln
-          </label>
-          <p id="measure-note" class="helper">Wandhöhe fix: 2800 mm.</p>
-          <button type="submit" class="visually-hidden">
-            Werte übernehmen
-          </button>
-        </form>
-        <p id="architect-help" class="helper"></p>
-      </div>
     </section>
 
     <div id="task-modal" class="modal" hidden>
@@ -821,8 +873,9 @@
             <section class="help-card">
               <h4>Architekt-Ansicht</h4>
               <p>
-                Oben aktivieren, Räume/Wände/Türen/Fenster ziehen. Maße rechts
-                justieren, "Angrenzende Räume koppeln" hält Nachbarn synchron.
+                Oben aktivieren. Rechts Werkzeuge für Auswahl, Tür/Fenster und
+                Raum-Zeichnung; Maße direkt eingeben. Außenbereiche per Toggle
+                anzeigen.
               </p>
             </section>
             <section class="help-card">
