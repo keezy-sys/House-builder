@@ -862,31 +862,16 @@
           </div>
           <button type="button" id="chat-modal-close">Schließen</button>
         </div>
-        <div class="chat-settings">
-          <label>
-            Modell
-            <select id="chat-model"></select>
-          </label>
-          <label>
-            Reasoning-Aufwand
-            <select id="chat-effort"></select>
-          </label>
-        </div>
         <ul id="chat-thread" class="chat-thread"></ul>
+        <p id="chat-status" class="helper"></p>
         <form id="chat-form" class="chat-form">
-          <label>
-            Rolle
-            <select id="chat-role"></select>
-          </label>
-          <label>
-            Nachricht
+          <div class="chat-input-row">
             <textarea
               id="chat-input"
               rows="3"
               placeholder="Nachricht eingeben"
+              aria-label="Nachricht"
             ></textarea>
-          </label>
-          <div class="modal-actions">
             <button type="submit" class="primary">Senden</button>
           </div>
         </form>
@@ -1054,6 +1039,17 @@
               </p>
             </section>
           </div>
+          <section class="help-chat-config">
+            <h4>ChatGPT-Standard</h4>
+            <p class="helper">
+              Aktuelles Modell und Reasoning-Aufwand werden serverseitig
+              verwaltet.
+            </p>
+            <div class="help-chat-values">
+              <span id="chat-config-model">Modell: –</span>
+              <span id="chat-config-effort">Reasoning-Aufwand: –</span>
+            </div>
+          </section>
         </div>
       </div>
     </div>

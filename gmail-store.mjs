@@ -422,9 +422,9 @@ const buildReplyRaw = ({ to, subject, messageId, references, body }) => {
     .replace(/=+$/, "");
 };
 
-const extractPinnedThread = (payload, threadId) => {
+const extractPinnedThread = (payload, threadId, ownerId) => {
   const tasks = Array.isArray(payload?.tasks) ? payload.tasks : [];
-  return tasks.find((task) => {
+  const matches = tasks.filter((task) => {
     const thread = task?.gmailThread;
     if (!thread || typeof thread !== "object") return false;
     const id =
@@ -435,6 +435,14 @@ const extractPinnedThread = (payload, threadId) => {
           : "";
     return id && id === threadId;
   });
+  if (!matches.length) return null;
+  if (ownerId) {
+    const owned = matches.find(
+      (task) => task?.gmailThread?.ownerId === ownerId,
+    );
+    if (owned) return owned;
+  }
+  return matches[0];
 };
 
 const ensureAccessToken = async ({ supabaseConfig, accessToken, account }) => {
@@ -559,6 +567,16 @@ const handleGmailApi = async ({ method, urlPath, headers, body, query }) => {
       const expiresAt = tokens.expires_in
         ? new Date(Date.now() + tokens.expires_in * 1000).toISOString()
         : null;
+      let existingAccount = null;
+      try {
+        existingAccount = await fetchGmailAccount({
+          ...supabaseConfig,
+          accessToken,
+          userId: user.id,
+        });
+      } catch {
+        existingAccount = null;
+      }
       const profile = await fetchGmailProfile({
         accessToken: tokens.access_token,
       });
@@ -569,7 +587,8 @@ const handleGmailApi = async ({ method, urlPath, headers, body, query }) => {
           user_id: user.id,
           email: profile?.emailAddress || user.email || "",
           access_token: tokens.access_token,
-          refresh_token: tokens.refresh_token || null,
+          refresh_token:
+            tokens.refresh_token || existingAccount?.refresh_token || null,
           token_type: tokens.token_type || "Bearer",
           scope: tokens.scope || "",
           expires_at: expiresAt,
@@ -633,7 +652,7 @@ const handleGmailApi = async ({ method, urlPath, headers, body, query }) => {
     );
   }
 
-  const pinnedTask = extractPinnedThread(payload, threadId);
+  const pinnedTask = extractPinnedThread(payload, threadId, user.id);
   if (!pinnedTask) {
     return buildError(404, "Thread not pinned.", "thread_not_pinned");
   }

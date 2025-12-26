@@ -133,22 +133,11 @@ const DEFAULT_TASK_FILTERS = {
   tag: "all",
   query: "",
 };
-const CHAT_MODELS = [
-  { value: "gpt-4.1-mini", label: "GPT-4.1 Mini" },
-  { value: "gpt-4.1", label: "GPT-4.1" },
-  { value: "gpt-4o-mini", label: "GPT-4o Mini" },
-];
-const CHAT_EFFORTS = [
-  { value: "low", label: "Niedrig" },
-  { value: "medium", label: "Mittel" },
-  { value: "high", label: "Hoch" },
-];
-const CHAT_ROLE_OPTIONS = [
-  { value: "user", label: "Ich" },
-  { value: "assistant", label: "ChatGPT" },
-];
-const DEFAULT_CHAT_MODEL = CHAT_MODELS[0].value;
-const DEFAULT_CHAT_EFFORT = "medium";
+const DEFAULT_CHAT_CONFIG = {
+  model: "gpt-4.1",
+  reasoningEffort: "auto",
+};
+const CHAT_MESSAGE_LIMIT = 20;
 
 const TASK_TAG_GROUPS = {
   materials: ["material"],
@@ -753,6 +742,17 @@ const chatModalState = {
   isOpen: false,
 };
 
+const chatRequestState = {
+  inFlight: false,
+};
+
+const chatConfigState = {
+  model: DEFAULT_CHAT_CONFIG.model,
+  reasoningEffort: DEFAULT_CHAT_CONFIG.reasoningEffort,
+  loaded: false,
+  loading: null,
+};
+
 const imageMaskState = {
   active: false,
   drawing: false,
@@ -954,12 +954,12 @@ const elements = {
   chatModalClose: document.getElementById("chat-modal-close"),
   chatModalTitle: document.getElementById("chat-modal-title"),
   chatModalContext: document.getElementById("chat-modal-context"),
-  chatModelSelect: document.getElementById("chat-model"),
-  chatEffortSelect: document.getElementById("chat-effort"),
-  chatRoleSelect: document.getElementById("chat-role"),
   chatThread: document.getElementById("chat-thread"),
+  chatStatus: document.getElementById("chat-status"),
   chatForm: document.getElementById("chat-form"),
   chatInput: document.getElementById("chat-input"),
+  chatConfigModel: document.getElementById("chat-config-model"),
+  chatConfigEffort: document.getElementById("chat-config-effort"),
   activityFeed: document.getElementById("activity-feed"),
   activityEmpty: document.getElementById("activity-empty"),
   authScreen: document.getElementById("auth-screen"),
@@ -1176,12 +1176,8 @@ const normalizeChatThread = (thread) => {
       typeof thread.id === "string" && thread.id.trim()
         ? thread.id.trim()
         : createChatThreadId(),
-    model: CHAT_MODELS.some((item) => item.value === model)
-      ? model
-      : DEFAULT_CHAT_MODEL,
-    effort: CHAT_EFFORTS.some((item) => item.value === effort)
-      ? effort
-      : DEFAULT_CHAT_EFFORT,
+    model,
+    effort,
     messages: normalizeChatMessages(thread.messages),
     createdAt,
     updatedAt,
@@ -1192,8 +1188,8 @@ const buildChatThread = () => {
   const timestamp = new Date().toISOString();
   return {
     id: createChatThreadId(),
-    model: DEFAULT_CHAT_MODEL,
-    effort: DEFAULT_CHAT_EFFORT,
+    model: chatConfigState.model || "",
+    effort: chatConfigState.reasoningEffort || "auto",
     messages: [],
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -2531,10 +2527,13 @@ const updateGmailHeaderUI = () => {
   elements.gmailStatus.hidden = !isAuthed;
   if (!isAuthed) return;
   const connected = gmailState.connected;
+  const errorMessage = gmailState.error;
   if (elements.gmailStatusText) {
-    elements.gmailStatusText.textContent = connected
+    const statusText = connected
       ? `Verbunden: ${gmailState.email || "Gmail"}`
       : "Nicht verbunden";
+    elements.gmailStatusText.textContent = errorMessage || statusText;
+    elements.gmailStatusText.classList.toggle("error", Boolean(errorMessage));
   }
   if (elements.gmailConnectBtn) {
     elements.gmailConnectBtn.hidden = connected;
@@ -2559,6 +2558,7 @@ const captureGmailOAuthParams = () => {
     if (storedState && stateParam && storedState !== stateParam) {
       gmailState.error =
         "Gmail-Verbindung fehlgeschlagen. Bitte erneut verbinden.";
+      sessionStorage.removeItem(gmailOAuthCodeKey);
     } else {
       sessionStorage.setItem(gmailOAuthCodeKey, code);
     }
@@ -2603,6 +2603,10 @@ const loadGmailStatus = async () => {
   } finally {
     gmailState.loading = false;
     updateGmailHeaderUI();
+    const activeTask = getTaskFromModal();
+    if (activeTask) {
+      void renderGmailThreadPanel(activeTask, { forceRefresh: false });
+    }
   }
 };
 
@@ -2630,6 +2634,10 @@ const exchangeGmailCode = async (code) => {
     gmailState.error = error?.message || "Gmail-Verbindung fehlgeschlagen.";
   } finally {
     updateGmailHeaderUI();
+    const activeTask = getTaskFromModal();
+    if (activeTask) {
+      void renderGmailThreadPanel(activeTask, { forceRefresh: false });
+    }
   }
 };
 
@@ -2644,8 +2652,15 @@ const startGmailConnect = async () => {
     window.alert("Bitte zuerst anmelden.");
     return;
   }
+  gmailState.error = "";
+  updateGmailHeaderUI();
   const token = getAuthToken();
-  if (!token) return;
+  if (!token) {
+    gmailState.error = "Anmeldung abgelaufen. Bitte erneut anmelden.";
+    updateGmailHeaderUI();
+    setGmailThreadStatus(gmailState.error, true);
+    return;
+  }
   const stateToken = createGmailOAuthState();
   sessionStorage.setItem(gmailOAuthStateKey, stateToken);
   try {
@@ -2668,6 +2683,8 @@ const startGmailConnect = async () => {
     gmailState.error =
       error?.message || "Gmail-Auth konnte nicht gestartet werden.";
     setGmailThreadStatus(gmailState.error, true);
+  } finally {
+    updateGmailHeaderUI();
   }
 };
 
@@ -2699,6 +2716,10 @@ const disconnectGmail = async () => {
     gmailState.error = error?.message || "Gmail konnte nicht getrennt werden.";
   } finally {
     updateGmailHeaderUI();
+    const activeTask = getTaskFromModal();
+    if (activeTask) {
+      void renderGmailThreadPanel(activeTask, { forceRefresh: false });
+    }
   }
 };
 
@@ -2992,6 +3013,8 @@ const handleSessionChange = async (session) => {
   await loadGmailStatus();
 
   if (authState.user.id !== previousUserId) {
+    gmailState.thread = null;
+    gmailState.threadId = null;
     await loadRemoteState();
     subscribeToStateChanges();
   }
@@ -3759,6 +3782,45 @@ const showCommentTooltipForMarker = (marker) => {
   showCommentTooltip(comment, roomId);
 };
 
+const focusCommentInRoom = (roomId, commentId) => {
+  if (!roomId || !commentId) return;
+  selectRoom(roomId);
+  setActiveView("room");
+  setActiveRoomTab("overview");
+  hideCommentTooltip();
+  window.requestAnimationFrame(() => {
+    if (elements.comments) {
+      elements.comments
+        .querySelectorAll(".is-focused")
+        .forEach((item) => item.classList.remove("is-focused"));
+    }
+    const commentItem = elements.comments?.querySelector(
+      `[data-comment-id="${commentId}"]`,
+    );
+    if (!commentItem) return;
+    commentItem.scrollIntoView({ behavior: "smooth", block: "center" });
+    commentItem.classList.add("is-focused");
+    window.setTimeout(() => {
+      commentItem.classList.remove("is-focused");
+    }, 1600);
+  });
+};
+
+const focusCommentFromMarker = (marker) => {
+  if (!marker || state.isAddingComment || state.isArchitectMode) return false;
+  const roomId = marker.dataset.roomId;
+  const commentId = marker.dataset.commentId;
+  if (!roomId || !commentId) return false;
+  if (state.isExteriorMode) {
+    const room = findRoomById(roomId);
+    if (!room || !isExteriorRoom(room)) return false;
+  }
+  const comment = getCommentById(roomId, commentId);
+  if (!comment) return false;
+  focusCommentInRoom(roomId, commentId);
+  return true;
+};
+
 const positionCommentContextMenu = (clientX, clientY) => {
   if (!elements.commentContextMenu) return;
   const menu = elements.commentContextMenu;
@@ -4017,16 +4079,148 @@ const renderChatThread = (thread) => {
   elements.chatThread.scrollTop = elements.chatThread.scrollHeight;
 };
 
-const syncChatModalControls = (thread) => {
-  if (elements.chatModelSelect && thread?.model) {
-    elements.chatModelSelect.value = thread.model;
+const setChatStatus = (text, isError = false) => {
+  if (!elements.chatStatus) return;
+  elements.chatStatus.textContent = text || "";
+  elements.chatStatus.classList.toggle("status-line", Boolean(text));
+  elements.chatStatus.classList.toggle("error", Boolean(text) && isError);
+};
+
+const setChatFormEnabled = (isEnabled) => {
+  if (elements.chatInput) {
+    elements.chatInput.disabled = !isEnabled;
   }
-  if (elements.chatEffortSelect && thread?.effort) {
-    elements.chatEffortSelect.value = thread.effort;
+  const submit = elements.chatForm?.querySelector("button[type='submit']");
+  if (submit) {
+    submit.disabled = !isEnabled;
   }
-  if (elements.chatRoleSelect) {
-    elements.chatRoleSelect.value = "user";
+};
+
+const formatChatEffortLabel = (value) => {
+  const normalized = String(value || "").toLowerCase();
+  if (!normalized || normalized === "auto") return "Auto";
+  if (normalized === "low") return "Niedrig";
+  if (normalized === "medium") return "Mittel";
+  if (normalized === "high") return "Hoch";
+  return value || "Auto";
+};
+
+const updateChatConfigDisplay = () => {
+  const model = chatConfigState.model || DEFAULT_CHAT_CONFIG.model || "";
+  const effort =
+    chatConfigState.reasoningEffort || DEFAULT_CHAT_CONFIG.reasoningEffort;
+  if (elements.chatConfigModel) {
+    elements.chatConfigModel.textContent = model
+      ? `Modell: ${model}`
+      : "Modell: Standard";
   }
+  if (elements.chatConfigEffort) {
+    elements.chatConfigEffort.textContent = `Reasoning-Aufwand: ${formatChatEffortLabel(
+      effort,
+    )}`;
+  }
+};
+
+const normalizeChatConfig = (payload) => {
+  const model = typeof payload?.model === "string" ? payload.model.trim() : "";
+  const reasoningEffort =
+    typeof payload?.reasoningEffort === "string"
+      ? payload.reasoningEffort.trim()
+      : "";
+  return {
+    model: model || DEFAULT_CHAT_CONFIG.model,
+    reasoningEffort: reasoningEffort || DEFAULT_CHAT_CONFIG.reasoningEffort,
+  };
+};
+
+const fetchChatConfig = async ({ force = false } = {}) => {
+  if (!force && chatConfigState.loaded) {
+    return {
+      model: chatConfigState.model,
+      reasoningEffort: chatConfigState.reasoningEffort,
+    };
+  }
+  if (chatConfigState.loading) {
+    return chatConfigState.loading;
+  }
+  chatConfigState.loading = (async () => {
+    try {
+      const response = await fetch("/api/chat-config");
+      let data = {};
+      try {
+        data = await response.json();
+      } catch {
+        data = {};
+      }
+      if (response.ok) {
+        const normalized = normalizeChatConfig(data);
+        chatConfigState.model = normalized.model;
+        chatConfigState.reasoningEffort = normalized.reasoningEffort;
+      }
+    } catch {
+      // Use fallback config on network errors.
+    }
+    chatConfigState.loaded = true;
+    chatConfigState.loading = null;
+    updateChatConfigDisplay();
+    return {
+      model: chatConfigState.model,
+      reasoningEffort: chatConfigState.reasoningEffort,
+    };
+  })();
+  return chatConfigState.loading;
+};
+
+const buildChatRequestPayload = ({ thread, contextLabel }) => {
+  const trimmed = Array.isArray(thread?.messages)
+    ? thread.messages.slice(-CHAT_MESSAGE_LIMIT)
+    : [];
+  const messages = trimmed
+    .map((message) => ({
+      role: message.role === "assistant" ? "assistant" : "user",
+      content: message.text,
+    }))
+    .filter((message) => message.content);
+  return {
+    messages,
+    context: contextLabel || "",
+  };
+};
+
+const requestChatResponse = async ({ thread, contextLabel }) => {
+  const payload = buildChatRequestPayload({ thread, contextLabel });
+  const response = await fetch("/api/chat", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  let data = {};
+  try {
+    data = await response.json();
+  } catch {
+    data = {};
+  }
+
+  if (!response.ok) {
+    const error = new Error(data?.error || `HTTP ${response.status}`);
+    error.code = data?.code;
+    throw error;
+  }
+
+  const message = String(data?.message || "").trim();
+  if (!message) {
+    const error = new Error("Keine Antwort erhalten.");
+    error.code = "missing_response";
+    throw error;
+  }
+  return {
+    message,
+    model: String(data?.model || "").trim(),
+    reasoningEffort: String(data?.reasoningEffort || "").trim(),
+  };
 };
 
 const openChatModal = ({ scope, roomId, taskId, commentId } = {}) => {
@@ -4054,10 +4248,11 @@ const openChatModal = ({ scope, roomId, taskId, commentId } = {}) => {
   if (resolved.created) {
     saveState();
   }
-  syncChatModalControls(resolved.thread);
   if (elements.chatInput) {
     elements.chatInput.value = "";
   }
+  setChatStatus("");
+  setChatFormEnabled(true);
   renderChatThread(resolved.thread);
   elements.chatModal.hidden = false;
   elements.chatInput?.focus();
@@ -4074,81 +4269,91 @@ const closeChatModal = () => {
   if (elements.chatInput) {
     elements.chatInput.value = "";
   }
+  setChatStatus("");
   if (elements.chatThread) {
     elements.chatThread.innerHTML = "";
   }
 };
 
-const getActiveChatThread = () => {
+const getActiveChatTarget = () => {
   if (!chatModalState.isOpen) return null;
-  const resolved = resolveChatTarget(chatModalState);
-  return resolved?.thread || null;
+  return resolveChatTarget(chatModalState);
 };
 
-const handleChatSubmit = (event) => {
+const handleChatSubmit = async (event) => {
   event.preventDefault();
-  const thread = getActiveChatThread();
+  if (chatRequestState.inFlight) return;
+  const resolved = getActiveChatTarget();
+  const thread = resolved?.thread;
   if (!thread || !elements.chatInput) return;
   const text = elements.chatInput.value.trim();
   if (!text) return;
-  const role = normalizeChatRole(elements.chatRoleSelect?.value || "user");
-  const isAssistant = role === "assistant";
   const timestamp = new Date().toISOString();
   thread.messages.push({
     id: createChatMessageId(),
-    role,
+    role: "user",
     text,
     createdAt: timestamp,
-    userId: isAssistant ? null : authState.user?.id || null,
-    userName: isAssistant ? "ChatGPT" : getActivityActor(),
-    userEmail: isAssistant ? "" : authState.user?.email || "",
+    userId: authState.user?.id || null,
+    userName: getActivityActor(),
+    userEmail: authState.user?.email || "",
   });
   thread.updatedAt = timestamp;
   elements.chatInput.value = "";
   saveState();
   renderChatThread(thread);
-  elements.chatInput.focus();
-};
-
-const handleChatSettingChange = (key, value) => {
-  const thread = getActiveChatThread();
-  if (!thread) return;
-  if (key === "model") {
-    if (!CHAT_MODELS.some((item) => item.value === value)) return;
-    if (thread.model === value) return;
-    thread.model = value;
-  } else if (key === "effort") {
-    if (!CHAT_EFFORTS.some((item) => item.value === value)) return;
-    if (thread.effort === value) return;
-    thread.effort = value;
-  } else {
-    return;
+  setChatStatus("ChatGPT antwortet …");
+  setChatFormEnabled(false);
+  chatRequestState.inFlight = true;
+  try {
+    const config = await fetchChatConfig();
+    const response = await requestChatResponse({
+      thread,
+      contextLabel: resolved?.contextLabel || "",
+    });
+    thread.messages.push({
+      id: createChatMessageId(),
+      role: "assistant",
+      text: response.message,
+      createdAt: new Date().toISOString(),
+      userId: null,
+      userName: "ChatGPT",
+      userEmail: "",
+    });
+    thread.model = response.model || config.model || thread.model;
+    thread.effort =
+      response.reasoningEffort || config.reasoningEffort || thread.effort;
+    thread.updatedAt = new Date().toISOString();
+    saveState();
+    renderChatThread(thread);
+    setChatStatus("");
+  } catch (error) {
+    console.error("ChatGPT Anfrage fehlgeschlagen:", error);
+    const networkBlocked = isLikelyNetworkBlock(error);
+    const message =
+      error?.code === "missing_api_key"
+        ? "Kein API-Schlüssel gefunden. OPENAI_API_KEY setzen."
+        : error?.code === "openai_error"
+          ? `OpenAI-Fehler: ${error.message}`
+          : networkBlocked
+            ? "ChatGPT ist nicht erreichbar. App über npm run serve starten."
+            : "Antwort fehlgeschlagen. Bitte erneut versuchen.";
+    setChatStatus(message, true);
+  } finally {
+    chatRequestState.inFlight = false;
+    setChatFormEnabled(true);
+    elements.chatInput?.focus();
   }
-  thread.updatedAt = new Date().toISOString();
-  saveState();
-};
-
-const populateChatSelect = (select, options) => {
-  if (!select) return;
-  select.innerHTML = "";
-  options.forEach((option) => {
-    const item = document.createElement("option");
-    item.value = option.value;
-    item.textContent = option.label;
-    select.appendChild(item);
-  });
 };
 
 const initChatControls = () => {
-  populateChatSelect(elements.chatModelSelect, CHAT_MODELS);
-  populateChatSelect(elements.chatEffortSelect, CHAT_EFFORTS);
-  populateChatSelect(elements.chatRoleSelect, CHAT_ROLE_OPTIONS);
   if (
     elements.roomChatTrigger &&
     !elements.roomChatTrigger.querySelector("svg")
   ) {
     elements.roomChatTrigger.appendChild(buildChatIcon());
   }
+  updateChatConfigDisplay();
 };
 
 const renderComments = (roomData) => {
@@ -6099,7 +6304,8 @@ const renderGmailThreadMeta = (task, thread) => {
   elements.gmailThreadMeta.innerHTML = "";
   if (!thread && !task?.gmailThread) return;
 
-  const subject = thread?.subject || task?.gmailThread?.subject || "Gmail-Thread";
+  const subject =
+    thread?.subject || task?.gmailThread?.subject || "Gmail-Thread";
   const subjectEl = document.createElement("div");
   subjectEl.textContent = subject;
   elements.gmailThreadMeta.appendChild(subjectEl);
@@ -6200,7 +6406,10 @@ const syncTaskGmailMeta = (task, thread) => {
   if (thread.snippet && thread.snippet !== task.gmailThread.snippet) {
     updates.snippet = thread.snippet;
   }
-  if (thread.lastMessageAt && thread.lastMessageAt !== task.gmailThread.lastMessageAt) {
+  if (
+    thread.lastMessageAt &&
+    thread.lastMessageAt !== task.gmailThread.lastMessageAt
+  ) {
     updates.lastMessageAt = thread.lastMessageAt;
   }
   if (!Object.keys(updates).length) return;
@@ -6223,6 +6432,11 @@ const renderGmailThreadPanel = async (task, { forceRefresh = false } = {}) => {
   const thread = task.gmailThread;
   const connected = gmailState.connected;
   const isOwner = isGmailThreadOwner(thread);
+
+  if (gmailState.error) {
+    setGmailThreadStatus(gmailState.error, true);
+    gmailState.error = "";
+  }
 
   if (elements.gmailThreadConnectHint) {
     elements.gmailThreadConnectHint.hidden = connected;
@@ -6255,10 +6469,10 @@ const renderGmailThreadPanel = async (task, { forceRefresh = false } = {}) => {
   }
 
   if (!isOwner) {
-    setGmailThreadStatus(
-      "Thread wurde von einem anderen Nutzer angeheftet.",
-      false,
-    );
+    const ownerLabel = thread?.ownerEmail
+      ? `Thread wurde von ${thread.ownerEmail} angeheftet.`
+      : "Thread wurde von einem anderen Nutzer angeheftet.";
+    setGmailThreadStatus(ownerLabel, false);
     clearGmailThreadView();
     return;
   }
@@ -6331,7 +6545,7 @@ const handleGmailThreadPin = async () => {
   await renderGmailThreadPanel(task, { forceRefresh: true });
 };
 
-const handleGmailThreadClear = () => {
+const handleGmailThreadClear = async () => {
   const task = getTaskFromModal();
   if (!task || !task.gmailThread) return;
   const confirmRemove = window.confirm(
@@ -6343,8 +6557,14 @@ const handleGmailThreadClear = () => {
   updateTaskSearchIndex(task);
   logTaskUpdate(task, { gmailThreadId: null });
   saveState();
+  if (supabase && authState.user) {
+    await pushStateToSupabase();
+  }
   gmailState.thread = null;
   gmailState.threadId = null;
+  if (elements.gmailThreadInput) {
+    elements.gmailThreadInput.value = "";
+  }
   setGmailThreadStatus("", false);
   setGmailReplyStatus("", false);
   clearGmailThreadView();
@@ -6415,6 +6635,10 @@ const openTaskModal = (taskId) => {
   if (elements.taskEndDate) {
     elements.taskEndDate.value = task.endDate || "";
   }
+  if (elements.gmailReplyText) {
+    elements.gmailReplyText.value = "";
+  }
+  setGmailReplyStatus("", false);
   renderDependencyOptions(task);
   void renderGmailThreadPanel(task, { forceRefresh: false });
   elements.taskModal.hidden = false;
@@ -6432,6 +6656,7 @@ const closeTaskModal = () => {
 const openHelpModal = () => {
   if (!elements.helpModal) return;
   elements.helpModal.hidden = false;
+  void fetchChatConfig({ force: true });
   elements.helpModalClose?.focus();
 };
 
@@ -9242,6 +9467,10 @@ const bindEvents = () => {
         handleAddComment(event);
         return;
       }
+      const marker = target?.closest?.(".comment-marker");
+      if (focusCommentFromMarker(marker)) {
+        return;
+      }
       const roomTarget = target?.closest?.(".room-hit");
       const roomId = roomTarget?.dataset?.roomId;
       if (roomId) {
@@ -9284,6 +9513,11 @@ const bindEvents = () => {
       return;
     }
 
+    const marker = target?.closest?.(".comment-marker");
+    if (focusCommentFromMarker(marker)) {
+      return;
+    }
+
     if (target.classList.contains("room-hit")) {
       selectRoom(target.dataset.roomId);
     }
@@ -9298,6 +9532,9 @@ const bindEvents = () => {
         if (!room || !isExteriorRoom(room)) {
           return;
         }
+      }
+      if (!state.isArchitectMode) {
+        return;
       }
       event.preventDefault();
       startCommentDrag(event, marker);
@@ -9536,17 +9773,16 @@ const bindEvents = () => {
     openChatModal({ scope: "room", roomId: state.activeRoomId });
   });
   elements.chatForm?.addEventListener("submit", handleChatSubmit);
+  elements.chatInput?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || event.shiftKey) return;
+    event.preventDefault();
+    elements.chatForm?.requestSubmit();
+  });
   elements.chatModalClose?.addEventListener("click", closeChatModal);
   elements.chatModal?.addEventListener("click", (event) => {
     if (event.target === elements.chatModal) {
       closeChatModal();
     }
-  });
-  elements.chatModelSelect?.addEventListener("change", (event) => {
-    handleChatSettingChange("model", event.target.value);
-  });
-  elements.chatEffortSelect?.addEventListener("change", (event) => {
-    handleChatSettingChange("effort", event.target.value);
   });
   elements.helpButton?.addEventListener("click", openHelpModal);
   elements.helpModalClose?.addEventListener("click", closeHelpModal);
@@ -9770,8 +10006,10 @@ const bindEvents = () => {
 };
 
 const init = () => {
+  captureGmailOAuthParams();
   hydrateStateFromLocal();
   initChatControls();
+  void fetchChatConfig({ force: false });
   state.isMobileView = MOBILE_MEDIA_QUERY.matches;
   document.body.classList.toggle("is-mobile", state.isMobileView);
   renderFloorplan();

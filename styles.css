@@ -259,6 +259,10 @@ body.auth-locked {
   color: #6c5845;
 }
 
+.gmail-status-text.error {
+  color: #b91c1c;
+}
+
 .auth-user {
   display: flex;
   flex-direction: column;
@@ -1008,6 +1012,28 @@ svg {
   color: #6c5845;
 }
 
+.help-chat-config {
+  margin-top: 1rem;
+  border: 1px solid #eadfce;
+  background: #fdf2e6;
+  border-radius: 0.8rem;
+  padding: 0.9rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.help-chat-config h4 {
+  margin: 0;
+}
+
+.help-chat-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  font-weight: 600;
+  color: #3b3127;
+}
+
 .modal-header {
   display: flex;
   align-items: center;
@@ -1043,24 +1069,6 @@ svg {
   gap: 0.3rem;
 }
 
-.chat-settings {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 0.8rem;
-}
-
-.chat-settings label {
-  display: grid;
-  gap: 0.4rem;
-  font-weight: 600;
-}
-
-.chat-settings select {
-  padding: 0.55rem 0.6rem;
-  border-radius: 0.6rem;
-  border: 1px solid #e4d4c0;
-}
-
 .chat-thread {
   list-style: none;
   margin: 0;
@@ -1081,6 +1089,13 @@ svg {
   padding: 0.6rem 0.7rem;
   display: grid;
   gap: 0.4rem;
+  max-width: 92%;
+}
+
+.chat-message:not(.is-assistant) {
+  align-self: flex-end;
+  background: #ffffff;
+  border-color: #e4d4c0;
 }
 
 .chat-message.is-assistant {
@@ -1095,6 +1110,10 @@ svg {
   gap: 0.4rem;
   font-size: 0.72rem;
   color: #7d6956;
+}
+
+.chat-message:not(.is-assistant) .chat-message-meta {
+  justify-content: flex-end;
 }
 
 .chat-message-role {
@@ -1112,28 +1131,24 @@ svg {
 }
 
 .chat-form {
-  display: grid;
-  gap: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
 }
 
-.chat-form label {
-  display: grid;
-  gap: 0.4rem;
-  font-weight: 600;
+.chat-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.6rem;
 }
 
-.chat-form textarea {
+.chat-input-row textarea {
+  flex: 1;
   padding: 0.6rem;
   border-radius: 0.6rem;
   border: 1px solid #e4d4c0;
   resize: vertical;
   min-height: 4.5rem;
-}
-
-.chat-form select {
-  padding: 0.55rem 0.6rem;
-  border-radius: 0.6rem;
-  border: 1px solid #e4d4c0;
 }
 
 .dependency-panel {
@@ -1361,6 +1376,12 @@ button {
   border-color: #e4d7c7;
   color: #9a8b7a;
   opacity: 0.7;
+}
+
+.comments li.is-focused {
+  background: #fff6e8;
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
 }
 
 .comments li.is-resolved .user-name,
