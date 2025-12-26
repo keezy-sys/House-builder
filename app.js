@@ -6424,6 +6424,9 @@ const closeTaskModal = () => {
   if (!elements.taskModal) return;
   elements.taskModal.hidden = true;
   taskModalState.taskId = null;
+  setGmailThreadStatus("", false);
+  setGmailReplyStatus("", false);
+  clearGmailThreadView();
 };
 
 const openHelpModal = () => {
@@ -9640,6 +9643,18 @@ const bindEvents = () => {
   elements.signupForm?.addEventListener("submit", handleSignup);
   elements.passwordResetForm?.addEventListener("submit", handlePasswordUpdate);
   elements.signOutBtn?.addEventListener("click", handleSignOut);
+  elements.gmailConnectBtn?.addEventListener("click", startGmailConnect);
+  elements.gmailDisconnectBtn?.addEventListener("click", disconnectGmail);
+  elements.gmailThreadPinBtn?.addEventListener("click", handleGmailThreadPin);
+  elements.gmailThreadClearBtn?.addEventListener(
+    "click",
+    handleGmailThreadClear,
+  );
+  elements.gmailThreadRefreshBtn?.addEventListener(
+    "click",
+    handleGmailThreadRefresh,
+  );
+  elements.gmailReplySend?.addEventListener("click", handleGmailReplySend);
 
   elements.toggleArchitect.addEventListener("change", (event) => {
     setArchitectMode(event.target.checked);
