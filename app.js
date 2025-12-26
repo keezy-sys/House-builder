@@ -141,6 +141,7 @@ const CHAT_MESSAGE_LIMIT = 20;
 
 const TASK_TAG_GROUPS = {
   materials: ["material"],
+  devices: ["geraet", "geraete", "device"],
   permits: ["permit", "genehmigung"],
   contractors: ["contractor", "handwerker", "auftragnehmer"],
 };
@@ -150,6 +151,11 @@ const TASK_COST_FIELDS = [
     key: "materials",
     label: "Materialkosten (Schätzung)",
     tags: TASK_TAG_GROUPS.materials,
+  },
+  {
+    key: "devices",
+    label: "Geraetekosten (Schätzung)",
+    tags: TASK_TAG_GROUPS.devices,
   },
   {
     key: "permits",
@@ -172,6 +178,11 @@ const TASK_VIEW_PRESETS = {
     label: "Material",
     filter: (task) =>
       taskHasAnyTag(task, TASK_TAG_GROUPS.materials) && !isTaskDone(task),
+  },
+  devices: {
+    label: "Geraete",
+    filter: (task) =>
+      taskHasAnyTag(task, TASK_TAG_GROUPS.devices) && !isTaskDone(task),
   },
   permits: {
     label: "Genehmigungen",
@@ -655,6 +666,8 @@ const SAVE_DEBOUNCE_MS = 800;
 const ACTIVITY_EVENT_LIMIT = 200;
 const ACTIVITY_FEED_LIMIT = 15;
 const ROOM_ACTIVITY_LIMIT = 12;
+const ACTIVITY_NOTIFICATION_STORAGE_KEY = "house-builder-activity-viewed";
+const ACTIVITY_NOTIFICATION_CLEAR_DELAY_MS = 2600;
 
 const isPlaceholder = (value) =>
   !value || value.includes("YOUR_") || value.includes("your_");
@@ -685,6 +698,14 @@ const syncState = {
   lastSavedAt: 0,
   applyingRemote: false,
   subscription: null,
+};
+
+const activityNotificationState = {
+  lastViewedAt: null,
+  pendingViewedAt: null,
+  clearTimer: null,
+  newEventIds: new Set(),
+  userKey: "",
 };
 
 const gmailState = {
@@ -911,6 +932,9 @@ const elements = {
   imagePinClear: document.getElementById("image-pin-clear"),
   taskForm: document.getElementById("task-form"),
   taskInput: document.getElementById("task-input"),
+  taskCreateForm: document.getElementById("task-create-form"),
+  taskCreateInput: document.getElementById("task-create-input"),
+  taskCreateRoom: document.getElementById("task-create-room"),
   taskTagsInput: document.getElementById("task-tags-input"),
   taskStatusInput: document.getElementById("task-status-input"),
   taskList: document.getElementById("task-list"),
@@ -960,6 +984,11 @@ const elements = {
   chatInput: document.getElementById("chat-input"),
   chatConfigModel: document.getElementById("chat-config-model"),
   chatConfigEffort: document.getElementById("chat-config-effort"),
+  activityPage: document.getElementById("activity-page"),
+  activityNotification: document.getElementById("activity-notification"),
+  activityNotificationCount: document.getElementById(
+    "activity-notification-count",
+  ),
   activityFeed: document.getElementById("activity-feed"),
   activityEmpty: document.getElementById("activity-empty"),
   authScreen: document.getElementById("auth-screen"),
@@ -1057,6 +1086,19 @@ const normalizeTaskTags = (tags) => {
       });
   });
   return normalized;
+};
+
+const normalizeTaskLink = (value) => {
+  if (value === null || value === undefined) return "";
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    if (!["http:", "https:"].includes(url.protocol)) return "";
+    return url.toString();
+  } catch {
+    return "";
+  }
 };
 
 const normalizeTaskMaterials = (materials) => ({
@@ -1200,6 +1242,7 @@ const buildTaskSearchIndex = (task) => {
   const parts = [
     task.title,
     task.notes,
+    task.link,
     task.assignee,
     Array.isArray(task.tags) ? task.tags.join(" ") : "",
     task.materials?.vendor,
@@ -1294,6 +1337,7 @@ const normalizeTask = (task, fallbackTitle) => {
     materials: normalizeTaskMaterials(task.materials),
     costs: normalizeTaskCosts(task.costs),
     priority: normalizeTaskPriority(task.priority),
+    link: normalizeTaskLink(task.link),
     notes: typeof task.notes === "string" ? task.notes : "",
     gmailThread: normalizeGmailThread(task.gmailThread),
     chat: normalizeChatThread(task.chat),
@@ -1346,6 +1390,7 @@ const createTask = ({
   materials = null,
   costs = null,
   priority = DEFAULT_TASK_PRIORITY,
+  link = "",
   notes = "",
   gmailThread = null,
 } = {}) => {
@@ -1368,6 +1413,7 @@ const createTask = ({
     priority: TASK_PRIORITIES.includes(priority)
       ? priority
       : DEFAULT_TASK_PRIORITY,
+    link: normalizeTaskLink(link),
     notes: notes || "",
     gmailThread: normalizeGmailThread(gmailThread),
     chat: null,
@@ -2999,6 +3045,7 @@ const handleSessionChange = async (session) => {
   }
 
   if (!authState.user) {
+    resetActivityNotificationState();
     gmailState.connected = false;
     gmailState.email = "";
     gmailState.thread = null;
@@ -3013,6 +3060,7 @@ const handleSessionChange = async (session) => {
   await loadGmailStatus();
 
   if (authState.user.id !== previousUserId) {
+    resetActivityNotificationState();
     gmailState.thread = null;
     gmailState.threadId = null;
     await loadRemoteState();
@@ -4948,9 +4996,174 @@ const getActivityRoomLabel = (roomId) => {
   return room ? room.name : "Unbekannter Raum";
 };
 
-const buildActivityItem = (event, { showRoom = true } = {}) => {
+const parseTimestamp = (value) => {
+  if (value === null || value === undefined) return 0;
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) return numeric;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const getActivityEventTimestamp = (event) => parseTimestamp(event?.createdAt);
+
+const getLatestActivityTimestamp = (events) => {
+  let latest = 0;
+  (Array.isArray(events) ? events : []).forEach((event) => {
+    const timestamp = getActivityEventTimestamp(event);
+    if (timestamp > latest) latest = timestamp;
+  });
+  return latest;
+};
+
+const getActivityNotificationUserKey = () => {
+  if (authState.user?.id) return `user:${authState.user.id}`;
+  if (authState.user?.email) return `email:${authState.user.email}`;
+  if (authState.displayName) return `name:${authState.displayName}`;
+  return "anonymous";
+};
+
+const getActivityNotificationStorageKey = () =>
+  `${ACTIVITY_NOTIFICATION_STORAGE_KEY}:${getActivityNotificationUserKey()}`;
+
+const resetActivityNotificationState = () => {
+  if (activityNotificationState.clearTimer) {
+    window.clearTimeout(activityNotificationState.clearTimer);
+  }
+  activityNotificationState.clearTimer = null;
+  activityNotificationState.pendingViewedAt = null;
+  activityNotificationState.lastViewedAt = null;
+  activityNotificationState.newEventIds = new Set();
+  activityNotificationState.userKey = "";
+  if (elements.activityNotification) {
+    elements.activityNotification.hidden = true;
+  }
+  if (elements.activityNotificationCount) {
+    elements.activityNotificationCount.textContent = "0";
+  }
+};
+
+const ensureActivityNotificationState = () => {
+  if (!authState.user) return false;
+  const userKey = getActivityNotificationUserKey();
+  if (activityNotificationState.userKey !== userKey) {
+    if (activityNotificationState.clearTimer) {
+      window.clearTimeout(activityNotificationState.clearTimer);
+    }
+    activityNotificationState.clearTimer = null;
+    activityNotificationState.pendingViewedAt = null;
+    activityNotificationState.lastViewedAt = null;
+    activityNotificationState.userKey = userKey;
+  }
+  if (activityNotificationState.lastViewedAt === null) {
+    const stored = parseTimestamp(
+      localStorage.getItem(getActivityNotificationStorageKey()),
+    );
+    if (stored) {
+      activityNotificationState.lastViewedAt = stored;
+      return true;
+    }
+    const baseline = Date.now();
+    activityNotificationState.lastViewedAt = baseline;
+    localStorage.setItem(getActivityNotificationStorageKey(), String(baseline));
+  }
+  return true;
+};
+
+const isActivityEventFromCurrentUser = (event) =>
+  isCurrentUser({
+    id: event?.actorId || null,
+    email: event?.actorEmail || null,
+    name: event?.actor || "",
+  });
+
+const getNewActivityEvents = () => {
+  if (!ensureActivityNotificationState()) return [];
+  const events = Array.isArray(state.activityEvents)
+    ? state.activityEvents
+    : [];
+  const lastViewedAt = activityNotificationState.lastViewedAt || 0;
+  return events.filter((event) => {
+    if (!event) return false;
+    if (isActivityEventFromCurrentUser(event)) return false;
+    const timestamp = getActivityEventTimestamp(event);
+    if (!timestamp) return false;
+    return timestamp > lastViewedAt;
+  });
+};
+
+const updateActivityNotificationBadge = (count) => {
+  if (!elements.activityNotification || !elements.activityNotificationCount) {
+    return;
+  }
+  if (!count) {
+    elements.activityNotification.hidden = true;
+    elements.activityNotificationCount.textContent = "0";
+    return;
+  }
+  elements.activityNotification.hidden = false;
+  elements.activityNotificationCount.textContent = String(count);
+  const label = `${count} neue Aktivität${count === 1 ? "" : "en"} anzeigen`;
+  elements.activityNotification.setAttribute("aria-label", label);
+  elements.activityNotification.title = label;
+};
+
+const syncActivityNotifications = () => {
+  if (!authState.user) {
+    activityNotificationState.newEventIds = new Set();
+    updateActivityNotificationBadge(0);
+    return activityNotificationState.newEventIds;
+  }
+  const newEvents = getNewActivityEvents();
+  activityNotificationState.newEventIds = new Set(
+    newEvents.map((event) => event.id),
+  );
+  updateActivityNotificationBadge(newEvents.length);
+  return activityNotificationState.newEventIds;
+};
+
+const scrollToActivityFeed = () => {
+  const target = elements.activityPage || elements.activityFeed;
+  if (!target) return;
+  target.scrollIntoView({ behavior: "smooth", block: "start" });
+};
+
+const scheduleActivityNotificationClear = (viewedAt) => {
+  if (!viewedAt) return;
+  if (activityNotificationState.clearTimer) {
+    window.clearTimeout(activityNotificationState.clearTimer);
+  }
+  activityNotificationState.pendingViewedAt = viewedAt;
+  activityNotificationState.clearTimer = window.setTimeout(() => {
+    const timestamp = activityNotificationState.pendingViewedAt;
+    if (timestamp) {
+      activityNotificationState.lastViewedAt = timestamp;
+      localStorage.setItem(
+        getActivityNotificationStorageKey(),
+        String(timestamp),
+      );
+    }
+    activityNotificationState.pendingViewedAt = null;
+    activityNotificationState.clearTimer = null;
+    renderActivityFeed();
+    renderRoomActivity();
+  }, ACTIVITY_NOTIFICATION_CLEAR_DELAY_MS);
+};
+
+const handleActivityNotificationClick = () => {
+  scrollToActivityFeed();
+  const newEvents = getNewActivityEvents();
+  if (!newEvents.length) return;
+  const latest = getLatestActivityTimestamp(newEvents);
+  if (!latest) return;
+  scheduleActivityNotificationClear(latest);
+};
+
+const buildActivityItem = (event, { showRoom = true, isNew = false } = {}) => {
   const item = document.createElement("li");
   item.className = "activity-item";
+  if (isNew) {
+    item.classList.add("is-new");
+  }
   const category = getActivityCategory(event.type);
   item.dataset.category = category;
 
@@ -4992,6 +5205,7 @@ const getSortedActivityEvents = () =>
 
 const renderActivityFeed = () => {
   if (!elements.activityFeed) return;
+  const newEventIds = syncActivityNotifications();
   elements.activityFeed.innerHTML = "";
   const events = getSortedActivityEvents().slice(0, ACTIVITY_FEED_LIMIT);
   if (!events.length) {
@@ -5004,12 +5218,14 @@ const renderActivityFeed = () => {
     elements.activityEmpty.hidden = true;
   }
   events.forEach((event) => {
-    elements.activityFeed.appendChild(buildActivityItem(event));
+    const isNew = newEventIds.has(event.id);
+    elements.activityFeed.appendChild(buildActivityItem(event, { isNew }));
   });
 };
 
 const renderRoomActivity = () => {
   if (!elements.roomActivity) return;
+  const newEventIds = syncActivityNotifications();
   elements.roomActivity.innerHTML = "";
   if (!state.activeRoomId) {
     if (elements.roomActivityEmpty) {
@@ -5036,8 +5252,9 @@ const renderRoomActivity = () => {
     elements.roomActivityEmpty.hidden = true;
   }
   events.forEach((event) => {
+    const isNew = newEventIds.has(event.id);
     elements.roomActivity.appendChild(
-      buildActivityItem(event, { showRoom: false }),
+      buildActivityItem(event, { showRoom: false, isNew }),
     );
   });
 };
@@ -5182,6 +5399,9 @@ const buildRoomFilterOptions = () => {
   return options;
 };
 
+const buildTaskCreateRoomOptions = () =>
+  buildRoomFilterOptions().filter((option) => option.value !== "all");
+
 const buildStatusFilterOptions = () => [
   { value: "all", label: "Alle Stati" },
   ...TASK_STATUSES.map((status) => ({
@@ -5268,6 +5488,21 @@ const renderTaskFilters = () => {
     elements.taskFilterSearch.value = state.taskFilters.query;
   }
   updateTaskTagFilterVisibility();
+};
+
+const renderTaskCreateForm = () => {
+  if (!elements.taskCreateRoom) return;
+  const currentValue = elements.taskCreateRoom.value;
+  const preferredValue =
+    currentValue ||
+    (state.taskFilters.roomId && state.taskFilters.roomId !== "all"
+      ? state.taskFilters.roomId
+      : state.activeRoomId || "none");
+  setSelectOptions(
+    elements.taskCreateRoom,
+    buildTaskCreateRoomOptions(),
+    preferredValue,
+  );
 };
 
 const applyTaskFilters = (tasks) => {
@@ -5465,7 +5700,7 @@ const buildTaskField = (labelText, input) => {
 const buildTagInput = (task) => {
   const input = document.createElement("input");
   input.type = "text";
-  input.placeholder = "material, genehmigung, handwerker";
+  input.placeholder = "material, geraete, genehmigung, handwerker";
   input.className = "task-text-input";
   input.value = Array.isArray(task.tags) ? task.tags.join(", ") : "";
   input.addEventListener("change", (event) => {
@@ -5498,6 +5733,52 @@ const buildDueDateInput = (task) => {
     renderTasksPanel();
   });
   return buildTaskField("Fällig bis", input);
+};
+
+const buildLinkInput = (task) => {
+  const input = document.createElement("input");
+  input.type = "url";
+  input.placeholder = "https://...";
+  input.className = "task-text-input";
+  input.value = task.link || "";
+  input.addEventListener("input", () => {
+    if (input.validationMessage) {
+      input.setCustomValidity("");
+    }
+  });
+  input.addEventListener("change", (event) => {
+    const raw = String(event.target.value || "").trim();
+    if (!raw) {
+      if (task.link) {
+        task.link = "";
+        task.updatedAt = new Date().toISOString();
+        updateTaskSearchIndex(task);
+        logTaskUpdate(task, { link: "" });
+        saveState();
+        renderTasksPanel();
+      }
+      event.target.setCustomValidity("");
+      return;
+    }
+    const normalized = normalizeTaskLink(raw);
+    if (!normalized) {
+      event.target.setCustomValidity(
+        "Bitte eine gültige URL mit http:// oder https:// eingeben.",
+      );
+      event.target.reportValidity();
+      event.target.value = task.link || "";
+      return;
+    }
+    event.target.setCustomValidity("");
+    if (task.link === normalized) return;
+    task.link = normalized;
+    task.updatedAt = new Date().toISOString();
+    updateTaskSearchIndex(task);
+    logTaskUpdate(task, { link: normalized });
+    saveState();
+    renderTasksPanel();
+  });
+  return buildTaskField("Link", input);
 };
 
 const buildMaterialsFields = (task) => {
@@ -6024,6 +6305,15 @@ const buildTaskItem = (
     due.textContent = `Fällig: ${formatShortDate(task.dueDate) || task.dueDate}`;
     meta.appendChild(due);
   }
+  if (task.link) {
+    const link = document.createElement("a");
+    link.className = "task-external-link";
+    link.href = task.link;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = "Link öffnen";
+    meta.appendChild(link);
+  }
   if (Array.isArray(task.dependencyIds) && task.dependencyIds.length) {
     const deps = document.createElement("span");
     deps.textContent = `Abhängigkeiten: ${task.dependencyIds.length}`;
@@ -6041,6 +6331,7 @@ const buildTaskItem = (
   if (showFields) {
     const fields = document.createElement("div");
     fields.className = "task-fields";
+    fields.appendChild(buildLinkInput(task));
     fields.appendChild(buildTagInput(task));
     fields.appendChild(buildDueDateInput(task));
     item.appendChild(fields);
@@ -6179,6 +6470,7 @@ const buildKanbanColumn = (status, tasks, taskMap) => {
 const renderTaskList = () => {
   if (!elements.taskList) return;
   renderTaskFilters();
+  renderTaskCreateForm();
   updateTaskViewButtons();
   renderTaskBulkAssigneeOptions();
   elements.taskList.innerHTML = "";
@@ -7757,6 +8049,35 @@ const requireActiveRoom = (message) => {
   if (state.activeRoomId) return true;
   window.alert(message || "Bitte zuerst einen Raum auswählen.");
   return false;
+};
+
+const handleTaskCreateSubmit = (event) => {
+  event.preventDefault();
+  if (!elements.taskCreateInput) return;
+  const rawValue = elements.taskCreateInput.value.trim();
+  if (!rawValue) {
+    return;
+  }
+  const parsed = parseTaskInput(rawValue);
+  if (!parsed.title) {
+    return;
+  }
+  const roomValue = elements.taskCreateRoom?.value || "none";
+  const roomId = roomValue === "none" ? null : roomValue;
+  const task = createTask({
+    title: parsed.title,
+    tags: parsed.tags || [],
+    roomId,
+  });
+  state.tasks.unshift(task);
+  logActivityEvent("task_created", {
+    taskId: task.id,
+    roomId: task.roomId,
+    metadata: { title: task.title },
+  });
+  elements.taskCreateInput.value = "";
+  saveState();
+  renderTasksPanel();
 };
 
 const handleTaskSubmit = (event) => {
@@ -9735,6 +10056,7 @@ const bindEvents = () => {
   }
 
   elements.taskForm?.addEventListener("submit", handleTaskSubmit);
+  elements.taskCreateForm?.addEventListener("submit", handleTaskCreateSubmit);
   elements.taskFilterRoom?.addEventListener("change", handleTaskFilterChange);
   elements.taskFilterStatus?.addEventListener("change", handleTaskFilterChange);
   elements.taskFilterAssignee?.addEventListener(
@@ -9785,6 +10107,10 @@ const bindEvents = () => {
     }
   });
   elements.helpButton?.addEventListener("click", openHelpModal);
+  elements.activityNotification?.addEventListener(
+    "click",
+    handleActivityNotificationClick,
+  );
   elements.helpModalClose?.addEventListener("click", closeHelpModal);
   elements.helpModal?.addEventListener("click", (event) => {
     if (event.target === elements.helpModal) {

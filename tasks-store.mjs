@@ -22,7 +22,7 @@ const TASK_STATUS_ALIASES = {
 const TASK_PRIORITIES = ["Low", "Med", "High"];
 const DEFAULT_TASK_STATUS = "Backlog";
 const DEFAULT_TASK_PRIORITY = "Med";
-const TASK_COST_KEYS = ["materials", "permits", "contractors"];
+const TASK_COST_KEYS = ["materials", "devices", "permits", "contractors"];
 
 const CONFIG_PATH = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -168,6 +168,19 @@ const normalizeAssignee = (value) => {
   if (value === null || value === undefined) return "";
   const raw = String(value || "").trim();
   return raw || "";
+};
+
+const normalizeTaskLink = (value) => {
+  if (value === null || value === undefined) return "";
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    if (!["http:", "https:"].includes(url.protocol)) return "";
+    return url.toString();
+  } catch {
+    return "";
+  }
 };
 
 const normalizeTaskTags = (tags) => {
@@ -328,6 +341,7 @@ const filterTasks = (tasks, filters) => {
       const haystack = [
         task.title,
         task.notes,
+        task.link,
         task.assignee,
         Array.isArray(task.tags) ? task.tags.join(" ") : "",
       ]
@@ -377,6 +391,9 @@ const applyTaskPatch = (task, patch) => {
   }
   if (Object.prototype.hasOwnProperty.call(patch, "notes")) {
     task.notes = typeof patch.notes === "string" ? patch.notes : "";
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "link")) {
+    task.link = normalizeTaskLink(patch.link);
   }
   if (Object.prototype.hasOwnProperty.call(patch, "startDate")) {
     task.startDate = normalizeDate(patch.startDate);
@@ -501,6 +518,7 @@ const handleTasksApi = async ({ method, urlPath, headers, body, query }) => {
       dueDate: normalizeDate(input.dueDate),
       priority: coercePriority(input.priority),
       notes: typeof input.notes === "string" ? input.notes : "",
+      link: normalizeTaskLink(input.link),
       costs: normalizeTaskCosts(input.costs),
       gmailThread: normalizeGmailThread(input.gmailThread),
       createdAt: timestamp,

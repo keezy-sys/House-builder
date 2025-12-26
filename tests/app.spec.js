@@ -153,6 +153,7 @@ test("saved views filtern Tasks nach Tags und Status", async ({ page }) => {
   await addTasks(page, [
     "Order tiles #materials",
     "Order paint #materials",
+    "Device delivery #geraete",
     "Permit submission #permit",
     "Contractor quote #contractor",
   ]);
@@ -161,6 +162,7 @@ test("saved views filtern Tasks nach Tags und Status", async ({ page }) => {
 
   const taskList = page.locator("#task-list");
   const paintTask = taskList.locator("[data-task-title='Order paint']");
+  const deviceTask = taskList.locator("[data-task-title='Device delivery']");
   await paintTask.locator("select[data-field='status']").selectOption("Done");
   await expect(paintTask).toHaveClass(/is-done/);
 
@@ -174,11 +176,21 @@ test("saved views filtern Tasks nach Tags und Status", async ({ page }) => {
   await expect(taskList.locator("[data-task-title='Order paint']")).toHaveCount(
     0,
   );
+  await expect(deviceTask).toHaveCount(0);
   await expect(
     taskList.locator("[data-task-title='Permit submission']"),
   ).toHaveCount(0);
   await expect(
     taskList.locator("[data-task-title='Contractor quote']"),
+  ).toHaveCount(0);
+
+  await page.locator("button[data-task-view='devices']").click();
+  await expect(deviceTask).toHaveCount(1);
+  await expect(taskList.locator("[data-task-title='Order tiles']")).toHaveCount(
+    0,
+  );
+  await expect(
+    taskList.locator("[data-task-title='Permit submission']"),
   ).toHaveCount(0);
 
   await page.locator("button[data-task-view='permits']").click();

@@ -883,7 +883,9 @@ svg {
   border-radius: 0.9rem;
   background: #fffaf4;
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
-  height: clamp(360px, 60vh, 620px);
+  grid-column: 1 / -1;
+  height: auto;
+  max-height: clamp(360px, 60vh, 620px);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 0.6rem;
@@ -1464,7 +1466,7 @@ button {
 
 .tasks-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
   align-items: start;
   margin-top: 0.8rem;
@@ -1486,9 +1488,10 @@ button {
 .task-board {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(240px, 1fr);
+  grid-auto-columns: minmax(200px, 260px);
   gap: 1rem;
   min-width: 100%;
+  min-height: 0;
   width: max-content;
   height: 100%;
 }
@@ -1536,7 +1539,8 @@ button {
   grid-template-rows: auto minmax(0, 1fr);
   gap: 0.6rem;
   height: 100%;
-  min-width: 220px;
+  min-width: 200px;
+  min-height: 0;
 }
 
 .kanban-column.is-dragover {
@@ -1573,6 +1577,8 @@ button {
   gap: 0.7rem;
   overflow-y: auto;
   min-height: 2.5rem;
+  max-height: 100%;
+  overscroll-behavior-y: contain;
 }
 
 .task-drag-handle {
@@ -1636,6 +1642,16 @@ button {
   color: #7d6956;
 }
 
+.task-external-link {
+  color: #9a4a2b;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.task-external-link:hover {
+  color: #c65a2e;
+}
+
 .task-tags {
   display: flex;
   flex-wrap: wrap;
@@ -1694,6 +1710,36 @@ button {
   font-size: 0.75rem;
   color: #7d6956;
   font-weight: 600;
+}
+
+.task-create {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 0.8rem;
+  grid-template-columns: minmax(220px, 2fr) minmax(160px, 1fr) auto;
+  align-items: end;
+}
+
+.task-create label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: #7d6956;
+}
+
+.task-create input,
+.task-create select {
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.6rem;
+  border: 1px solid #e4d4c0;
+  background: #fffaf4;
+  font-weight: 600;
+  color: #3b3127;
+}
+
+.task-create-hint {
+  margin-top: 0.4rem;
 }
 
 .task-select-toggle {
@@ -2258,6 +2304,42 @@ button {
   flex-wrap: wrap;
 }
 
+.activity-notification {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  padding: 0.35rem 0.65rem;
+  background: #fff0d6;
+  border: 1px solid #f1c792;
+  color: #9a4a2b;
+  font-size: 0.85rem;
+  font-weight: 600;
+  box-shadow: 0 8px 18px rgba(198, 90, 46, 0.14);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+
+.activity-notification:hover {
+  background: #ffe5bf;
+  box-shadow: 0 12px 20px rgba(198, 90, 46, 0.18);
+  transform: translateY(-1px);
+}
+
+.activity-notification-count {
+  min-width: 1.4rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: #c65a2e;
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.2;
+}
+
 .activity-list {
   list-style: none;
   padding: 0;
@@ -2274,6 +2356,29 @@ button {
   display: grid;
   gap: 0.4rem;
   border-left: 4px solid #e4d4c0;
+  transition:
+    background 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+.activity-item.is-new {
+  position: relative;
+  background: #fff5d1;
+  box-shadow:
+    0 0 0 1px #f3d39b,
+    0 12px 20px rgba(198, 90, 46, 0.12);
+}
+
+.activity-item.is-new::after {
+  content: "";
+  position: absolute;
+  top: 0.7rem;
+  right: 0.7rem;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: #c65a2e;
+  box-shadow: 0 0 0 4px rgba(198, 90, 46, 0.12);
 }
 
 .activity-item[data-category="task"] {
@@ -2952,6 +3057,7 @@ button {
 
   .tasks-layout .timeline-panel {
     height: auto;
+    max-height: none;
   }
 
   .activity-page {
@@ -3041,6 +3147,14 @@ button {
 
   .task-filters {
     grid-template-columns: 1fr;
+  }
+
+  .task-create {
+    grid-template-columns: 1fr;
+  }
+
+  .task-create button {
+    width: 100%;
   }
 
   .task-fields {

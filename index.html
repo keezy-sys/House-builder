@@ -101,6 +101,19 @@
           <span>Architekt-Ansicht</span>
         </label>
         <button
+          type="button"
+          id="activity-notification"
+          class="activity-notification"
+          hidden
+        >
+          <span>Neue Updates</span>
+          <span
+            id="activity-notification-count"
+            class="activity-notification-count"
+            >0</span
+          >
+        </button>
+        <button
           id="help-button"
           class="help-button"
           type="button"
@@ -329,7 +342,7 @@
               <input
                 type="text"
                 id="task-input"
-                placeholder="Aufgabe hinzufügen, z.B. Fliesen bestellen #material"
+                placeholder="Aufgabe hinzufügen, z.B. Fliesen bestellen #material #geraete"
               />
               <button type="submit" class="primary">Hinzufügen</button>
             </form>
@@ -487,6 +500,24 @@
                 Filter zurücksetzen
               </button>
             </div>
+            <form id="task-create-form" class="task-create">
+              <label>
+                <span>Aufgabe</span>
+                <input
+                  type="text"
+                  id="task-create-input"
+                  placeholder="Aufgabe hinzufügen, z.B. Fliesen bestellen #material"
+                />
+              </label>
+              <label>
+                <span>Raum</span>
+                <select id="task-create-room"></select>
+              </label>
+              <button type="submit" class="primary">Neue Aufgabe</button>
+            </form>
+            <p class="helper task-create-hint">
+              Hashtags werden als Tags übernommen.
+            </p>
             <div class="task-views">
               <span class="task-views-label">Ansichten</span>
               <div
@@ -509,6 +540,14 @@
                   aria-selected="false"
                 >
                   Material
+                </button>
+                <button
+                  class="segmented-option"
+                  type="button"
+                  data-task-view="devices"
+                  aria-selected="false"
+                >
+                  Geraete
                 </button>
                 <button
                   class="segmented-option"
@@ -761,7 +800,11 @@
       </aside>
     </main>
 
-    <section class="activity-page" aria-label="Aktivitätsfeed">
+    <section
+      id="activity-page"
+      class="activity-page"
+      aria-label="Aktivitätsfeed"
+    >
       <div class="activity-header">
         <div>
           <h2>Aktivitätsfeed</h2>
