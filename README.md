@@ -38,6 +38,7 @@ create policy "house_state update" on public.house_state
 4. **Auth konfigurieren**
    - In Supabase unter Auth → URL Configuration „Site URL“ und Redirect URLs (lokal + Netlify) setzen.
    - Wenn Email confirmations aktiv sind: SMTP/E-Mail Provider konfigurieren (sonst keine Bestätigungs-Mail) oder Email confirmations deaktivieren.
+   - Für Magic Links und Passwort-Reset ist ein E-Mail Provider + erlaubte Redirect-URL ebenfalls nötig.
 
 5. **Netlify deployen**
    - Build command: leer
@@ -51,6 +52,7 @@ create policy "house_state update" on public.house_state
 - Für **Wolfgang** und **Konstantin** je ein Konto mit E-Mail/Passwort über die UI erstellen.
 - Danach in Supabase unter Auth -> Providers -> Email die Selbstregistrierung deaktivieren (Enable Email Signup aus).
 - Neue Nutzer nur noch als Admin im Supabase Dashboard anlegen/einladen. Für spätere Öffnung der Registrierung den Toggle wieder aktivieren.
+- Magic Links sind auf bestehende Nutzer beschränkt.
 
 ## Lokal entwickeln
 

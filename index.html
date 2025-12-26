@@ -13,7 +13,7 @@
         <p class="helper">
           Bitte anmelden, um den Hausplan gemeinsam zu bearbeiten.
         </p>
-        <div class="auth-forms">
+        <div class="auth-forms" id="auth-forms">
           <form id="login-form" class="auth-form">
             <h3>Anmelden</h3>
             <label>
@@ -30,6 +30,14 @@
               />
             </label>
             <button class="primary" type="submit">Anmelden</button>
+            <div class="auth-secondary">
+              <button class="link-button" type="button" id="magic-link-btn">
+                Magic Link senden
+              </button>
+              <button class="link-button" type="button" id="reset-password-btn">
+                Passwort vergessen?
+              </button>
+            </div>
           </form>
           <div class="auth-divider"><span>oder</span></div>
           <form id="signup-form" class="auth-form">
@@ -54,6 +62,31 @@
             <button type="submit">Konto anlegen</button>
           </form>
         </div>
+        <div id="password-reset-panel" class="auth-recovery" hidden>
+          <h3>Passwort neu setzen</h3>
+          <p class="helper">Bitte ein neues Passwort festlegen.</p>
+          <form id="password-reset-form" class="auth-form">
+            <label>
+              Neues Passwort
+              <input
+                type="password"
+                name="password"
+                required
+                autocomplete="new-password"
+              />
+            </label>
+            <label>
+              Passwort bestätigen
+              <input
+                type="password"
+                name="passwordConfirm"
+                required
+                autocomplete="new-password"
+              />
+            </label>
+            <button class="primary" type="submit">Passwort ändern</button>
+          </form>
+        </div>
         <p id="auth-error" class="helper" role="alert"></p>
       </div>
     </div>
@@ -76,6 +109,14 @@
         >
           ?
         </button>
+        <div class="gmail-status" id="gmail-status" hidden>
+          <span class="gmail-status-label">Gmail</span>
+          <span id="gmail-status-text" class="gmail-status-text"
+            >Nicht verbunden</span
+          >
+          <button id="gmail-connect" type="button">Gmail verbinden</button>
+          <button id="gmail-disconnect" type="button">Trennen</button>
+        </div>
         <div class="auth-info" id="auth-info" hidden>
           <div class="auth-user">
             <span class="auth-label">Angemeldet als</span>
@@ -87,7 +128,7 @@
     </header>
 
     <main class="app">
-      <div class="mobile-bar" aria-label="Mobile Navigation">
+      <nav class="mobile-bar" aria-label="Mobile Navigation">
         <label class="mobile-room-picker">
           <span>Raum</span>
           <select id="mobile-room-select" aria-label="Raum auswählen"></select>
@@ -114,7 +155,7 @@
             Aufgaben
           </button>
         </div>
-      </div>
+      </nav>
       <section class="floorplan" aria-label="Grundriss">
         <div class="floorplan-header">
           <div class="floorplan-copy">
@@ -227,7 +268,18 @@
 
         <div class="view-stack is-active" id="room-view" data-architect-hidden>
           <section class="panel" id="room-panel">
-            <h2 id="room-title">Bitte wählen Sie einen Raum</h2>
+            <div class="room-title-row">
+              <h2 id="room-title">Bitte wählen Sie einen Raum</h2>
+              <button
+                id="room-chat-trigger"
+                class="chat-trigger"
+                type="button"
+                aria-label="ChatGPT Chat"
+                title="ChatGPT Chat"
+                aria-disabled="true"
+                disabled
+              ></button>
+            </div>
             <p id="room-subtitle">
               Klicken Sie auf einen Raum im Grundriss, um Details zu sehen.
             </p>
@@ -530,11 +582,13 @@
             </div>
             <div class="tasks-layout">
               <div class="tasks-board">
-                <section
-                  id="task-list"
-                  class="task-board"
-                  aria-label="Aufgaben nach Status"
-                ></section>
+                <div class="task-board-scroll">
+                  <section
+                    id="task-list"
+                    class="task-board"
+                    aria-label="Aufgaben nach Status"
+                  ></section>
+                </div>
                 <p id="tasks-empty" class="helper" hidden>
                   Keine Aufgaben für diese Filter.
                 </p>
@@ -745,9 +799,95 @@
             <div class="dependency-title">Abhängigkeiten</div>
             <div id="task-dependency-list" class="dependency-list"></div>
           </div>
+          <div class="task-gmail-panel">
+            <div class="task-gmail-header">
+              <div class="task-gmail-title">Gmail-Thread</div>
+              <button type="button" id="gmail-thread-refresh">
+                Aktualisieren
+              </button>
+            </div>
+            <p id="gmail-thread-status" class="helper" hidden></p>
+            <p id="gmail-thread-connect" class="helper" hidden>
+              Gmail verbinden, um Threads anzupinnen und Antworten zu senden.
+            </p>
+            <div class="task-gmail-inputs">
+              <input
+                type="text"
+                id="gmail-thread-input"
+                placeholder="Thread-URL oder ID"
+              />
+              <button type="button" id="gmail-thread-pin" class="primary">
+                Anheften
+              </button>
+              <button type="button" id="gmail-thread-clear">Lösen</button>
+            </div>
+            <div id="gmail-thread-view" class="gmail-thread-view" hidden>
+              <div id="gmail-thread-meta" class="gmail-thread-meta"></div>
+              <ul id="gmail-thread-messages" class="gmail-thread-messages"></ul>
+            </div>
+            <label class="gmail-reply">
+              <span>Antwort</span>
+              <textarea
+                id="gmail-reply-text"
+                rows="3"
+                placeholder="Antwort schreiben"
+              ></textarea>
+            </label>
+            <div class="gmail-reply-actions">
+              <button type="button" id="gmail-reply-send" class="primary">
+                Antwort senden
+              </button>
+              <span id="gmail-reply-status" class="helper"></span>
+            </div>
+          </div>
           <div class="modal-actions">
             <button type="button" id="task-modal-cancel">Abbrechen</button>
             <button type="submit" class="primary">Speichern</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="chat-modal" class="modal" hidden>
+      <div
+        class="modal-surface chat-modal-surface"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="chat-modal-title"
+      >
+        <div class="modal-header">
+          <div class="chat-modal-heading">
+            <h3 id="chat-modal-title">ChatGPT Chat</h3>
+            <p id="chat-modal-context" class="helper"></p>
+          </div>
+          <button type="button" id="chat-modal-close">Schließen</button>
+        </div>
+        <div class="chat-settings">
+          <label>
+            Modell
+            <select id="chat-model"></select>
+          </label>
+          <label>
+            Reasoning-Aufwand
+            <select id="chat-effort"></select>
+          </label>
+        </div>
+        <ul id="chat-thread" class="chat-thread"></ul>
+        <form id="chat-form" class="chat-form">
+          <label>
+            Rolle
+            <select id="chat-role"></select>
+          </label>
+          <label>
+            Nachricht
+            <textarea
+              id="chat-input"
+              rows="3"
+              placeholder="Nachricht eingeben"
+            ></textarea>
+          </label>
+          <div class="modal-actions">
+            <button type="submit" class="primary">Senden</button>
           </div>
         </form>
       </div>

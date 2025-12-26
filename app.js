@@ -133,6 +133,22 @@ const DEFAULT_TASK_FILTERS = {
   tag: "all",
   query: "",
 };
+const CHAT_MODELS = [
+  { value: "gpt-4.1-mini", label: "GPT-4.1 Mini" },
+  { value: "gpt-4.1", label: "GPT-4.1" },
+  { value: "gpt-4o-mini", label: "GPT-4o Mini" },
+];
+const CHAT_EFFORTS = [
+  { value: "low", label: "Niedrig" },
+  { value: "medium", label: "Mittel" },
+  { value: "high", label: "Hoch" },
+];
+const CHAT_ROLE_OPTIONS = [
+  { value: "user", label: "Ich" },
+  { value: "assistant", label: "ChatGPT" },
+];
+const DEFAULT_CHAT_MODEL = CHAT_MODELS[0].value;
+const DEFAULT_CHAT_EFFORT = "medium";
 
 const TASK_TAG_GROUPS = {
   materials: ["material"],
@@ -280,342 +296,369 @@ const applyOpeningDefaults = (openings) =>
     return normalized;
   });
 
-const buildDefaultFloorPlans = () => ({
-  ground: {
-    id: "ground",
-    name: "Erdgeschoss",
-    rooms: [
-      {
-        id: "ground-bedroom-left",
-        name: "Schlafzimmer",
-        x: 50,
-        y: 50,
-        width: 230,
-        height: 160,
-      },
-      {
-        id: "ground-living",
-        name: "Wohnzimmer",
-        x: 280,
-        y: 50,
-        width: 260,
-        height: 160,
-      },
-      {
-        id: "ground-bedroom-right",
-        name: "Schlafzimmer",
-        x: 540,
-        y: 50,
-        width: 190,
-        height: 230,
-      },
-      {
-        id: "ground-cellar",
-        name: "Keller",
-        x: 50,
-        y: 210,
-        width: 230,
-        height: 200,
-      },
-      {
-        id: "ground-kitchen",
-        name: "Küche",
-        x: 280,
-        y: 210,
-        width: 200,
-        height: 150,
-      },
-      {
-        id: "ground-bathroom",
-        name: "Bad",
-        x: 480,
-        y: 210,
-        width: 170,
-        height: 150,
-      },
-      {
-        id: "ground-hallway",
-        name: "Flur",
-        x: 280,
-        y: 360,
-        width: 330,
-        height: 90,
-      },
-      {
-        id: "ground-storage",
-        name: "Abstellschrank",
-        x: 610,
-        y: 360,
-        width: 120,
-        height: 90,
-      },
-    ],
-    openings: applyOpeningDefaults([
-      {
-        id: "ground-window-left",
-        type: "window",
-        roomId: "ground-bedroom-left",
-        label: "Fenster Schlafzimmer links (EG)",
-        x1: 80,
-        y1: 40,
-        x2: 220,
-        y2: 40,
-      },
-      {
-        id: "ground-window-living",
-        type: "window",
-        roomId: "ground-living",
-        label: "Fenster Wohnzimmer (EG)",
-        x1: 320,
-        y1: 40,
-        x2: 520,
-        y2: 40,
-      },
-      {
-        id: "ground-window-right",
-        type: "window",
-        roomId: "ground-bedroom-right",
-        label: "Fenster Schlafzimmer rechts (EG)",
-        x1: 580,
-        y1: 40,
-        x2: 710,
-        y2: 40,
-      },
-      {
-        id: "ground-door-living-hall",
-        type: "door",
-        roomId: "ground-living",
-        label: "Tür Wohnzimmer → Flur (EG)",
-        x1: 380,
-        y1: 210,
-        x2: 460,
-        y2: 210,
-      },
-      {
-        id: "ground-door-kitchen-hall",
-        type: "door",
-        roomId: "ground-kitchen",
-        label: "Tür Küche → Flur (EG)",
-        x1: 340,
-        y1: 360,
-        x2: 400,
-        y2: 360,
-      },
-      {
-        id: "ground-door-bathroom-hall",
-        type: "door",
-        roomId: "ground-bathroom",
-        label: "Tür Bad → Flur (EG)",
-        x1: 520,
-        y1: 360,
-        x2: 580,
-        y2: 360,
-      },
-      {
-        id: "ground-door-bedroom-right",
-        type: "door",
-        roomId: "ground-bedroom-right",
-        label: "Tür Schlafzimmer rechts (EG)",
-        x1: 540,
-        y1: 190,
-        x2: 540,
-        y2: 220,
-      },
-      {
-        id: "ground-door-cellar",
-        type: "door",
-        roomId: "ground-cellar",
-        label: "Tür Keller (EG)",
-        x1: 250,
-        y1: 260,
-        x2: 280,
-        y2: 260,
-      },
-    ]),
-  },
-  upper: {
-    id: "upper",
-    name: "Obergeschoss",
-    rooms: [
-      {
-        id: "upper-living",
-        name: "Wohnzimmer",
-        x: 50,
-        y: 50,
-        width: 310,
-        height: 190,
-      },
-      {
-        id: "upper-bedroom-left",
-        name: "Schlafzimmer",
-        x: 360,
-        y: 50,
-        width: 200,
-        height: 120,
-      },
-      {
-        id: "upper-bedroom-right",
-        name: "Schlafzimmer",
-        x: 560,
-        y: 50,
-        width: 170,
-        height: 400,
-      },
-      {
-        id: "upper-cellar",
-        name: "Arbeitszimmer",
-        x: 50,
-        y: 240,
-        width: 180,
-        height: 210,
-      },
-      {
-        id: "upper-kitchen",
-        name: "Küche",
-        x: 230,
-        y: 240,
-        width: 130,
-        height: 210,
-      },
-      {
-        id: "upper-hallway",
-        name: "Flur",
-        x: 360,
-        y: 170,
-        width: 200,
-        height: 140,
-      },
-      {
-        id: "upper-storage",
-        name: "Treppe",
-        x: 360,
-        y: 310,
-        width: 90,
-        height: 140,
-      },
-      {
-        id: "upper-bathroom",
-        name: "Bad",
-        x: 450,
-        y: 310,
-        width: 110,
-        height: 140,
-      },
-    ],
-    openings: applyOpeningDefaults([
-      {
-        id: "upper-window-living",
-        type: "window",
-        roomId: "upper-living",
-        label: "Fenster Wohnzimmer (OG)",
-        x1: 120,
-        y1: 40,
-        x2: 280,
-        y2: 40,
-      },
-      {
-        id: "upper-window-bedroom",
-        type: "window",
-        roomId: "upper-bedroom-left",
-        label: "Fenster Schlafzimmer (OG)",
-        x1: 400,
-        y1: 40,
-        x2: 520,
-        y2: 40,
-      },
-      {
-        id: "upper-window-office",
-        type: "window",
-        roomId: "upper-cellar",
-        label: "Fenster Arbeitszimmer (OG)",
-        x1: 40,
-        y1: 300,
-        x2: 40,
-        y2: 360,
-      },
-      {
-        id: "upper-door-living-hall",
-        type: "door",
-        roomId: "upper-living",
-        label: "Tür Wohnzimmer → Flur (OG)",
-        x1: 360,
-        y1: 200,
-        x2: 360,
-        y2: 230,
-      },
-      {
-        id: "upper-door-bedroom-hall",
-        type: "door",
-        roomId: "upper-bedroom-left",
-        label: "Tür Schlafzimmer → Flur (OG)",
-        x1: 430,
-        y1: 170,
-        x2: 470,
-        y2: 170,
-      },
-      {
-        id: "upper-door-bathroom-hall",
-        type: "door",
-        roomId: "upper-bathroom",
-        label: "Tür Bad → Flur (OG)",
-        x1: 490,
-        y1: 310,
-        x2: 530,
-        y2: 310,
-      },
-      {
-        id: "upper-door-bedroom-right",
-        type: "door",
-        roomId: "upper-bedroom-right",
-        label: "Tür Schlafzimmer rechts (OG)",
-        x1: 560,
-        y1: 230,
-        x2: 560,
-        y2: 260,
-      },
-      {
-        id: "upper-door-stairs-hall",
-        type: "door",
-        roomId: "upper-storage",
-        label: "Tür Treppe → Flur (OG)",
-        x1: 380,
-        y1: 310,
-        x2: 420,
-        y2: 310,
-      },
-      {
-        id: "upper-door-kitchen-stairs",
-        type: "door",
-        roomId: "upper-kitchen",
-        label: "Tür Küche → Treppe (OG)",
-        x1: 360,
-        y1: 340,
-        x2: 360,
-        y2: 370,
-      },
-      {
-        id: "upper-door-office-living",
-        type: "door",
-        roomId: "upper-cellar",
-        label: "Tür Arbeitszimmer → Wohnzimmer (OG)",
-        x1: 110,
-        y1: 240,
-        x2: 150,
-        y2: 240,
-      },
-      {
-        id: "upper-door-bedroom-balcony",
-        type: "door",
-        roomId: "upper-bedroom-right",
-        label: "Tür Schlafzimmer rechts → Balkon (OG)",
-        x1: 620,
-        y1: 40,
-        x2: 680,
-        y2: 40,
-      },
-    ]),
-  },
-});
+const ensureExteriorRooms = (floorPlans) => {
+  if (!floorPlans || typeof floorPlans !== "object") return floorPlans;
+  Object.entries(EXTERIOR_ROOMS).forEach(([floorId, exteriorRooms]) => {
+    const floor = floorPlans[floorId];
+    if (!floor || !Array.isArray(floor.rooms)) return;
+    exteriorRooms.forEach((exteriorRoom) => {
+      const existing = floor.rooms.find((room) => room.id === exteriorRoom.id);
+      if (existing) {
+        existing.name = exteriorRoom.name || existing.name;
+        existing.exteriorType = exteriorRoom.exteriorType;
+        existing.isExterior = true;
+        existing.x = exteriorRoom.x;
+        existing.y = exteriorRoom.y;
+        existing.width = exteriorRoom.width;
+        existing.height = exteriorRoom.height;
+        return;
+      }
+      floor.rooms.push({
+        ...exteriorRoom,
+        isExterior: true,
+      });
+    });
+  });
+  return floorPlans;
+};
+
+const buildDefaultFloorPlans = () =>
+  ensureExteriorRooms({
+    ground: {
+      id: "ground",
+      name: "Erdgeschoss",
+      rooms: [
+        {
+          id: "ground-bedroom-left",
+          name: "Schlafzimmer",
+          x: 50,
+          y: 50,
+          width: 230,
+          height: 160,
+        },
+        {
+          id: "ground-living",
+          name: "Wohnzimmer",
+          x: 280,
+          y: 50,
+          width: 260,
+          height: 160,
+        },
+        {
+          id: "ground-bedroom-right",
+          name: "Schlafzimmer",
+          x: 540,
+          y: 50,
+          width: 190,
+          height: 230,
+        },
+        {
+          id: "ground-cellar",
+          name: "Keller",
+          x: 50,
+          y: 210,
+          width: 230,
+          height: 200,
+        },
+        {
+          id: "ground-kitchen",
+          name: "Küche",
+          x: 280,
+          y: 210,
+          width: 200,
+          height: 150,
+        },
+        {
+          id: "ground-bathroom",
+          name: "Bad",
+          x: 480,
+          y: 210,
+          width: 170,
+          height: 150,
+        },
+        {
+          id: "ground-hallway",
+          name: "Flur",
+          x: 280,
+          y: 360,
+          width: 330,
+          height: 90,
+        },
+        {
+          id: "ground-storage",
+          name: "Abstellschrank",
+          x: 610,
+          y: 360,
+          width: 120,
+          height: 90,
+        },
+      ],
+      openings: applyOpeningDefaults([
+        {
+          id: "ground-window-left",
+          type: "window",
+          roomId: "ground-bedroom-left",
+          label: "Fenster Schlafzimmer links (EG)",
+          x1: 80,
+          y1: 40,
+          x2: 220,
+          y2: 40,
+        },
+        {
+          id: "ground-window-living",
+          type: "window",
+          roomId: "ground-living",
+          label: "Fenster Wohnzimmer (EG)",
+          x1: 320,
+          y1: 40,
+          x2: 520,
+          y2: 40,
+        },
+        {
+          id: "ground-window-right",
+          type: "window",
+          roomId: "ground-bedroom-right",
+          label: "Fenster Schlafzimmer rechts (EG)",
+          x1: 580,
+          y1: 40,
+          x2: 710,
+          y2: 40,
+        },
+        {
+          id: "ground-door-living-hall",
+          type: "door",
+          roomId: "ground-living",
+          label: "Tür Wohnzimmer → Flur (EG)",
+          x1: 380,
+          y1: 210,
+          x2: 460,
+          y2: 210,
+        },
+        {
+          id: "ground-door-kitchen-hall",
+          type: "door",
+          roomId: "ground-kitchen",
+          label: "Tür Küche → Flur (EG)",
+          x1: 340,
+          y1: 360,
+          x2: 400,
+          y2: 360,
+        },
+        {
+          id: "ground-door-bathroom-hall",
+          type: "door",
+          roomId: "ground-bathroom",
+          label: "Tür Bad → Flur (EG)",
+          x1: 520,
+          y1: 360,
+          x2: 580,
+          y2: 360,
+        },
+        {
+          id: "ground-door-bedroom-right",
+          type: "door",
+          roomId: "ground-bedroom-right",
+          label: "Tür Schlafzimmer rechts (EG)",
+          x1: 540,
+          y1: 190,
+          x2: 540,
+          y2: 220,
+        },
+        {
+          id: "ground-door-cellar",
+          type: "door",
+          roomId: "ground-cellar",
+          label: "Tür Keller (EG)",
+          x1: 250,
+          y1: 260,
+          x2: 280,
+          y2: 260,
+        },
+      ]),
+    },
+    upper: {
+      id: "upper",
+      name: "Obergeschoss",
+      rooms: [
+        {
+          id: "upper-living",
+          name: "Wohnzimmer",
+          x: 50,
+          y: 50,
+          width: 310,
+          height: 190,
+        },
+        {
+          id: "upper-bedroom-left",
+          name: "Schlafzimmer",
+          x: 360,
+          y: 50,
+          width: 200,
+          height: 120,
+        },
+        {
+          id: "upper-bedroom-right",
+          name: "Schlafzimmer",
+          x: 560,
+          y: 50,
+          width: 170,
+          height: 400,
+        },
+        {
+          id: "upper-cellar",
+          name: "Arbeitszimmer",
+          x: 50,
+          y: 240,
+          width: 180,
+          height: 210,
+        },
+        {
+          id: "upper-kitchen",
+          name: "Küche",
+          x: 230,
+          y: 240,
+          width: 130,
+          height: 210,
+        },
+        {
+          id: "upper-hallway",
+          name: "Flur",
+          x: 360,
+          y: 170,
+          width: 200,
+          height: 140,
+        },
+        {
+          id: "upper-storage",
+          name: "Treppe",
+          x: 360,
+          y: 310,
+          width: 90,
+          height: 140,
+        },
+        {
+          id: "upper-bathroom",
+          name: "Bad",
+          x: 450,
+          y: 310,
+          width: 110,
+          height: 140,
+        },
+      ],
+      openings: applyOpeningDefaults([
+        {
+          id: "upper-window-living",
+          type: "window",
+          roomId: "upper-living",
+          label: "Fenster Wohnzimmer (OG)",
+          x1: 120,
+          y1: 40,
+          x2: 280,
+          y2: 40,
+        },
+        {
+          id: "upper-window-bedroom",
+          type: "window",
+          roomId: "upper-bedroom-left",
+          label: "Fenster Schlafzimmer (OG)",
+          x1: 400,
+          y1: 40,
+          x2: 520,
+          y2: 40,
+        },
+        {
+          id: "upper-window-office",
+          type: "window",
+          roomId: "upper-cellar",
+          label: "Fenster Arbeitszimmer (OG)",
+          x1: 40,
+          y1: 300,
+          x2: 40,
+          y2: 360,
+        },
+        {
+          id: "upper-door-living-hall",
+          type: "door",
+          roomId: "upper-living",
+          label: "Tür Wohnzimmer → Flur (OG)",
+          x1: 360,
+          y1: 200,
+          x2: 360,
+          y2: 230,
+        },
+        {
+          id: "upper-door-bedroom-hall",
+          type: "door",
+          roomId: "upper-bedroom-left",
+          label: "Tür Schlafzimmer → Flur (OG)",
+          x1: 430,
+          y1: 170,
+          x2: 470,
+          y2: 170,
+        },
+        {
+          id: "upper-door-bathroom-hall",
+          type: "door",
+          roomId: "upper-bathroom",
+          label: "Tür Bad → Flur (OG)",
+          x1: 490,
+          y1: 310,
+          x2: 530,
+          y2: 310,
+        },
+        {
+          id: "upper-door-bedroom-right",
+          type: "door",
+          roomId: "upper-bedroom-right",
+          label: "Tür Schlafzimmer rechts (OG)",
+          x1: 560,
+          y1: 230,
+          x2: 560,
+          y2: 260,
+        },
+        {
+          id: "upper-door-stairs-hall",
+          type: "door",
+          roomId: "upper-storage",
+          label: "Tür Treppe → Flur (OG)",
+          x1: 380,
+          y1: 310,
+          x2: 420,
+          y2: 310,
+        },
+        {
+          id: "upper-door-kitchen-stairs",
+          type: "door",
+          roomId: "upper-kitchen",
+          label: "Tür Küche → Treppe (OG)",
+          x1: 360,
+          y1: 340,
+          x2: 360,
+          y2: 370,
+        },
+        {
+          id: "upper-door-office-living",
+          type: "door",
+          roomId: "upper-cellar",
+          label: "Tür Arbeitszimmer → Wohnzimmer (OG)",
+          x1: 110,
+          y1: 240,
+          x2: 150,
+          y2: 240,
+        },
+        {
+          id: "upper-door-bedroom-balcony",
+          type: "door",
+          roomId: "upper-bedroom-right",
+          label: "Tür Schlafzimmer rechts → Balkon (OG)",
+          x1: 620,
+          y1: 40,
+          x2: 680,
+          y2: 40,
+        },
+      ]),
+    },
+  });
 
 const SHARED_STATE_TABLE = "house_state";
 const SHARED_STATE_ID = "default";
@@ -645,6 +688,7 @@ const authState = {
   session: null,
   user: null,
   displayName: "",
+  isRecovery: false,
 };
 
 const syncState = {
@@ -652,6 +696,16 @@ const syncState = {
   lastSavedAt: 0,
   applyingRemote: false,
   subscription: null,
+};
+
+const gmailState = {
+  connected: false,
+  email: "",
+  threadId: null,
+  thread: null,
+  loading: false,
+  threadLoading: false,
+  error: "",
 };
 
 const isLocalHost = ["localhost", "127.0.0.1"].includes(
@@ -688,6 +742,14 @@ const imageModalState = {
   roomId: null,
   imageId: null,
   baseVersionId: null,
+  isOpen: false,
+};
+
+const chatModalState = {
+  scope: null,
+  roomId: null,
+  taskId: null,
+  commentId: null,
   isOpen: false,
 };
 
@@ -757,6 +819,7 @@ const elements = {
   mobileRoomSelect: document.getElementById("mobile-room-select"),
   roomTitle: document.getElementById("room-title"),
   roomSubtitle: document.getElementById("room-subtitle"),
+  roomChatTrigger: document.getElementById("room-chat-trigger"),
   roomTabButtons: Array.from(document.querySelectorAll("[data-room-tab]")),
   roomTabPanels: Array.from(document.querySelectorAll("[data-room-panel]")),
   roomView: document.getElementById("room-view"),
@@ -875,25 +938,59 @@ const elements = {
   taskStartDate: document.getElementById("task-start-date"),
   taskEndDate: document.getElementById("task-end-date"),
   taskDependencyList: document.getElementById("task-dependency-list"),
+  gmailThreadStatus: document.getElementById("gmail-thread-status"),
+  gmailThreadConnectHint: document.getElementById("gmail-thread-connect"),
+  gmailThreadInput: document.getElementById("gmail-thread-input"),
+  gmailThreadPinBtn: document.getElementById("gmail-thread-pin"),
+  gmailThreadClearBtn: document.getElementById("gmail-thread-clear"),
+  gmailThreadRefreshBtn: document.getElementById("gmail-thread-refresh"),
+  gmailThreadView: document.getElementById("gmail-thread-view"),
+  gmailThreadMeta: document.getElementById("gmail-thread-meta"),
+  gmailThreadMessages: document.getElementById("gmail-thread-messages"),
+  gmailReplyText: document.getElementById("gmail-reply-text"),
+  gmailReplySend: document.getElementById("gmail-reply-send"),
+  gmailReplyStatus: document.getElementById("gmail-reply-status"),
+  chatModal: document.getElementById("chat-modal"),
+  chatModalClose: document.getElementById("chat-modal-close"),
+  chatModalTitle: document.getElementById("chat-modal-title"),
+  chatModalContext: document.getElementById("chat-modal-context"),
+  chatModelSelect: document.getElementById("chat-model"),
+  chatEffortSelect: document.getElementById("chat-effort"),
+  chatRoleSelect: document.getElementById("chat-role"),
+  chatThread: document.getElementById("chat-thread"),
+  chatForm: document.getElementById("chat-form"),
+  chatInput: document.getElementById("chat-input"),
   activityFeed: document.getElementById("activity-feed"),
   activityEmpty: document.getElementById("activity-empty"),
   authScreen: document.getElementById("auth-screen"),
+  authForms: document.getElementById("auth-forms"),
   loginForm: document.getElementById("login-form"),
   signupForm: document.getElementById("signup-form"),
   authError: document.getElementById("auth-error"),
   authInfo: document.getElementById("auth-info"),
   authUserName: document.getElementById("auth-user-name"),
+  gmailStatus: document.getElementById("gmail-status"),
+  gmailStatusText: document.getElementById("gmail-status-text"),
+  gmailConnectBtn: document.getElementById("gmail-connect"),
+  gmailDisconnectBtn: document.getElementById("gmail-disconnect"),
+  magicLinkBtn: document.getElementById("magic-link-btn"),
+  resetPasswordBtn: document.getElementById("reset-password-btn"),
+  passwordResetPanel: document.getElementById("password-reset-panel"),
+  passwordResetForm: document.getElementById("password-reset-form"),
   signOutBtn: document.getElementById("sign-out"),
 };
 
 const storageKey = "house-builder-state";
 const apiKeyStorageKey = "house-builder-image-api-key";
+const gmailOAuthStateKey = "house-builder-gmail-oauth-state";
+const gmailOAuthCodeKey = "house-builder-gmail-oauth-code";
 
 const defaultRoomData = () => ({
   checklist: [],
   images: [],
   comments: [],
   decisions: [],
+  chat: null,
   scene: null,
 });
 
@@ -908,6 +1005,10 @@ const createDecisionId = () =>
 
 const createCommentId = () =>
   `comment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const createChatThreadId = () =>
+  `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const createChatMessageId = () =>
+  `chatmsg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const createRoomId = (floorId) =>
   `room-${floorId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const createOpeningId = () =>
@@ -982,6 +1083,123 @@ const normalizeTaskCosts = (costs) => {
   }, {});
 };
 
+const normalizeGmailThread = (thread) => {
+  if (!thread || typeof thread !== "object") return null;
+  const id =
+    typeof thread.id === "string"
+      ? thread.id.trim()
+      : typeof thread.threadId === "string"
+        ? thread.threadId.trim()
+        : "";
+  if (!id) return null;
+  const subject =
+    typeof thread.subject === "string" ? thread.subject.trim() : "";
+  const snippet =
+    typeof thread.snippet === "string" ? thread.snippet.trim() : "";
+  const lastMessageAt =
+    typeof thread.lastMessageAt === "string" && thread.lastMessageAt.trim()
+      ? thread.lastMessageAt.trim()
+      : null;
+  const ownerId =
+    typeof thread.ownerId === "string" && thread.ownerId.trim()
+      ? thread.ownerId.trim()
+      : null;
+  const ownerEmail =
+    typeof thread.ownerEmail === "string" && thread.ownerEmail.trim()
+      ? thread.ownerEmail.trim()
+      : null;
+  return {
+    id,
+    subject,
+    snippet,
+    lastMessageAt,
+    ownerId,
+    ownerEmail,
+  };
+};
+
+const normalizeChatRole = (value) =>
+  value === "assistant" || value === "user" ? value : "user";
+
+const normalizeChatMessage = (message) => {
+  if (!message || typeof message !== "object") return null;
+  const text = typeof message.text === "string" ? message.text.trim() : "";
+  if (!text) return null;
+  const createdAt =
+    typeof message.createdAt === "string" && message.createdAt.trim()
+      ? message.createdAt.trim()
+      : new Date().toISOString();
+  return {
+    id:
+      typeof message.id === "string" && message.id.trim()
+        ? message.id.trim()
+        : createChatMessageId(),
+    role: normalizeChatRole(message.role),
+    text,
+    createdAt,
+    userId:
+      typeof message.userId === "string" && message.userId.trim()
+        ? message.userId.trim()
+        : null,
+    userName:
+      typeof message.userName === "string" ? message.userName.trim() : "",
+    userEmail:
+      typeof message.userEmail === "string" ? message.userEmail.trim() : "",
+  };
+};
+
+const normalizeChatMessages = (messages) => {
+  if (!Array.isArray(messages)) return [];
+  return messages.map(normalizeChatMessage).filter(Boolean);
+};
+
+const normalizeChatThread = (thread) => {
+  if (!thread || typeof thread !== "object") return null;
+  const model =
+    typeof thread.model === "string" && thread.model.trim()
+      ? thread.model.trim()
+      : "";
+  const effort =
+    typeof thread.effort === "string" && thread.effort.trim()
+      ? thread.effort.trim()
+      : "";
+  const createdAt =
+    typeof thread.createdAt === "string" && thread.createdAt.trim()
+      ? thread.createdAt.trim()
+      : new Date().toISOString();
+  const updatedAt =
+    typeof thread.updatedAt === "string" && thread.updatedAt.trim()
+      ? thread.updatedAt.trim()
+      : createdAt;
+  return {
+    id:
+      typeof thread.id === "string" && thread.id.trim()
+        ? thread.id.trim()
+        : createChatThreadId(),
+    model: CHAT_MODELS.some((item) => item.value === model)
+      ? model
+      : DEFAULT_CHAT_MODEL,
+    effort: CHAT_EFFORTS.some((item) => item.value === effort)
+      ? effort
+      : DEFAULT_CHAT_EFFORT,
+    messages: normalizeChatMessages(thread.messages),
+    createdAt,
+    updatedAt,
+  };
+};
+
+const buildChatThread = () => {
+  const timestamp = new Date().toISOString();
+  return {
+    id: createChatThreadId(),
+    model: DEFAULT_CHAT_MODEL,
+    effort: DEFAULT_CHAT_EFFORT,
+    messages: [],
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+};
+
 const buildTaskSearchIndex = (task) => {
   const parts = [
     task.title,
@@ -989,6 +1207,7 @@ const buildTaskSearchIndex = (task) => {
     task.assignee,
     Array.isArray(task.tags) ? task.tags.join(" ") : "",
     task.materials?.vendor,
+    task.gmailThread?.subject,
   ];
   return parts
     .map((part) => String(part || "").trim())
@@ -1080,6 +1299,8 @@ const normalizeTask = (task, fallbackTitle) => {
     costs: normalizeTaskCosts(task.costs),
     priority: normalizeTaskPriority(task.priority),
     notes: typeof task.notes === "string" ? task.notes : "",
+    gmailThread: normalizeGmailThread(task.gmailThread),
+    chat: normalizeChatThread(task.chat),
     createdAt,
     updatedAt,
   };
@@ -1130,6 +1351,7 @@ const createTask = ({
   costs = null,
   priority = DEFAULT_TASK_PRIORITY,
   notes = "",
+  gmailThread = null,
 } = {}) => {
   const timestamp = new Date().toISOString();
   const task = {
@@ -1151,6 +1373,8 @@ const createTask = ({
       ? priority
       : DEFAULT_TASK_PRIORITY,
     notes: notes || "",
+    gmailThread: normalizeGmailThread(gmailThread),
+    chat: null,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -1266,6 +1490,7 @@ const normalizeComments = (comments) => {
       if (!comment.resolved && comment.resolvedAt) {
         comment.resolvedAt = null;
       }
+      comment.chat = normalizeChatThread(comment.chat);
       return comment;
     })
     .filter(Boolean);
@@ -1424,7 +1649,7 @@ const loadFloorPlans = (payloadFloorPlans) => {
   if (isLegacyUpperLayout(floorPlans.upper)) {
     floorPlans.upper = fallback.upper;
   }
-  return floorPlans;
+  return ensureExteriorRooms(floorPlans);
 };
 
 const normalizeOpenings = (floorPlans) => {
@@ -1453,6 +1678,7 @@ const ensureRoomData = (roomId) => {
   if (!Array.isArray(roomData.decisions)) roomData.decisions = [];
   roomData.comments = normalizeComments(roomData.comments);
   roomData.decisions = normalizeDecisions(roomData.decisions);
+  roomData.chat = normalizeChatThread(roomData.chat);
   if (roomData.scene === undefined) roomData.scene = null;
   return roomData;
 };
@@ -1576,6 +1802,14 @@ const formatWeekLabel = (date) =>
 
 const getActiveFloor = () =>
   state.floorPlans[state.activeFloorId] || state.floorPlans.ground;
+
+const isExteriorRoom = (room) => room?.isExterior === true;
+
+const getInteriorRooms = (floor) =>
+  floor?.rooms?.filter((room) => !isExteriorRoom(room)) ?? [];
+
+const getExteriorRooms = (floor) =>
+  floor?.rooms?.filter((room) => isExteriorRoom(room)) ?? [];
 
 const findRoomById = (roomId) => {
   for (const floor of Object.values(state.floorPlans)) {
@@ -1826,9 +2060,10 @@ const getClosestWallForPointInFloor = (
   minSpan,
   preferredRoomId = null,
 ) => {
-  if (!floor || !Array.isArray(floor.rooms)) return null;
+  const rooms = getInteriorRooms(floor);
+  if (!rooms.length) return null;
   let best = null;
-  floor.rooms.forEach((room) => {
+  rooms.forEach((room) => {
     const walls = getRoomWalls(room);
     if (!walls.length) return;
     const viableWalls = walls.filter(
@@ -1946,7 +2181,7 @@ const getWallSelectionData = (selection) => {
   if (!selection || selection.elementType !== "wall") return null;
   const floor = state.floorPlans[selection.floorId] || getActiveFloor();
   const room = floor.rooms.find((item) => item.id === selection.roomId);
-  if (!room) return null;
+  if (!room || isExteriorRoom(room)) return null;
   const wall = getWallForRoomSide(room, selection.wallSide);
   if (!wall) return null;
   const wallMeta = getWallMeta(wall);
@@ -1965,6 +2200,7 @@ const getOpeningSelectionData = (selection) => {
   );
   if (!opening) return null;
   const room = floor.rooms.find((item) => item.id === opening.roomId);
+  if (!room || isExteriorRoom(room)) return null;
   const meta = getOpeningMeta(opening);
   const wallSide = resolveOpeningWallSide(opening, room, meta);
   const bounds = getOpeningBoundsForWall(room, wallSide, meta.axis);
@@ -1991,7 +2227,7 @@ const getOpeningSelectionData = (selection) => {
 
 const getRoomsSharingWall = (floor, wallMeta) => {
   const matches = [];
-  floor.rooms.forEach((room) => {
+  getInteriorRooms(floor).forEach((room) => {
     const edges = [
       {
         edge: "left",
@@ -2150,12 +2386,35 @@ const formatAuthError = (error) => {
   if (normalized.includes("redirect") && normalized.includes("not allowed")) {
     return "Redirect-URL nicht erlaubt. In Supabase Auth → URL Configuration diese Domain erlauben.";
   }
+  if (normalized.includes("user") && normalized.includes("not found")) {
+    return "Kein Konto mit dieser E-Mail gefunden.";
+  }
   return message;
+};
+
+const getAuthRedirectUrl = () => {
+  const url = new URL(window.location.href);
+  url.search = "";
+  url.hash = "";
+  return url.toString();
+};
+
+const hasRecoveryParam = () => {
+  const searchParams = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams(
+    window.location.hash.replace(/^#/, ""),
+  );
+  return (
+    searchParams.get("type") === "recovery" ||
+    hashParams.get("type") === "recovery"
+  );
 };
 
 const getActivityActor = () =>
   authState.displayName ||
   (authState.user ? getDisplayName(authState.user) : "Unbekannt");
+
+const getAuthToken = () => authState.session?.access_token || "";
 
 const logActivityEvent = (
   type,
@@ -2184,12 +2443,14 @@ const logActivityEvent = (
 };
 
 const setAuthFormsEnabled = (isEnabled) => {
-  [elements.loginForm, elements.signupForm].forEach((form) => {
-    if (!form) return;
-    form.querySelectorAll("input, button").forEach((input) => {
-      input.disabled = !isEnabled;
-    });
-  });
+  [elements.loginForm, elements.signupForm, elements.passwordResetForm].forEach(
+    (form) => {
+      if (!form) return;
+      form.querySelectorAll("input, button").forEach((input) => {
+        input.disabled = !isEnabled;
+      });
+    },
+  );
 };
 
 const setAuthScreenVisible = (isVisible) => {
@@ -2200,13 +2461,21 @@ const setAuthScreenVisible = (isVisible) => {
 
 const updateAuthUI = () => {
   const isAuthed = Boolean(authState.user);
-  setAuthScreenVisible(!isAuthed);
+  const isRecovery = Boolean(authState.isRecovery);
+  setAuthScreenVisible(!isAuthed || isRecovery);
+  if (elements.authForms) {
+    elements.authForms.hidden = isRecovery;
+  }
+  if (elements.passwordResetPanel) {
+    elements.passwordResetPanel.hidden = !isRecovery;
+  }
   if (elements.authInfo) {
-    elements.authInfo.hidden = !isAuthed;
+    elements.authInfo.hidden = !isAuthed || isRecovery;
   }
   if (elements.authUserName) {
-    elements.authUserName.textContent = isAuthed ? authState.displayName : "";
-    if (isAuthed) {
+    elements.authUserName.textContent =
+      isAuthed && !isRecovery ? authState.displayName : "";
+    if (isAuthed && !isRecovery) {
       elements.authUserName.classList.add("user-name");
       applyUserColor(elements.authUserName, {
         id: authState.user?.id,
@@ -2216,6 +2485,220 @@ const updateAuthUI = () => {
     } else {
       elements.authUserName.classList.remove("user-name");
     }
+  }
+};
+
+const readJson = async (response) => {
+  try {
+    return await response.json();
+  } catch {
+    return {};
+  }
+};
+
+const createGmailOAuthState = () => {
+  if (window.crypto?.getRandomValues) {
+    const bytes = new Uint8Array(16);
+    window.crypto.getRandomValues(bytes);
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
+
+const setGmailThreadStatus = (message, isError = false) => {
+  if (!elements.gmailThreadStatus) return;
+  elements.gmailThreadStatus.textContent = message || "";
+  elements.gmailThreadStatus.classList.toggle(
+    "error",
+    Boolean(message && isError),
+  );
+  elements.gmailThreadStatus.hidden = !message;
+};
+
+const setGmailReplyStatus = (message, isError = false) => {
+  if (!elements.gmailReplyStatus) return;
+  elements.gmailReplyStatus.textContent = message || "";
+  elements.gmailReplyStatus.classList.toggle(
+    "error",
+    Boolean(message && isError),
+  );
+  elements.gmailReplyStatus.hidden = !message;
+};
+
+const updateGmailHeaderUI = () => {
+  if (!elements.gmailStatus) return;
+  const isAuthed = Boolean(authState.user) && !authState.isRecovery;
+  elements.gmailStatus.hidden = !isAuthed;
+  if (!isAuthed) return;
+  const connected = gmailState.connected;
+  if (elements.gmailStatusText) {
+    elements.gmailStatusText.textContent = connected
+      ? `Verbunden: ${gmailState.email || "Gmail"}`
+      : "Nicht verbunden";
+  }
+  if (elements.gmailConnectBtn) {
+    elements.gmailConnectBtn.hidden = connected;
+  }
+  if (elements.gmailDisconnectBtn) {
+    elements.gmailDisconnectBtn.hidden = !connected;
+  }
+};
+
+const captureGmailOAuthParams = () => {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code");
+  const stateParam = params.get("state");
+  const error = params.get("error");
+  if (!code && !error) return;
+
+  if (error) {
+    gmailState.error = "Gmail-Verbindung abgebrochen.";
+    sessionStorage.removeItem(gmailOAuthCodeKey);
+  } else if (code) {
+    const storedState = sessionStorage.getItem(gmailOAuthStateKey);
+    if (storedState && stateParam && storedState !== stateParam) {
+      gmailState.error =
+        "Gmail-Verbindung fehlgeschlagen. Bitte erneut verbinden.";
+    } else {
+      sessionStorage.setItem(gmailOAuthCodeKey, code);
+    }
+  }
+
+  ["code", "state", "scope", "error"].forEach((key) => params.delete(key));
+  const url = new URL(window.location.href);
+  url.search = params.toString();
+  window.history.replaceState({}, "", url.toString());
+};
+
+const loadGmailStatus = async () => {
+  if (!authState.user) {
+    gmailState.connected = false;
+    gmailState.email = "";
+    updateGmailHeaderUI();
+    return;
+  }
+  const token = getAuthToken();
+  if (!token) return;
+  gmailState.loading = true;
+  try {
+    const response = await fetch("/api/gmail/status", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const data = await readJson(response);
+    if (!response.ok) {
+      throw new Error(
+        data?.error || "Gmail-Status konnte nicht geladen werden.",
+      );
+    }
+    gmailState.connected = Boolean(data?.connected);
+    gmailState.email = data?.email || "";
+    gmailState.error = "";
+  } catch (error) {
+    gmailState.connected = false;
+    gmailState.email = "";
+    gmailState.error =
+      error?.message || "Gmail-Status konnte nicht geladen werden.";
+  } finally {
+    gmailState.loading = false;
+    updateGmailHeaderUI();
+  }
+};
+
+const exchangeGmailCode = async (code) => {
+  const token = getAuthToken();
+  if (!token) return;
+  try {
+    const response = await fetch("/api/gmail/token", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ code }),
+    });
+    const data = await readJson(response);
+    if (!response.ok) {
+      throw new Error(data?.error || "Gmail-Verbindung fehlgeschlagen.");
+    }
+    gmailState.connected = Boolean(data?.connected);
+    gmailState.email = data?.email || "";
+    gmailState.error = "";
+    sessionStorage.removeItem(gmailOAuthCodeKey);
+  } catch (error) {
+    gmailState.error = error?.message || "Gmail-Verbindung fehlgeschlagen.";
+  } finally {
+    updateGmailHeaderUI();
+  }
+};
+
+const completePendingGmailOAuth = async () => {
+  const code = sessionStorage.getItem(gmailOAuthCodeKey);
+  if (!code) return;
+  await exchangeGmailCode(code);
+};
+
+const startGmailConnect = async () => {
+  if (!authState.user) {
+    window.alert("Bitte zuerst anmelden.");
+    return;
+  }
+  const token = getAuthToken();
+  if (!token) return;
+  const stateToken = createGmailOAuthState();
+  sessionStorage.setItem(gmailOAuthStateKey, stateToken);
+  try {
+    const response = await fetch(
+      `/api/gmail/auth?state=${encodeURIComponent(stateToken)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+    const data = await readJson(response);
+    if (!response.ok || !data?.url) {
+      throw new Error(
+        data?.error || "Gmail-Auth konnte nicht gestartet werden.",
+      );
+    }
+    window.location.assign(data.url);
+  } catch (error) {
+    gmailState.error =
+      error?.message || "Gmail-Auth konnte nicht gestartet werden.";
+    setGmailThreadStatus(gmailState.error, true);
+  }
+};
+
+const disconnectGmail = async () => {
+  if (!authState.user) return;
+  const token = getAuthToken();
+  if (!token) return;
+  const confirmDisconnect = window.confirm(
+    "Gmail-Verbindung wirklich trennen?",
+  );
+  if (!confirmDisconnect) return;
+  try {
+    const response = await fetch("/api/gmail/account", {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const data = await readJson(response);
+    if (!response.ok) {
+      throw new Error(data?.error || "Gmail konnte nicht getrennt werden.");
+    }
+    gmailState.connected = false;
+    gmailState.email = "";
+    gmailState.thread = null;
+    gmailState.threadId = null;
+    gmailState.error = "";
+  } catch (error) {
+    gmailState.error = error?.message || "Gmail konnte nicht getrennt werden.";
+  } finally {
+    updateGmailHeaderUI();
   }
 };
 
@@ -2489,14 +2972,24 @@ const handleSessionChange = async (session) => {
   authState.user = session?.user ?? null;
   authState.displayName = authState.user ? getDisplayName(authState.user) : "";
   updateAuthUI();
+  updateGmailHeaderUI();
   if (authState.user) {
     setAuthMessage("", false);
   }
 
   if (!authState.user) {
+    gmailState.connected = false;
+    gmailState.email = "";
+    gmailState.thread = null;
+    gmailState.threadId = null;
+    gmailState.error = "";
+    updateGmailHeaderUI();
     clearStateSubscription();
     return;
   }
+
+  await completePendingGmailOAuth();
+  await loadGmailStatus();
 
   if (authState.user.id !== previousUserId) {
     await loadRemoteState();
@@ -2515,15 +3008,33 @@ const initAuth = async () => {
   }
 
   setAuthFormsEnabled(true);
+  authState.isRecovery = hasRecoveryParam();
   const { data, error } = await supabase.auth.getSession();
   if (error) {
     console.error("Supabase Sessionfehler:", error);
     setAuthMessage("Anmeldung fehlgeschlagen. Bitte erneut versuchen.");
   }
+  if (authState.isRecovery && !data?.session) {
+    authState.isRecovery = false;
+    setAuthMessage(
+      "Passwort-Link ungültig oder abgelaufen. Bitte erneut anfordern.",
+    );
+  }
   await handleSessionChange(data?.session ?? null);
   supabase.auth.onAuthStateChange((event, session) => {
+    if (event === "PASSWORD_RECOVERY") {
+      authState.isRecovery = true;
+    } else if (event === "SIGNED_OUT" || event === "SIGNED_IN") {
+      authState.isRecovery = false;
+    }
     void handleSessionChange(session);
   });
+};
+
+const getLoginEmail = () => {
+  if (!elements.loginForm) return "";
+  const input = elements.loginForm.querySelector('input[name="email"]');
+  return String(input?.value || "").trim();
 };
 
 const handleLogin = async (event) => {
@@ -2546,6 +3057,51 @@ const handleLogin = async (event) => {
   }
   setAuthMessage("");
   event.target.reset();
+};
+
+const handleMagicLink = async () => {
+  if (!supabase) return;
+  const email = getLoginEmail();
+  if (!email) {
+    setAuthMessage("Bitte E-Mail eingeben.");
+    return;
+  }
+  setAuthFormsEnabled(false);
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: {
+      emailRedirectTo: getAuthRedirectUrl(),
+      shouldCreateUser: false,
+    },
+  });
+  setAuthFormsEnabled(true);
+  if (error) {
+    setAuthMessage(formatAuthError(error));
+    return;
+  }
+  setAuthMessage("Magic Link ist unterwegs. Bitte Postfach prüfen.", false);
+};
+
+const handlePasswordResetRequest = async () => {
+  if (!supabase) return;
+  const email = getLoginEmail();
+  if (!email) {
+    setAuthMessage("Bitte E-Mail eingeben.");
+    return;
+  }
+  setAuthFormsEnabled(false);
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: getAuthRedirectUrl(),
+  });
+  setAuthFormsEnabled(true);
+  if (error) {
+    setAuthMessage(formatAuthError(error));
+    return;
+  }
+  setAuthMessage(
+    "E-Mail zum Zurücksetzen ist unterwegs. Bitte Postfach prüfen.",
+    false,
+  );
 };
 
 const handleSignup = async (event) => {
@@ -2579,6 +3135,42 @@ const handleSignup = async (event) => {
     setAuthMessage("", false);
   }
   event.target.reset();
+};
+
+const handlePasswordUpdate = async (event) => {
+  event.preventDefault();
+  if (!supabase) return;
+  if (!authState.user) {
+    authState.isRecovery = false;
+    updateAuthUI();
+    setAuthMessage(
+      "Passwort-Link ungültig oder abgelaufen. Bitte erneut anfordern.",
+    );
+    return;
+  }
+  const formData = new FormData(event.target);
+  const password = String(formData.get("password") || "").trim();
+  const passwordConfirm = String(formData.get("passwordConfirm") || "").trim();
+  if (!password || !passwordConfirm) {
+    setAuthMessage("Bitte neues Passwort eingeben.");
+    return;
+  }
+  if (password !== passwordConfirm) {
+    setAuthMessage("Passwörter stimmen nicht überein.");
+    return;
+  }
+  setAuthFormsEnabled(false);
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) {
+    setAuthFormsEnabled(true);
+    setAuthMessage(formatAuthError(error));
+    return;
+  }
+  authState.isRecovery = false;
+  setAuthMessage("Passwort geändert. Bitte neu anmelden.", false);
+  event.target.reset();
+  await supabase.auth.signOut();
+  setAuthFormsEnabled(true);
 };
 
 const handleSignOut = async () => {
@@ -2618,20 +3210,6 @@ const createSvgCircle = (cx, cy, r, className) => {
     circle.setAttribute("class", className);
   }
   return circle;
-};
-
-const renderExteriorFeatures = (floor) => {
-  if (!state.isExteriorMode || !floor) return;
-  const features = EXTERIOR_FEATURES[floor.id] || [];
-  features.forEach((feature) => {
-    const rect = createSvgElement("rect");
-    rect.setAttribute("x", feature.x);
-    rect.setAttribute("y", feature.y);
-    rect.setAttribute("width", feature.width);
-    rect.setAttribute("height", feature.height);
-    rect.setAttribute("class", `exterior-area exterior-${feature.type}`);
-    elements.floorplan.appendChild(rect);
-  });
 };
 
 const getRoomDraftRect = (draft) => {
@@ -2795,8 +3373,29 @@ const renderFloorplan = () => {
   updateFloorplanViewBox();
   const floor = getActiveFloor();
   if (!floor) return;
+  const interiorRooms = getInteriorRooms(floor);
+  const exteriorRooms = getExteriorRooms(floor);
+  const visibleExteriorRooms = state.isExteriorMode ? exteriorRooms : [];
 
-  renderExteriorFeatures(floor);
+  visibleExteriorRooms.forEach((room) => {
+    const rect = createSvgElement("rect");
+    rect.setAttribute("x", room.x);
+    rect.setAttribute("y", room.y);
+    rect.setAttribute("width", room.width);
+    rect.setAttribute("height", room.height);
+    const isActive = state.activeRoomId === room.id;
+    rect.setAttribute(
+      "class",
+      `room-hit exterior-room exterior-area exterior-${room.exteriorType}${
+        isActive ? " active" : ""
+      }`,
+    );
+    rect.dataset.roomId = room.id;
+    rect.dataset.floorId = floor.id;
+    rect.dataset.elementType = "room";
+    rect.dataset.exterior = "true";
+    elements.floorplan.appendChild(rect);
+  });
 
   const outline = createSvgElement("rect");
   outline.setAttribute("x", OUTER_WALL_BOUNDS.x);
@@ -2806,7 +3405,7 @@ const renderFloorplan = () => {
   outline.setAttribute("class", "outer-wall");
   elements.floorplan.appendChild(outline);
 
-  buildWallSegments(floor.rooms).forEach((wall) => {
+  buildWallSegments(interiorRooms).forEach((wall) => {
     const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
     line.setAttribute("x1", wall.x1);
     line.setAttribute("y1", wall.y1);
@@ -2816,7 +3415,7 @@ const renderFloorplan = () => {
     elements.floorplan.appendChild(line);
   });
 
-  floor.rooms.forEach((room) => {
+  interiorRooms.forEach((room) => {
     const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
     rect.setAttribute("x", room.x);
     rect.setAttribute("y", room.y);
@@ -2836,6 +3435,7 @@ const renderFloorplan = () => {
     rect.dataset.floorId = floor.id;
     rect.dataset.elementType = "room";
     rect.dataset.elementLabel = `${room.name} – Raum`;
+    rect.dataset.exterior = "false";
 
     const label = document.createElementNS(
       "http://www.w3.org/2000/svg",
@@ -2850,7 +3450,19 @@ const renderFloorplan = () => {
     elements.floorplan.appendChild(label);
   });
 
-  floor.rooms.forEach((room) => {
+  visibleExteriorRooms.forEach((room) => {
+    const label = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "text",
+    );
+    label.setAttribute("x", room.x + 12);
+    label.setAttribute("y", room.y + 28);
+    label.setAttribute("class", "room-label");
+    label.textContent = room.name;
+    elements.floorplan.appendChild(label);
+  });
+
+  interiorRooms.forEach((room) => {
     const wallSegments = [
       {
         x1: room.x,
@@ -2917,7 +3529,8 @@ const renderFloorplan = () => {
     const isSelected =
       state.selectedElement?.openingId === opening.id &&
       state.selectedElement?.floorId === floor.id;
-    const room = floor.rooms.find((item) => item.id === opening.roomId) || null;
+    const room =
+      interiorRooms.find((item) => item.id === opening.roomId) || null;
     elements.floorplan.appendChild(
       createOpeningGroup(opening, room, floor.id, isSelected),
     );
@@ -2936,7 +3549,8 @@ const renderFloorplan = () => {
     }
   }
 
-  floor.rooms.forEach((room) => {
+  const commentRooms = state.isExteriorMode ? exteriorRooms : interiorRooms;
+  commentRooms.forEach((room) => {
     const roomData = ensureRoomData(room.id);
     roomData.comments.forEach((comment) => {
       if (comment.resolved) return;
@@ -2961,6 +3575,10 @@ const renderRoomPanel = () => {
     elements.roomTitle.textContent = "Bitte wählen Sie einen Raum";
     elements.roomSubtitle.textContent =
       "Klicken Sie auf einen Raum im Grundriss, um Details zu sehen.";
+    if (elements.roomChatTrigger) {
+      elements.roomChatTrigger.disabled = true;
+      elements.roomChatTrigger.setAttribute("aria-disabled", "true");
+    }
     renderRoomTasks();
     if (elements.comments) {
       elements.comments.innerHTML = "";
@@ -3002,8 +3620,18 @@ const renderRoomPanel = () => {
   elements.roomTitle.textContent = room.name;
   elements.roomSubtitle.textContent =
     "Aufgaben, Inspirationen und Entscheidungen für den Raum verwalten.";
+  if (elements.roomChatTrigger) {
+    elements.roomChatTrigger.disabled = false;
+    elements.roomChatTrigger.setAttribute("aria-disabled", "false");
+    elements.roomChatTrigger.setAttribute(
+      "aria-label",
+      `ChatGPT Chat zu ${room.name}`,
+    );
+    elements.roomChatTrigger.title = `ChatGPT Chat zu ${room.name}`;
+  }
   elements.threeDLabel.textContent = `3D-Ansicht für ${room.name}`;
-  const canShowThreeD = !state.isExteriorMode && !state.isMobileView;
+  const canShowThreeD =
+    !state.isExteriorMode && !state.isMobileView && !isExteriorRoom(room);
   if (!canShowThreeD) {
     state.show3d = false;
   }
@@ -3232,6 +3860,297 @@ const handleCommentContextAction = (action) => {
   }
 };
 
+const CHAT_SCOPE_LABELS = {
+  room: "Raum",
+  task: "Aufgabe",
+  comment: "Kommentar",
+};
+
+const ensureChatThread = (target) => {
+  if (!target) return { thread: null, created: false };
+  const normalized = normalizeChatThread(target.chat);
+  if (normalized) {
+    target.chat = normalized;
+    return { thread: normalized, created: false };
+  }
+  const thread = buildChatThread();
+  target.chat = thread;
+  return { thread, created: true };
+};
+
+const resolveChatTarget = ({ scope, roomId, taskId, commentId }) => {
+  if (scope === "room") {
+    if (!roomId) return null;
+    const room = findRoomById(roomId);
+    const roomData = ensureRoomData(roomId);
+    const { thread, created } = ensureChatThread(roomData);
+    const label = room?.name || roomId;
+    return {
+      scope,
+      roomId,
+      target: roomData,
+      thread,
+      created,
+      label,
+      contextLabel: `${CHAT_SCOPE_LABELS.room}: ${label}`,
+    };
+  }
+  if (scope === "task") {
+    const task = state.tasks.find((item) => item.id === taskId);
+    if (!task) return null;
+    const { thread, created } = ensureChatThread(task);
+    const label = task.title || task.id;
+    return {
+      scope,
+      taskId,
+      target: task,
+      thread,
+      created,
+      label,
+      contextLabel: `${CHAT_SCOPE_LABELS.task}: ${label}`,
+    };
+  }
+  if (scope === "comment") {
+    if (!roomId || !commentId) return null;
+    const comment = getCommentById(roomId, commentId);
+    if (!comment) return null;
+    const { thread, created } = ensureChatThread(comment);
+    const label = truncateText(getCommentText(comment), 80) || "Kommentar";
+    return {
+      scope,
+      roomId,
+      commentId,
+      target: comment,
+      thread,
+      created,
+      label,
+      contextLabel: `${CHAT_SCOPE_LABELS.comment}: ${label}`,
+    };
+  }
+  return null;
+};
+
+const buildChatIcon = () => {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  const circle = document.createElementNS(SVG_NS, "circle");
+  circle.setAttribute("cx", "12");
+  circle.setAttribute("cy", "12");
+  circle.setAttribute("r", "9");
+  circle.setAttribute("fill", "none");
+  circle.setAttribute("stroke", "currentColor");
+  circle.setAttribute("stroke-width", "1.5");
+  svg.appendChild(circle);
+  [8, 12, 16].forEach((cx) => {
+    const dot = document.createElementNS(SVG_NS, "circle");
+    dot.setAttribute("cx", String(cx));
+    dot.setAttribute("cy", "12");
+    dot.setAttribute("r", "1.2");
+    dot.setAttribute("fill", "currentColor");
+    svg.appendChild(dot);
+  });
+  return svg;
+};
+
+const buildChatTrigger = ({ scope, roomId, taskId, commentId, label } = {}) => {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "chat-trigger";
+  button.setAttribute("aria-label", label || "ChatGPT Chat");
+  button.title = label || "ChatGPT Chat";
+  button.appendChild(buildChatIcon());
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    openChatModal({ scope, roomId, taskId, commentId });
+  });
+  button.addEventListener("pointerdown", (event) => event.stopPropagation());
+  button.addEventListener("dragstart", (event) => event.preventDefault());
+  return button;
+};
+
+const renderChatThread = (thread) => {
+  if (!elements.chatThread) return;
+  elements.chatThread.innerHTML = "";
+  if (!thread || !Array.isArray(thread.messages) || !thread.messages.length) {
+    const empty = document.createElement("li");
+    empty.className = "chat-empty helper";
+    empty.textContent = "Noch keine Nachrichten.";
+    elements.chatThread.appendChild(empty);
+    return;
+  }
+  thread.messages.forEach((message) => {
+    const item = document.createElement("li");
+    item.className = "chat-message";
+    item.classList.toggle("is-assistant", message.role === "assistant");
+
+    const meta = document.createElement("div");
+    meta.className = "chat-message-meta";
+    if (message.role === "assistant") {
+      const role = document.createElement("span");
+      role.className = "chat-message-role";
+      role.textContent = "ChatGPT";
+      meta.appendChild(role);
+    } else {
+      const authorLabel = message.userName || message.userEmail || "Unbekannt";
+      meta.appendChild(
+        createUserSpan({
+          label: authorLabel,
+          id: message.userId,
+          email: message.userEmail,
+        }),
+      );
+    }
+    const time = document.createElement("span");
+    time.className = "chat-message-time";
+    time.textContent = formatActivityTimestamp(message.createdAt);
+    meta.appendChild(time);
+    item.appendChild(meta);
+
+    const text = document.createElement("div");
+    text.className = "chat-message-text";
+    text.textContent = message.text;
+    item.appendChild(text);
+
+    elements.chatThread.appendChild(item);
+  });
+  elements.chatThread.scrollTop = elements.chatThread.scrollHeight;
+};
+
+const syncChatModalControls = (thread) => {
+  if (elements.chatModelSelect && thread?.model) {
+    elements.chatModelSelect.value = thread.model;
+  }
+  if (elements.chatEffortSelect && thread?.effort) {
+    elements.chatEffortSelect.value = thread.effort;
+  }
+  if (elements.chatRoleSelect) {
+    elements.chatRoleSelect.value = "user";
+  }
+};
+
+const openChatModal = ({ scope, roomId, taskId, commentId } = {}) => {
+  if (!elements.chatModal) return;
+  const resolved = resolveChatTarget({
+    scope,
+    roomId,
+    taskId,
+    commentId,
+  });
+  if (!resolved || !resolved.thread) return;
+
+  chatModalState.scope = resolved.scope;
+  chatModalState.roomId = roomId || null;
+  chatModalState.taskId = taskId || null;
+  chatModalState.commentId = commentId || null;
+  chatModalState.isOpen = true;
+
+  if (elements.chatModalTitle) {
+    elements.chatModalTitle.textContent = "ChatGPT Chat";
+  }
+  if (elements.chatModalContext) {
+    elements.chatModalContext.textContent = resolved.contextLabel;
+  }
+  if (resolved.created) {
+    saveState();
+  }
+  syncChatModalControls(resolved.thread);
+  if (elements.chatInput) {
+    elements.chatInput.value = "";
+  }
+  renderChatThread(resolved.thread);
+  elements.chatModal.hidden = false;
+  elements.chatInput?.focus();
+};
+
+const closeChatModal = () => {
+  if (!elements.chatModal) return;
+  elements.chatModal.hidden = true;
+  chatModalState.scope = null;
+  chatModalState.roomId = null;
+  chatModalState.taskId = null;
+  chatModalState.commentId = null;
+  chatModalState.isOpen = false;
+  if (elements.chatInput) {
+    elements.chatInput.value = "";
+  }
+  if (elements.chatThread) {
+    elements.chatThread.innerHTML = "";
+  }
+};
+
+const getActiveChatThread = () => {
+  if (!chatModalState.isOpen) return null;
+  const resolved = resolveChatTarget(chatModalState);
+  return resolved?.thread || null;
+};
+
+const handleChatSubmit = (event) => {
+  event.preventDefault();
+  const thread = getActiveChatThread();
+  if (!thread || !elements.chatInput) return;
+  const text = elements.chatInput.value.trim();
+  if (!text) return;
+  const role = normalizeChatRole(elements.chatRoleSelect?.value || "user");
+  const isAssistant = role === "assistant";
+  const timestamp = new Date().toISOString();
+  thread.messages.push({
+    id: createChatMessageId(),
+    role,
+    text,
+    createdAt: timestamp,
+    userId: isAssistant ? null : authState.user?.id || null,
+    userName: isAssistant ? "ChatGPT" : getActivityActor(),
+    userEmail: isAssistant ? "" : authState.user?.email || "",
+  });
+  thread.updatedAt = timestamp;
+  elements.chatInput.value = "";
+  saveState();
+  renderChatThread(thread);
+  elements.chatInput.focus();
+};
+
+const handleChatSettingChange = (key, value) => {
+  const thread = getActiveChatThread();
+  if (!thread) return;
+  if (key === "model") {
+    if (!CHAT_MODELS.some((item) => item.value === value)) return;
+    if (thread.model === value) return;
+    thread.model = value;
+  } else if (key === "effort") {
+    if (!CHAT_EFFORTS.some((item) => item.value === value)) return;
+    if (thread.effort === value) return;
+    thread.effort = value;
+  } else {
+    return;
+  }
+  thread.updatedAt = new Date().toISOString();
+  saveState();
+};
+
+const populateChatSelect = (select, options) => {
+  if (!select) return;
+  select.innerHTML = "";
+  options.forEach((option) => {
+    const item = document.createElement("option");
+    item.value = option.value;
+    item.textContent = option.label;
+    select.appendChild(item);
+  });
+};
+
+const initChatControls = () => {
+  populateChatSelect(elements.chatModelSelect, CHAT_MODELS);
+  populateChatSelect(elements.chatEffortSelect, CHAT_EFFORTS);
+  populateChatSelect(elements.chatRoleSelect, CHAT_ROLE_OPTIONS);
+  if (
+    elements.roomChatTrigger &&
+    !elements.roomChatTrigger.querySelector("svg")
+  ) {
+    elements.roomChatTrigger.appendChild(buildChatIcon());
+  }
+};
+
 const renderComments = (roomData) => {
   elements.comments.innerHTML = "";
   roomData.comments.forEach((comment) => {
@@ -3243,8 +4162,12 @@ const renderComments = (roomData) => {
     li.classList.toggle("is-resolved", comment.resolved);
     const author = getCommentAuthorLabel(comment);
     const text = getCommentText(comment);
+    const row = document.createElement("div");
+    row.className = "comment-row";
+    const message = document.createElement("div");
+    message.className = "comment-message";
     appendActivityMessage(
-      li,
+      message,
       buildActivityMessageParts(
         {
           type: "comment_added",
@@ -3256,6 +4179,16 @@ const renderComments = (roomData) => {
         { truncateDetail: false },
       ),
     );
+    row.appendChild(message);
+    row.appendChild(
+      buildChatTrigger({
+        scope: "comment",
+        roomId: state.activeRoomId,
+        commentId: comment.id,
+        label: "ChatGPT Chat zum Kommentar",
+      }),
+    );
+    li.appendChild(row);
     elements.comments.appendChild(li);
   });
 };
@@ -4792,6 +5725,9 @@ const buildTaskItem = (
     header.addEventListener("dragend", handleTaskDragEnd);
   }
 
+  const headerMain = document.createElement("div");
+  headerMain.className = "task-header-main";
+
   if (showSelection) {
     const selection = document.createElement("label");
     selection.className = "task-select-toggle";
@@ -4812,20 +5748,33 @@ const buildTaskItem = (
     title.textContent = task.title;
     selection.appendChild(checkbox);
     selection.appendChild(title);
-    header.appendChild(selection);
+    headerMain.appendChild(selection);
   } else {
     const title = document.createElement("span");
     title.className = "task-title";
     title.textContent = task.title;
-    header.appendChild(title);
+    headerMain.appendChild(title);
   }
 
   if (showRoom) {
     const room = document.createElement("span");
     room.className = "task-room";
     room.textContent = getRoomLabel(task.roomId);
-    header.appendChild(room);
+    headerMain.appendChild(room);
   }
+
+  header.appendChild(headerMain);
+
+  const headerActions = document.createElement("div");
+  headerActions.className = "task-header-actions";
+  headerActions.appendChild(
+    buildChatTrigger({
+      scope: "task",
+      taskId: task.id,
+      label: "ChatGPT Chat zur Aufgabe",
+    }),
+  );
+  header.appendChild(headerActions);
 
   item.appendChild(header);
 
@@ -5099,6 +6048,359 @@ const renderTasksPanel = () => {
   }
 };
 
+const getTaskFromModal = () => {
+  const taskId = taskModalState.taskId;
+  if (!taskId) return null;
+  return state.tasks.find((item) => item.id === taskId) || null;
+};
+
+const parseGmailThreadId = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (!raw.includes("mail.google.com")) {
+    return raw;
+  }
+  try {
+    const url = new URL(raw);
+    const hash = url.hash.replace(/^#/, "");
+    if (hash) {
+      const parts = hash.split("/").filter(Boolean);
+      return parts[parts.length - 1] || "";
+    }
+    const threadParam = url.searchParams.get("th");
+    return threadParam ? threadParam.trim() : raw;
+  } catch {
+    return raw;
+  }
+};
+
+const isGmailThreadOwner = (thread) => {
+  if (!thread?.ownerId) return true;
+  return thread.ownerId === authState.user?.id;
+};
+
+const setGmailThreadViewVisible = (isVisible) => {
+  if (!elements.gmailThreadView) return;
+  elements.gmailThreadView.hidden = !isVisible;
+};
+
+const clearGmailThreadView = () => {
+  if (elements.gmailThreadMeta) {
+    elements.gmailThreadMeta.innerHTML = "";
+  }
+  if (elements.gmailThreadMessages) {
+    elements.gmailThreadMessages.innerHTML = "";
+  }
+  setGmailThreadViewVisible(false);
+};
+
+const renderGmailThreadMeta = (task, thread) => {
+  if (!elements.gmailThreadMeta) return;
+  elements.gmailThreadMeta.innerHTML = "";
+  if (!thread && !task?.gmailThread) return;
+
+  const subject = thread?.subject || task?.gmailThread?.subject || "Gmail-Thread";
+  const subjectEl = document.createElement("div");
+  subjectEl.textContent = subject;
+  elements.gmailThreadMeta.appendChild(subjectEl);
+
+  const snippet = thread?.snippet || task?.gmailThread?.snippet;
+  if (snippet) {
+    const snippetEl = document.createElement("div");
+    snippetEl.textContent = snippet;
+    elements.gmailThreadMeta.appendChild(snippetEl);
+  }
+
+  const lastMessageAt =
+    thread?.lastMessageAt || task?.gmailThread?.lastMessageAt || "";
+  if (lastMessageAt) {
+    const time = document.createElement("div");
+    time.textContent = `Letzte Mail: ${formatActivityTimestamp(lastMessageAt)}`;
+    elements.gmailThreadMeta.appendChild(time);
+  }
+
+  const ownerEmail = task?.gmailThread?.ownerEmail;
+  if (ownerEmail) {
+    const owner = document.createElement("div");
+    owner.textContent = `Angeheftet von ${ownerEmail}`;
+    elements.gmailThreadMeta.appendChild(owner);
+  }
+};
+
+const renderGmailThreadMessages = (thread) => {
+  if (!elements.gmailThreadMessages) return;
+  elements.gmailThreadMessages.innerHTML = "";
+  const messages = Array.isArray(thread?.messages) ? thread.messages : [];
+  if (!messages.length) {
+    const empty = document.createElement("li");
+    empty.className = "helper";
+    empty.textContent = "Keine Nachrichten gefunden.";
+    elements.gmailThreadMessages.appendChild(empty);
+    return;
+  }
+
+  messages.forEach((message) => {
+    const item = document.createElement("li");
+    item.className = "gmail-message";
+
+    const header = document.createElement("div");
+    header.className = "gmail-message-header";
+    const from = document.createElement("span");
+    from.textContent = message?.headers?.from || "Unbekannt";
+    const date = document.createElement("span");
+    date.textContent = message?.internalDate
+      ? formatActivityTimestamp(message.internalDate)
+      : message?.headers?.date || "";
+    header.appendChild(from);
+    header.appendChild(date);
+    item.appendChild(header);
+
+    const subject = message?.headers?.subject;
+    if (subject) {
+      const subjectEl = document.createElement("div");
+      subjectEl.className = "gmail-message-subject";
+      subjectEl.textContent = subject;
+      item.appendChild(subjectEl);
+    }
+
+    const snippet = document.createElement("div");
+    snippet.textContent = message?.snippet || "";
+    item.appendChild(snippet);
+
+    elements.gmailThreadMessages.appendChild(item);
+  });
+};
+
+const requestGmailThread = async (threadId) => {
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error("Nicht angemeldet.");
+  }
+  const response = await fetch(
+    `/api/gmail/thread/${encodeURIComponent(threadId)}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+  const data = await readJson(response);
+  if (!response.ok) {
+    throw new Error(data?.error || "Gmail-Thread konnte nicht geladen werden.");
+  }
+  return data?.thread || null;
+};
+
+const syncTaskGmailMeta = (task, thread) => {
+  if (!task?.gmailThread || !thread) return;
+  const updates = {};
+  if (thread.subject && thread.subject !== task.gmailThread.subject) {
+    updates.subject = thread.subject;
+  }
+  if (thread.snippet && thread.snippet !== task.gmailThread.snippet) {
+    updates.snippet = thread.snippet;
+  }
+  if (thread.lastMessageAt && thread.lastMessageAt !== task.gmailThread.lastMessageAt) {
+    updates.lastMessageAt = thread.lastMessageAt;
+  }
+  if (!Object.keys(updates).length) return;
+  task.gmailThread = {
+    ...task.gmailThread,
+    ...updates,
+  };
+  task.updatedAt = new Date().toISOString();
+  updateTaskSearchIndex(task);
+  saveState();
+  renderTasksPanel();
+};
+
+const renderGmailThreadPanel = async (task, { forceRefresh = false } = {}) => {
+  if (!elements.gmailThreadInput) return;
+  if (!task) {
+    clearGmailThreadView();
+    return;
+  }
+  const thread = task.gmailThread;
+  const connected = gmailState.connected;
+  const isOwner = isGmailThreadOwner(thread);
+
+  if (elements.gmailThreadConnectHint) {
+    elements.gmailThreadConnectHint.hidden = connected;
+  }
+  if (elements.gmailThreadInput) {
+    elements.gmailThreadInput.value = thread?.id || "";
+    elements.gmailThreadInput.disabled = !connected || !isOwner;
+  }
+  if (elements.gmailThreadPinBtn) {
+    elements.gmailThreadPinBtn.disabled = !connected || !isOwner;
+  }
+  if (elements.gmailThreadClearBtn) {
+    elements.gmailThreadClearBtn.disabled = !thread;
+  }
+  if (elements.gmailThreadRefreshBtn) {
+    elements.gmailThreadRefreshBtn.disabled = !thread || !connected || !isOwner;
+  }
+  if (elements.gmailReplyText) {
+    elements.gmailReplyText.disabled = !thread || !connected || !isOwner;
+  }
+  if (elements.gmailReplySend) {
+    elements.gmailReplySend.disabled = !thread || !connected || !isOwner;
+  }
+
+  if (!thread) {
+    setGmailThreadStatus("", false);
+    setGmailReplyStatus("", false);
+    clearGmailThreadView();
+    return;
+  }
+
+  if (!isOwner) {
+    setGmailThreadStatus(
+      "Thread wurde von einem anderen Nutzer angeheftet.",
+      false,
+    );
+    clearGmailThreadView();
+    return;
+  }
+
+  if (!connected) {
+    setGmailThreadStatus("Gmail ist nicht verbunden.", true);
+    clearGmailThreadView();
+    return;
+  }
+
+  if (!forceRefresh && gmailState.threadId === thread.id && gmailState.thread) {
+    setGmailThreadStatus("", false);
+    renderGmailThreadMeta(task, gmailState.thread);
+    renderGmailThreadMessages(gmailState.thread);
+    setGmailThreadViewVisible(true);
+    return;
+  }
+
+  gmailState.threadLoading = true;
+  setGmailThreadStatus("Gmail-Thread wird geladen ...");
+  try {
+    const loaded = await requestGmailThread(thread.id);
+    gmailState.threadId = thread.id;
+    gmailState.thread = loaded;
+    setGmailThreadStatus("", false);
+    renderGmailThreadMeta(task, loaded);
+    renderGmailThreadMessages(loaded);
+    setGmailThreadViewVisible(true);
+    syncTaskGmailMeta(task, loaded);
+  } catch (error) {
+    setGmailThreadStatus(
+      error?.message || "Gmail-Thread konnte nicht geladen werden.",
+      true,
+    );
+    clearGmailThreadView();
+  } finally {
+    gmailState.threadLoading = false;
+  }
+};
+
+const handleGmailThreadPin = async () => {
+  const task = getTaskFromModal();
+  if (!task) return;
+  if (!gmailState.connected) {
+    setGmailThreadStatus("Bitte zuerst Gmail verbinden.", true);
+    return;
+  }
+  const input = elements.gmailThreadInput?.value || "";
+  const threadId = parseGmailThreadId(input);
+  if (!threadId) {
+    setGmailThreadStatus("Bitte Thread-URL oder ID eingeben.", true);
+    return;
+  }
+
+  task.gmailThread = {
+    id: threadId,
+    subject: task.gmailThread?.subject || "",
+    snippet: task.gmailThread?.snippet || "",
+    lastMessageAt: task.gmailThread?.lastMessageAt || null,
+    ownerId: authState.user?.id || null,
+    ownerEmail: authState.user?.email || "",
+  };
+  task.updatedAt = new Date().toISOString();
+  updateTaskSearchIndex(task);
+  logTaskUpdate(task, { gmailThreadId: threadId });
+  saveState();
+  if (supabase && authState.user) {
+    await pushStateToSupabase();
+  }
+  await renderGmailThreadPanel(task, { forceRefresh: true });
+};
+
+const handleGmailThreadClear = () => {
+  const task = getTaskFromModal();
+  if (!task || !task.gmailThread) return;
+  const confirmRemove = window.confirm(
+    "Gmail-Thread wirklich von der Aufgabe loesen?",
+  );
+  if (!confirmRemove) return;
+  task.gmailThread = null;
+  task.updatedAt = new Date().toISOString();
+  updateTaskSearchIndex(task);
+  logTaskUpdate(task, { gmailThreadId: null });
+  saveState();
+  gmailState.thread = null;
+  gmailState.threadId = null;
+  setGmailThreadStatus("", false);
+  setGmailReplyStatus("", false);
+  clearGmailThreadView();
+};
+
+const handleGmailReplySend = async () => {
+  const task = getTaskFromModal();
+  const threadId = task?.gmailThread?.id;
+  if (!task || !threadId) return;
+  const replyText = elements.gmailReplyText?.value?.trim() || "";
+  if (!replyText) {
+    setGmailReplyStatus("Bitte eine Antwort eingeben.", true);
+    return;
+  }
+  const token = getAuthToken();
+  if (!token) return;
+  setGmailReplyStatus("Antwort wird gesendet ...");
+  try {
+    const response = await fetch(
+      `/api/gmail/thread/${encodeURIComponent(threadId)}/reply`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ message: replyText }),
+      },
+    );
+    const data = await readJson(response);
+    if (!response.ok) {
+      throw new Error(data?.error || "Antwort konnte nicht gesendet werden.");
+    }
+    if (elements.gmailReplyText) {
+      elements.gmailReplyText.value = "";
+    }
+    setGmailReplyStatus("Antwort gesendet.", false);
+    logActivityEvent("gmail_reply_sent", {
+      taskId: task.id,
+      metadata: { threadId },
+    });
+    await renderGmailThreadPanel(task, { forceRefresh: true });
+  } catch (error) {
+    setGmailReplyStatus(
+      error?.message || "Antwort konnte nicht gesendet werden.",
+      true,
+    );
+  }
+};
+
+const handleGmailThreadRefresh = async () => {
+  const task = getTaskFromModal();
+  if (!task?.gmailThread) return;
+  await renderGmailThreadPanel(task, { forceRefresh: true });
+};
+
 const openTaskModal = (taskId) => {
   if (!elements.taskModal) return;
   const task = state.tasks.find((item) => item.id === taskId);
@@ -5114,6 +6416,7 @@ const openTaskModal = (taskId) => {
     elements.taskEndDate.value = task.endDate || "";
   }
   renderDependencyOptions(task);
+  void renderGmailThreadPanel(task, { forceRefresh: false });
   elements.taskModal.hidden = false;
 };
 
@@ -5991,7 +7294,10 @@ const updateFloorplanHint = () => {
 };
 
 const updateInteriorControls = () => {
-  const isLocked = state.isExteriorMode;
+  const activeRoom = state.activeRoomId
+    ? findRoomById(state.activeRoomId)
+    : null;
+  const isLocked = state.isExteriorMode && !isExteriorRoom(activeRoom);
   if (elements.addCommentBtn) {
     elements.addCommentBtn.disabled = isLocked;
     elements.addCommentBtn.setAttribute("aria-disabled", String(isLocked));
@@ -6034,13 +7340,6 @@ const setArchitectMode = (isOn) => {
   if (elements.toggleArchitect) {
     elements.toggleArchitect.checked = isOn;
   }
-  if (!isOn && state.isExteriorMode) {
-    state.isExteriorMode = false;
-    document.body.classList.remove("exterior-mode");
-    if (elements.exteriorToggle) {
-      elements.exteriorToggle.checked = false;
-    }
-  }
   state.selectedElement = null;
   state.isAddingComment = false;
   state.roomDraft = null;
@@ -6067,6 +7366,12 @@ const setExteriorMode = (isOn) => {
     state.selectedElement = null;
     state.roomDraft = null;
     state.show3d = false;
+    const activeRoom = state.activeRoomId
+      ? findRoomById(state.activeRoomId)
+      : null;
+    if (activeRoom && !isExteriorRoom(activeRoom)) {
+      state.activeRoomId = null;
+    }
     resetDragState();
     clearHoverState();
     hideCommentTooltip();
@@ -6109,6 +7414,12 @@ const setActiveFloor = (floorId) => {
 };
 
 const selectRoom = (roomId) => {
+  if (state.isExteriorMode && roomId) {
+    const room = findRoomById(roomId);
+    if (room && !isExteriorRoom(room)) {
+      return;
+    }
+  }
   state.activeRoomId = roomId;
   state.isAddingComment = false;
   state.show3d = false;
@@ -6120,6 +7431,7 @@ const selectRoom = (roomId) => {
   renderArchitectPanel();
   syncTaskRoomFilter(roomId, { shouldRender: true });
   renderMobileRoomSelect();
+  updateInteriorControls();
 };
 
 const selectArchitectElement = (target) => {
@@ -6156,16 +7468,19 @@ const selectArchitectElement = (target) => {
 };
 
 const handleAddComment = (event) => {
-  if (!state.activeRoomId || !state.isAddingComment || state.isExteriorMode) {
+  if (!state.activeRoomId || !state.isAddingComment) {
     return;
   }
-
-  const { x, y } = getFloorplanPoint(event);
 
   const room = findRoomById(state.activeRoomId);
   if (!room) {
     return;
   }
+  if (state.isExteriorMode && !isExteriorRoom(room)) {
+    return;
+  }
+
+  const { x, y } = getFloorplanPoint(event);
   const withinRoom =
     x >= room.x &&
     x <= room.x + room.width &&
@@ -6197,6 +7512,7 @@ const handleAddComment = (event) => {
     x,
     y,
     resolved: false,
+    chat: null,
   });
 
   state.isAddingComment = false;
@@ -7914,15 +9230,27 @@ const syncRangeNumber = (rangeEl, numberEl) => {
 const bindEvents = () => {
   elements.floorplan.addEventListener("click", (event) => {
     const target = event.target;
-    const hitTarget = target?.closest?.(".architect-hit");
     if (dragState.suppressClick) {
       dragState.suppressClick = false;
       return;
     }
     if (state.isExteriorMode) {
+      if (state.isAddingComment) {
+        handleAddComment(event);
+        return;
+      }
+      const roomTarget = target?.closest?.(".room-hit");
+      const roomId = roomTarget?.dataset?.roomId;
+      if (roomId) {
+        const room = findRoomById(roomId);
+        if (room && isExteriorRoom(room)) {
+          selectRoom(roomId);
+        }
+      }
       return;
     }
     if (state.isArchitectMode) {
+      const hitTarget = target?.closest?.(".architect-hit");
       const point = getFloorplanPoint(event);
       if (state.architectTool === "door") {
         addOpeningAtPoint("door", point);
@@ -7959,14 +9287,20 @@ const bindEvents = () => {
   });
 
   elements.floorplan.addEventListener("pointerdown", (event) => {
-    if (state.isExteriorMode) return;
     const target = event.target;
     const marker = target?.closest?.(".comment-marker");
     if (marker) {
+      if (state.isExteriorMode) {
+        const room = findRoomById(marker.dataset.roomId);
+        if (!room || !isExteriorRoom(room)) {
+          return;
+        }
+      }
       event.preventDefault();
       startCommentDrag(event, marker);
       return;
     }
+    if (state.isExteriorMode) return;
     if (!state.isArchitectMode || state.architectTool !== "select") return;
     const hitTarget = target?.closest?.(".architect-hit");
     if (!hitTarget) return;
@@ -7981,13 +9315,16 @@ const bindEvents = () => {
   elements.floorplan.addEventListener("pointerup", finishArchitectDrag);
   elements.floorplan.addEventListener("pointercancel", finishArchitectDrag);
   elements.floorplan.addEventListener("pointermove", (event) => {
-    if (state.isExteriorMode) {
-      hideCommentTooltip();
-      return;
-    }
     const target = event.target;
     const marker = target?.closest?.(".comment-marker");
     if (marker) {
+      if (state.isExteriorMode) {
+        const room = findRoomById(marker.dataset.roomId);
+        if (!room || !isExteriorRoom(room)) {
+          hideCommentTooltip();
+          return;
+        }
+      }
       showCommentTooltipForMarker(marker);
       return;
     }
@@ -7997,13 +9334,18 @@ const bindEvents = () => {
     hideCommentTooltip();
   });
   elements.floorplan.addEventListener("contextmenu", (event) => {
-    if (state.isExteriorMode) return;
     const target = event.target;
     const marker = target?.closest?.(".comment-marker");
     if (!marker) return;
     const roomId = marker.dataset.roomId;
     const commentId = marker.dataset.commentId;
     if (!roomId || !commentId) return;
+    if (state.isExteriorMode) {
+      const room = findRoomById(roomId);
+      if (!room || !isExteriorRoom(room)) {
+        return;
+      }
+    }
     const comment = getCommentById(roomId, commentId);
     if (!comment) return;
     event.preventDefault();
@@ -8041,7 +9383,12 @@ const bindEvents = () => {
   });
 
   elements.addCommentBtn.addEventListener("click", () => {
-    if (state.isExteriorMode) return;
+    const activeRoom = state.activeRoomId
+      ? findRoomById(state.activeRoomId)
+      : null;
+    if (state.isExteriorMode && !isExteriorRoom(activeRoom)) {
+      return;
+    }
     if (
       !requireActiveRoom(
         "Bitte wählen Sie einen Raum aus, um einen Kommentar zu platzieren.",
@@ -8181,6 +9528,23 @@ const bindEvents = () => {
       closeTaskModal();
     }
   });
+  elements.roomChatTrigger?.addEventListener("click", () => {
+    if (!state.activeRoomId) return;
+    openChatModal({ scope: "room", roomId: state.activeRoomId });
+  });
+  elements.chatForm?.addEventListener("submit", handleChatSubmit);
+  elements.chatModalClose?.addEventListener("click", closeChatModal);
+  elements.chatModal?.addEventListener("click", (event) => {
+    if (event.target === elements.chatModal) {
+      closeChatModal();
+    }
+  });
+  elements.chatModelSelect?.addEventListener("change", (event) => {
+    handleChatSettingChange("model", event.target.value);
+  });
+  elements.chatEffortSelect?.addEventListener("change", (event) => {
+    handleChatSettingChange("effort", event.target.value);
+  });
   elements.helpButton?.addEventListener("click", openHelpModal);
   elements.helpModalClose?.addEventListener("click", closeHelpModal);
   elements.helpModal?.addEventListener("click", (event) => {
@@ -8250,6 +9614,9 @@ const bindEvents = () => {
     if (imageModalState.isOpen) {
       closeImageModal();
     }
+    if (chatModalState.isOpen) {
+      closeChatModal();
+    }
   });
   document.addEventListener("click", (event) => {
     if (!commentContextState.isOpen) return;
@@ -8265,7 +9632,13 @@ const bindEvents = () => {
   elements.addEvidenceLinkBtn?.addEventListener("click", handleAddEvidenceLink);
   elements.setApiKeyBtn?.addEventListener("click", handleSetApiKey);
   elements.loginForm?.addEventListener("submit", handleLogin);
+  elements.magicLinkBtn?.addEventListener("click", handleMagicLink);
+  elements.resetPasswordBtn?.addEventListener(
+    "click",
+    handlePasswordResetRequest,
+  );
   elements.signupForm?.addEventListener("submit", handleSignup);
+  elements.passwordResetForm?.addEventListener("submit", handlePasswordUpdate);
   elements.signOutBtn?.addEventListener("click", handleSignOut);
 
   elements.toggleArchitect.addEventListener("change", (event) => {
@@ -8383,6 +9756,7 @@ const bindEvents = () => {
 
 const init = () => {
   hydrateStateFromLocal();
+  initChatControls();
   state.isMobileView = MOBILE_MEDIA_QUERY.matches;
   document.body.classList.toggle("is-mobile", state.isMobileView);
   renderFloorplan();

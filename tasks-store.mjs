@@ -242,6 +242,41 @@ const normalizeTaskCosts = (costs) => {
   }, {});
 };
 
+const normalizeGmailThread = (thread) => {
+  if (!thread || typeof thread !== "object") return null;
+  const id =
+    typeof thread.id === "string"
+      ? thread.id.trim()
+      : typeof thread.threadId === "string"
+        ? thread.threadId.trim()
+        : "";
+  if (!id) return null;
+  const subject =
+    typeof thread.subject === "string" ? thread.subject.trim() : "";
+  const snippet =
+    typeof thread.snippet === "string" ? thread.snippet.trim() : "";
+  const lastMessageAt =
+    typeof thread.lastMessageAt === "string" && thread.lastMessageAt.trim()
+      ? thread.lastMessageAt.trim()
+      : null;
+  const ownerId =
+    typeof thread.ownerId === "string" && thread.ownerId.trim()
+      ? thread.ownerId.trim()
+      : null;
+  const ownerEmail =
+    typeof thread.ownerEmail === "string" && thread.ownerEmail.trim()
+      ? thread.ownerEmail.trim()
+      : null;
+  return {
+    id,
+    subject,
+    snippet,
+    lastMessageAt,
+    ownerId,
+    ownerEmail,
+  };
+};
+
 const parseFilters = (searchParams) => {
   if (!searchParams) {
     return {
@@ -370,6 +405,9 @@ const applyTaskPatch = (task, patch) => {
       task.costs = normalizeTaskCosts();
     }
   }
+  if (Object.prototype.hasOwnProperty.call(patch, "gmailThread")) {
+    task.gmailThread = normalizeGmailThread(patch.gmailThread);
+  }
 };
 
 const handleTasksApi = async ({ method, urlPath, headers, body, query }) => {
@@ -464,6 +502,7 @@ const handleTasksApi = async ({ method, urlPath, headers, body, query }) => {
       priority: coercePriority(input.priority),
       notes: typeof input.notes === "string" ? input.notes : "",
       costs: normalizeTaskCosts(input.costs),
+      gmailThread: normalizeGmailThread(input.gmailThread),
       createdAt: timestamp,
       updatedAt: timestamp,
     };

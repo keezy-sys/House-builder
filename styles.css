@@ -94,6 +94,33 @@ body.auth-locked {
   border: 1px solid #e4d4c0;
 }
 
+.auth-secondary {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.2rem;
+}
+
+.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #a84a24;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  color: #7c3a1f;
+}
+
+.link-button:disabled {
+  color: #b9a596;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
 .auth-divider {
   display: none;
   align-items: center;
@@ -119,6 +146,12 @@ body.auth-locked {
   padding: 0 0.8rem;
   position: relative;
   z-index: 1;
+}
+
+.auth-recovery {
+  margin-top: 1.5rem;
+  padding-top: 1.2rem;
+  border-top: 1px dashed #eadfce;
 }
 
 .app-header {
@@ -163,6 +196,28 @@ body.auth-locked {
   background: #f5e4d2;
 }
 
+.chat-trigger {
+  width: 2.1rem;
+  height: 2.1rem;
+  padding: 0;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #fdf2e6;
+  border: 1px solid #e4d4c0;
+  color: #9a4a2b;
+}
+
+.chat-trigger:hover {
+  background: #f5e4d2;
+}
+
+.chat-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .toggle {
   display: flex;
   align-items: center;
@@ -178,6 +233,30 @@ body.auth-locked {
   border: 1px solid #eadfce;
   border-radius: 999px;
   padding: 0.4rem 0.8rem;
+}
+
+.gmail-status {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: #fdf2e6;
+  border: 1px solid #eadfce;
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  flex-wrap: wrap;
+}
+
+.gmail-status-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #7d6956;
+  font-weight: 700;
+}
+
+.gmail-status-text {
+  font-size: 0.85rem;
+  color: #6c5845;
 }
 
 .auth-user {
@@ -246,11 +325,6 @@ body.auth-locked {
 .mobile-view-toggle {
   width: 100%;
   justify-content: space-between;
-}
-
-.mobile-view-toggle .segmented-option {
-  flex: 1 1 50%;
-  text-align: center;
 }
 
 .floorplan {
@@ -373,6 +447,11 @@ body.auth-locked {
 svg {
   width: 100%;
   height: auto;
+}
+
+.chat-trigger svg {
+  width: 1.2rem;
+  height: 1.2rem;
 }
 
 .outer-wall {
@@ -697,6 +776,17 @@ svg {
   align-items: center;
 }
 
+.room-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.room-title-row h2 {
+  margin: 0;
+}
+
 .room-tabs {
   display: inline-flex;
   flex-wrap: wrap;
@@ -942,6 +1032,110 @@ svg {
   border: 1px solid #e4d4c0;
 }
 
+.chat-modal-surface {
+  width: min(720px, 100%);
+  max-height: min(85vh, 860px);
+  overflow: auto;
+}
+
+.chat-modal-heading {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.chat-settings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.8rem;
+}
+
+.chat-settings label {
+  display: grid;
+  gap: 0.4rem;
+  font-weight: 600;
+}
+
+.chat-settings select {
+  padding: 0.55rem 0.6rem;
+  border-radius: 0.6rem;
+  border: 1px solid #e4d4c0;
+}
+
+.chat-thread {
+  list-style: none;
+  margin: 0;
+  padding: 0.8rem;
+  border-radius: 0.8rem;
+  border: 1px solid #eadfce;
+  background: #fdf2e6;
+  display: grid;
+  gap: 0.6rem;
+  max-height: min(40vh, 360px);
+  overflow: auto;
+}
+
+.chat-message {
+  background: #fffaf4;
+  border: 1px solid #eadfce;
+  border-radius: 0.7rem;
+  padding: 0.6rem 0.7rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.chat-message.is-assistant {
+  background: #edf6ff;
+  border-color: #cfe1ff;
+}
+
+.chat-message-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  color: #7d6956;
+}
+
+.chat-message-role {
+  font-weight: 700;
+  color: #3b3127;
+}
+
+.chat-message-text {
+  white-space: pre-wrap;
+  font-size: 0.85rem;
+}
+
+.chat-empty {
+  text-align: center;
+}
+
+.chat-form {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.chat-form label {
+  display: grid;
+  gap: 0.4rem;
+  font-weight: 600;
+}
+
+.chat-form textarea {
+  padding: 0.6rem;
+  border-radius: 0.6rem;
+  border: 1px solid #e4d4c0;
+  resize: vertical;
+  min-height: 4.5rem;
+}
+
+.chat-form select {
+  padding: 0.55rem 0.6rem;
+  border-radius: 0.6rem;
+  border: 1px solid #e4d4c0;
+}
+
 .dependency-panel {
   display: grid;
   gap: 0.6rem;
@@ -949,6 +1143,112 @@ svg {
   background: #fdf2e6;
   border-radius: 0.8rem;
   border: 1px solid #eadfce;
+}
+
+.task-gmail-panel {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.8rem;
+  background: #fdf2e6;
+  border-radius: 0.8rem;
+  border: 1px solid #eadfce;
+}
+
+.task-gmail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.task-gmail-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #7d6956;
+  font-weight: 700;
+}
+
+.task-gmail-inputs {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+}
+
+.task-gmail-inputs input {
+  padding: 0.6rem;
+  border-radius: 0.6rem;
+  border: 1px solid #e4d4c0;
+}
+
+.gmail-thread-view {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.6rem;
+  border-radius: 0.6rem;
+  background: #fffaf4;
+  border: 1px solid #eadfce;
+}
+
+.gmail-thread-meta {
+  display: grid;
+  gap: 0.3rem;
+  color: #6c5845;
+  font-size: 0.85rem;
+}
+
+.gmail-thread-messages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.gmail-message {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.6rem;
+  border-radius: 0.6rem;
+  border: 1px solid #eadfce;
+  background: #ffffff;
+}
+
+.gmail-message-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-size: 0.75rem;
+  color: #7d6956;
+}
+
+.gmail-message-subject {
+  font-weight: 600;
+  color: #3b3127;
+}
+
+.gmail-reply {
+  display: grid;
+  gap: 0.4rem;
+  font-weight: 600;
+}
+
+.gmail-reply textarea {
+  padding: 0.6rem;
+  border-radius: 0.6rem;
+  border: 1px solid #e4d4c0;
+  resize: vertical;
+}
+
+.gmail-reply-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
 }
 
 .dependency-title {
@@ -1007,6 +1307,10 @@ button {
   font-weight: 600;
 }
 
+.gmail-status button {
+  padding: 0.35rem 0.8rem;
+}
+
 .checklist,
 .comments {
   list-style: none;
@@ -1022,6 +1326,17 @@ button {
   padding: 0.7rem;
   border-radius: 0.6rem;
   border: 1px solid #eadfce;
+}
+
+.comment-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.comment-message {
+  flex: 1;
+  min-width: 0;
 }
 
 .user-name,
@@ -1140,16 +1455,21 @@ button {
   min-width: 0;
 }
 
+.task-board-scroll {
+  overflow: auto hidden;
+  padding-bottom: 0.4rem;
+  height: clamp(360px, 60vh, 620px);
+  min-width: 0;
+}
+
 .task-board {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(240px, 1fr);
   gap: 1rem;
-  overflow-x: auto;
-  padding-bottom: 0.4rem;
-  height: clamp(360px, 60vh, 620px);
-  min-width: 0;
-  width: 100%;
+  min-width: 100%;
+  width: max-content;
+  height: 100%;
 }
 
 .task-list-mobile {
@@ -1261,6 +1581,20 @@ button {
   justify-content: space-between;
   gap: 0.6rem;
   flex-wrap: wrap;
+}
+
+.task-header-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.task-header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .task-title {
@@ -2079,6 +2413,11 @@ button {
   box-shadow: 0 6px 12px rgba(198, 90, 46, 0.28);
 }
 
+.mobile-view-toggle .segmented-option {
+  flex: 1 1 50%;
+  text-align: center;
+}
+
 #three-d-reset {
   justify-self: start;
   background: #fdf2e6;
@@ -2526,10 +2865,24 @@ button {
   stroke-width: 1.2;
 }
 
+.exterior-room:hover,
+.exterior-room.active {
+  fill: #d7efda;
+  stroke: #b6d1b6;
+}
+
 .exterior-area.exterior-corridor,
 .exterior-area.exterior-stairs {
   fill: #e5e7eb;
   stroke: #cbd5e1;
+}
+
+.exterior-room.exterior-corridor:hover,
+.exterior-room.exterior-stairs:hover,
+.exterior-room.exterior-corridor.active,
+.exterior-room.exterior-stairs.active {
+  fill: #dfe4ea;
+  stroke: #c4cfdb;
 }
 
 .room-draft {
@@ -2564,7 +2917,7 @@ button {
     grid-template-columns: 1fr;
   }
 
-  .task-board {
+  .task-board-scroll {
     height: auto;
   }
 
@@ -2616,6 +2969,11 @@ button {
     display: none;
   }
 
+  .gmail-status {
+    width: 100%;
+    justify-content: space-between;
+  }
+
   .app {
     padding: 1rem;
     gap: 1rem;
@@ -2654,6 +3012,10 @@ button {
   .room-tabs::-webkit-scrollbar-thumb {
     background: #e4d4c0;
     border-radius: 999px;
+  }
+
+  .task-gmail-inputs {
+    grid-template-columns: 1fr;
   }
 
   .task-filters {

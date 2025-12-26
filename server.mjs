@@ -3,6 +3,7 @@ import { readFile, stat } from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import { handleEvidenceApi } from "./evidence-store.mjs";
+import { handleGmailApi } from "./gmail-store.mjs";
 import { handleTasksApi } from "./tasks-store.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -224,6 +225,19 @@ const startServer = () =>
 
       if (tasksResponse) {
         sendJson(res, tasksResponse.statusCode, tasksResponse.payload);
+        return;
+      }
+
+      const gmailResponse = await handleGmailApi({
+        method,
+        urlPath,
+        headers: req.headers,
+        query: parsedUrl.searchParams,
+        body,
+      });
+
+      if (gmailResponse) {
+        sendJson(res, gmailResponse.statusCode, gmailResponse.payload);
         return;
       }
 
