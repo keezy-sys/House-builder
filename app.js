@@ -769,6 +769,8 @@ const state = {
 
 const taskModalState = {
   taskId: null,
+  dependencyDrafts: null,
+  dependencyPickerOpen: false,
 };
 
 const imageModalState = {
@@ -990,15 +992,22 @@ const elements = {
   taskModal: document.getElementById("task-modal"),
   taskModalForm: document.getElementById("task-modal-form"),
   taskModalTitle: document.getElementById("task-modal-title"),
+  taskModalChat: document.getElementById("task-modal-chat"),
   taskModalClose: document.getElementById("task-modal-close"),
   taskModalCancel: document.getElementById("task-modal-cancel"),
   taskFileList: document.getElementById("task-file-list"),
   taskFileEmpty: document.getElementById("task-file-empty"),
   taskFileUpload: document.getElementById("task-file-upload"),
   taskFileLink: document.getElementById("task-file-link"),
+  taskDatePanel: document.getElementById("task-date-panel"),
+  taskDateSummary: document.getElementById("task-date-summary"),
   taskStartDate: document.getElementById("task-start-date"),
   taskEndDate: document.getElementById("task-end-date"),
   taskDependencyList: document.getElementById("task-dependency-list"),
+  taskDependencySummary: document.getElementById("task-dependency-summary"),
+  taskDependencyToggle: document.getElementById("task-dependency-toggle"),
+  taskDependencyPicker: document.getElementById("task-dependency-picker"),
+  taskDependencyClose: document.getElementById("task-dependency-close"),
   emailPanelStatus: document.getElementById("email-panel-status"),
   emailPanelRefresh: document.getElementById("email-panel-refresh"),
   emailAccounts: document.getElementById("email-accounts"),
@@ -1006,6 +1015,8 @@ const elements = {
   emailConnectGmail: document.getElementById("email-connect-gmail"),
   emailConnectMicrosoft: document.getElementById("email-connect-microsoft"),
   emailUnlinkedThreads: document.getElementById("email-unlinked-threads"),
+  emailUnlinkedPanel: document.getElementById("email-unlinked-panel"),
+  emailUnlinkedToggle: document.getElementById("email-unlinked-toggle"),
   emailLinkedThreads: document.getElementById("email-linked-threads"),
   emailThreadView: document.getElementById("email-thread-view"),
   emailThreadMeta: document.getElementById("email-thread-meta"),
@@ -1043,6 +1054,11 @@ const elements = {
   authError: document.getElementById("auth-error"),
   authInfo: document.getElementById("auth-info"),
   authUserName: document.getElementById("auth-user-name"),
+  emailAccountsButton: document.getElementById("email-accounts-button"),
+  emailAccountsModal: document.getElementById("email-accounts-modal"),
+  emailAccountsClose: document.getElementById("email-accounts-close"),
+  emailAccountsRefresh: document.getElementById("email-accounts-refresh"),
+  emailAccountsStatus: document.getElementById("email-accounts-status"),
   securitySettingsBtn: document.getElementById("security-settings"),
   magicLinkBtn: document.getElementById("magic-link-btn"),
   resetPasswordBtn: document.getElementById("reset-password-btn"),
@@ -2549,6 +2565,13 @@ const updateAuthUI = () => {
   if (elements.authInfo) {
     elements.authInfo.hidden = !isAuthed || isRecovery;
   }
+  if (elements.emailAccountsButton) {
+    elements.emailAccountsButton.hidden = !isAuthed || isRecovery;
+  }
+  if ((!isAuthed || isRecovery) && elements.emailAccountsModal) {
+    elements.emailAccountsModal.hidden = true;
+    updateModalScrollLock();
+  }
   if (elements.securitySettingsBtn) {
     elements.securitySettingsBtn.hidden = !isAuthed || isRecovery;
   }
@@ -2615,13 +2638,16 @@ const createEmailOAuthState = () => {
 };
 
 const setEmailPanelStatus = (message, isError = false) => {
-  if (!elements.emailPanelStatus) return;
-  elements.emailPanelStatus.textContent = message || "";
-  elements.emailPanelStatus.classList.toggle(
-    "error",
-    Boolean(message && isError),
-  );
-  elements.emailPanelStatus.hidden = !message;
+  const targets = [
+    elements.emailPanelStatus,
+    elements.emailAccountsStatus,
+  ].filter(Boolean);
+  if (!targets.length) return;
+  targets.forEach((target) => {
+    target.textContent = message || "";
+    target.classList.toggle("error", Boolean(message && isError));
+    target.hidden = !message;
+  });
 };
 
 const setEmailReplyStatus = (message, isError = false) => {
@@ -3200,6 +3226,27 @@ const updateModalScrollLock = () => {
   if (!document.body) return;
   const hasOpenModal = Boolean(document.querySelector(".modal:not([hidden])"));
   document.body.classList.toggle("modal-open", hasOpenModal);
+};
+
+const openEmailAccountsModal = () => {
+  if (!elements.emailAccountsModal) return;
+  if (!authState.user || authState.isRecovery) {
+    window.alert("Bitte zuerst anmelden.");
+    return;
+  }
+  elements.emailAccountsModal.hidden = false;
+  updateModalScrollLock();
+  void loadEmailAccounts();
+};
+
+const closeEmailAccountsModal = () => {
+  if (!elements.emailAccountsModal) return;
+  elements.emailAccountsModal.hidden = true;
+  updateModalScrollLock();
+};
+
+const handleEmailAccountsRefresh = () => {
+  void loadEmailAccounts();
 };
 
 const openSecurityModal = () => {
@@ -4911,12 +4958,10 @@ const buildTaskPlanTrigger = ({ taskId, label } = {}) => {
   button.className = "chat-trigger plan-trigger";
   button.setAttribute("aria-label", label || "Planen");
   button.title = label || "Planen";
-  button.setAttribute("aria-haspopup", "menu");
-  button.setAttribute("aria-expanded", "false");
   button.appendChild(buildPlanIcon());
   button.addEventListener("click", (event) => {
     event.stopPropagation();
-    toggleTaskPlanMenu(button, taskId);
+    openTaskModal(taskId);
   });
   button.addEventListener("pointerdown", (event) => event.stopPropagation());
   button.addEventListener("dragstart", (event) => event.preventDefault());
@@ -8803,11 +8848,208 @@ const cleanupEmailLinksForTask = async (taskId) => {
   }
 };
 
+const normalizeDependencyIds = (dependencyIds = []) =>
+  Array.from(
+    new Set(
+      (Array.isArray(dependencyIds) ? dependencyIds : []).filter(
+        (id) => typeof id === "string",
+      ),
+    ),
+  );
+
+const getDependencyDrafts = () => {
+  if (!taskModalState.dependencyDrafts) {
+    taskModalState.dependencyDrafts = new Map();
+  }
+  return taskModalState.dependencyDrafts;
+};
+
+const getDependencyDraft = (taskId) => {
+  const drafts = getDependencyDrafts();
+  if (drafts.has(taskId)) return drafts.get(taskId);
+  const task = state.tasks.find((item) => item.id === taskId);
+  const deps = normalizeDependencyIds(task?.dependencyIds);
+  drafts.set(taskId, deps);
+  return deps;
+};
+
+const buildDependencyDraftMap = () => {
+  const taskMap = buildTaskMap();
+  if (!taskModalState.dependencyDrafts) return taskMap;
+  taskModalState.dependencyDrafts.forEach((deps, taskId) => {
+    const task = taskMap.get(taskId);
+    if (!task) return;
+    taskMap.set(taskId, {
+      ...task,
+      dependencyIds: normalizeDependencyIds(deps),
+    });
+  });
+  return taskMap;
+};
+
+const getDependencyState = (taskId, candidateId) => {
+  const outgoing = getDependencyDraft(taskId).includes(candidateId);
+  const incoming = getDependencyDraft(candidateId).includes(taskId);
+  if (outgoing && incoming) return "both";
+  if (outgoing) return "outgoing";
+  if (incoming) return "incoming";
+  return "none";
+};
+
+const getNextDependencyState = (state) => {
+  if (state === "none") return "outgoing";
+  if (state === "outgoing") return "incoming";
+  return "none";
+};
+
+const applyDependencyState = (taskId, candidateId, nextState) => {
+  const currentDeps = [...getDependencyDraft(taskId)];
+  const candidateDeps = [...getDependencyDraft(candidateId)];
+  const removeDependency = (list, id) => {
+    const index = list.indexOf(id);
+    if (index >= 0) {
+      list.splice(index, 1);
+    }
+  };
+  removeDependency(currentDeps, candidateId);
+  removeDependency(candidateDeps, taskId);
+  if (nextState === "outgoing") {
+    currentDeps.push(candidateId);
+  }
+  if (nextState === "incoming") {
+    candidateDeps.push(taskId);
+  }
+
+  const normalizedCurrent = normalizeDependencyIds(currentDeps);
+  const normalizedCandidate = normalizeDependencyIds(candidateDeps);
+  const taskMap = buildDependencyDraftMap();
+  if (taskMap.has(taskId)) {
+    taskMap.set(taskId, {
+      ...taskMap.get(taskId),
+      dependencyIds: normalizedCurrent,
+    });
+  }
+  if (taskMap.has(candidateId)) {
+    taskMap.set(candidateId, {
+      ...taskMap.get(candidateId),
+      dependencyIds: normalizedCandidate,
+    });
+  }
+
+  if (
+    nextState === "outgoing" &&
+    wouldCreateCycle(taskId, candidateId, taskMap)
+  ) {
+    window.alert("Diese Abhängigkeit würde einen Zyklus erzeugen.");
+    return false;
+  }
+  if (
+    nextState === "incoming" &&
+    wouldCreateCycle(candidateId, taskId, taskMap)
+  ) {
+    window.alert("Diese Abhängigkeit würde einen Zyklus erzeugen.");
+    return false;
+  }
+
+  const drafts = getDependencyDrafts();
+  drafts.set(taskId, normalizedCurrent);
+  drafts.set(candidateId, normalizedCandidate);
+  return true;
+};
+
+const updateDependencySummary = (taskId) => {
+  if (!elements.taskDependencySummary) return;
+  const outgoingCount = getDependencyDraft(taskId).length;
+  const incomingCount = state.tasks.filter((item) =>
+    getDependencyDraft(item.id).includes(taskId),
+  ).length;
+  if (!outgoingCount && !incomingCount) {
+    elements.taskDependencySummary.textContent = "Keine Abhängigkeiten.";
+    return;
+  }
+  const parts = [];
+  if (outgoingCount) {
+    parts.push(
+      `Hängt von ${outgoingCount} Aufgabe${outgoingCount === 1 ? "" : "n"} ab`,
+    );
+  }
+  if (incomingCount) {
+    parts.push(
+      `${incomingCount} Aufgabe${
+        incomingCount === 1 ? "" : "n"
+      } hängt von dieser Aufgabe ab`,
+    );
+  }
+  elements.taskDependencySummary.textContent = parts.join(" · ");
+};
+
+const updateTaskDateSummary = (task) => {
+  if (!elements.taskDateSummary) return;
+  const start = task?.startDate ? formatShortDate(task.startDate) : "";
+  const end = task?.endDate ? formatShortDate(task.endDate) : "";
+  let text = "Termin hinzufügen";
+  if (start && end && start !== end) {
+    text = `Termin: ${start} - ${end}`;
+  } else if (start || end) {
+    text = `Termin: ${start || end}`;
+  }
+  elements.taskDateSummary.textContent = text;
+};
+
+const updateTaskDateSummaryFromInputs = () => {
+  if (!elements.taskStartDate && !elements.taskEndDate) return;
+  updateTaskDateSummary({
+    startDate: elements.taskStartDate?.value || "",
+    endDate: elements.taskEndDate?.value || "",
+  });
+};
+
+const openDependencyPicker = () => {
+  if (!elements.taskDependencyPicker) return;
+  elements.taskDependencyPicker.hidden = false;
+  taskModalState.dependencyPickerOpen = true;
+  if (elements.taskDependencyToggle) {
+    elements.taskDependencyToggle.setAttribute("aria-expanded", "true");
+  }
+};
+
+const closeDependencyPicker = () => {
+  if (!elements.taskDependencyPicker) return;
+  elements.taskDependencyPicker.hidden = true;
+  taskModalState.dependencyPickerOpen = false;
+  if (elements.taskDependencyToggle) {
+    elements.taskDependencyToggle.setAttribute("aria-expanded", "false");
+  }
+};
+
+const toggleDependencyPicker = () => {
+  if (taskModalState.dependencyPickerOpen) {
+    closeDependencyPicker();
+  } else {
+    openDependencyPicker();
+  }
+};
+
+const toggleEmailUnlinkedPanel = () => {
+  if (!elements.emailUnlinkedPanel || !elements.emailUnlinkedToggle) return;
+  const shouldOpen = elements.emailUnlinkedPanel.hidden;
+  elements.emailUnlinkedPanel.hidden = !shouldOpen;
+  elements.emailUnlinkedToggle.setAttribute(
+    "aria-expanded",
+    shouldOpen ? "true" : "false",
+  );
+  elements.emailUnlinkedToggle.textContent = shouldOpen
+    ? "Schließen"
+    : "+ Thread verknüpfen";
+};
+
 const openTaskModal = (taskId) => {
   if (!elements.taskModal) return;
   const task = state.tasks.find((item) => item.id === taskId);
   if (!task) return;
   taskModalState.taskId = taskId;
+  taskModalState.dependencyDrafts = new Map();
+  getDependencyDraft(taskId);
   if (elements.taskModalTitle) {
     elements.taskModalTitle.textContent = `Aufgabe planen: ${task.title}`;
   }
@@ -8816,6 +9058,13 @@ const openTaskModal = (taskId) => {
   }
   if (elements.taskEndDate) {
     elements.taskEndDate.value = task.endDate || "";
+  }
+  if (elements.taskDatePanel) {
+    elements.taskDatePanel.open = Boolean(task.startDate || task.endDate);
+  }
+  updateTaskDateSummary(task);
+  if (elements.taskModalChat && !elements.taskModalChat.hasChildNodes()) {
+    elements.taskModalChat.appendChild(buildChatIcon());
   }
   if (elements.emailReplyText) {
     elements.emailReplyText.value = "";
@@ -8828,6 +9077,15 @@ const openTaskModal = (taskId) => {
   }
   setEmailReplyStatus("", false);
   setEmailReplyTranslateStatus("", false);
+  setEmailPanelStatus("", false);
+  closeDependencyPicker();
+  if (elements.emailUnlinkedPanel) {
+    elements.emailUnlinkedPanel.hidden = true;
+  }
+  if (elements.emailUnlinkedToggle) {
+    elements.emailUnlinkedToggle.setAttribute("aria-expanded", "false");
+    elements.emailUnlinkedToggle.textContent = "+ Thread verknüpfen";
+  }
   renderDependencyOptions(task);
   renderTaskFiles(task);
   void refreshEmailPanel(task, { force: false });
@@ -8839,6 +9097,18 @@ const closeTaskModal = () => {
   if (!elements.taskModal) return;
   elements.taskModal.hidden = true;
   taskModalState.taskId = null;
+  taskModalState.dependencyDrafts = null;
+  closeDependencyPicker();
+  if (elements.taskDatePanel) {
+    elements.taskDatePanel.open = false;
+  }
+  if (elements.emailUnlinkedPanel) {
+    elements.emailUnlinkedPanel.hidden = true;
+  }
+  if (elements.emailUnlinkedToggle) {
+    elements.emailUnlinkedToggle.setAttribute("aria-expanded", "false");
+    elements.emailUnlinkedToggle.textContent = "+ Thread verknüpfen";
+  }
   setEmailPanelStatus("", false);
   setEmailReplyStatus("", false);
   clearEmailThreadView();
@@ -8862,6 +9132,8 @@ const closeHelpModal = () => {
 const renderDependencyOptions = (task) => {
   if (!elements.taskDependencyList) return;
   elements.taskDependencyList.innerHTML = "";
+  if (!task) return;
+  updateDependencySummary(task.id);
   const candidates = state.tasks.filter((item) => item.id !== task.id);
   if (!candidates.length) {
     const note = document.createElement("p");
@@ -8871,29 +9143,43 @@ const renderDependencyOptions = (task) => {
     return;
   }
 
-  const taskMap = buildTaskMap();
+  candidates.sort((a, b) =>
+    String(a.title || "").localeCompare(String(b.title || ""), "de", {
+      sensitivity: "base",
+    }),
+  );
+
   candidates.forEach((candidate) => {
-    const isChecked = task.dependencyIds?.includes(candidate.id);
-    const isDisabled =
-      !isChecked && wouldCreateCycle(task.id, candidate.id, taskMap);
-    const label = document.createElement("label");
-    label.className = "dependency-option";
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.value = candidate.id;
-    checkbox.checked = Boolean(isChecked);
-    checkbox.disabled = Boolean(isDisabled);
-    const text = document.createElement("span");
-    text.textContent = candidate.title;
-    label.appendChild(checkbox);
-    label.appendChild(text);
-    if (isDisabled) {
-      const note = document.createElement("span");
-      note.className = "dependency-note";
-      note.textContent = "Zyklus";
-      label.appendChild(note);
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "dependency-item";
+    const state = getDependencyState(task.id, candidate.id);
+    item.dataset.state = state;
+    const name = document.createElement("span");
+    name.className = "dependency-name";
+    name.textContent = candidate.title;
+    const stateLabel = document.createElement("span");
+    stateLabel.className = "dependency-state";
+    if (state === "outgoing") {
+      stateLabel.textContent = "->";
+    } else if (state === "incoming") {
+      stateLabel.textContent = "<-";
+    } else if (state === "both") {
+      stateLabel.textContent = "beide";
+    } else {
+      stateLabel.textContent = "keine";
     }
-    elements.taskDependencyList.appendChild(label);
+    item.appendChild(name);
+    item.appendChild(stateLabel);
+    item.addEventListener("click", () => {
+      const currentState = getDependencyState(task.id, candidate.id);
+      const nextState = getNextDependencyState(currentState);
+      if (!applyDependencyState(task.id, candidate.id, nextState)) {
+        return;
+      }
+      renderDependencyOptions(task);
+    });
+    elements.taskDependencyList.appendChild(item);
   });
 };
 
@@ -8909,31 +9195,6 @@ const handleTaskModalSubmit = (event) => {
 
   const nextStartValue = elements.taskStartDate?.value || "";
   const nextEndValue = elements.taskEndDate?.value || "";
-  const selectedDependencies = Array.from(
-    elements.taskDependencyList?.querySelectorAll(
-      "input[type='checkbox']:checked",
-    ) || [],
-  ).map((input) => input.value);
-
-  const taskMap = buildTaskMap();
-  const validDependencyIds = Array.from(new Set(selectedDependencies)).filter(
-    (id) => id !== task.id && taskMap.has(id),
-  );
-
-  const previousDependencies = Array.isArray(task.dependencyIds)
-    ? task.dependencyIds
-    : [];
-  const addedDependencies = validDependencyIds.filter(
-    (id) => !previousDependencies.includes(id),
-  );
-  const createsCycle = addedDependencies.some((dependencyId) =>
-    wouldCreateCycle(task.id, dependencyId, taskMap),
-  );
-  if (createsCycle) {
-    window.alert("Diese Abhängigkeit würde einen Zyklus erzeugen.");
-    renderDependencyOptions(task);
-    return;
-  }
 
   let nextStartDate = isValidDateInput(nextStartValue) ? nextStartValue : null;
   let nextEndDate = isValidDateInput(nextEndValue) ? nextEndValue : null;
@@ -8950,27 +9211,65 @@ const handleTaskModalSubmit = (event) => {
       [nextStartDate, nextEndDate] = [nextEndDate, nextStartDate];
     }
   }
-  const dependenciesChanged =
-    previousDependencies.length !== validDependencyIds.length ||
-    previousDependencies.some((id) => !validDependencyIds.includes(id));
 
-  if (
-    task.startDate === nextStartDate &&
-    task.endDate === nextEndDate &&
-    !dependenciesChanged
-  ) {
+  const taskMap = buildTaskMap();
+  const dependencyDrafts = taskModalState.dependencyDrafts || new Map();
+  const dependencyUpdates = [];
+  dependencyDrafts.forEach((draftDeps, draftTaskId) => {
+    const targetTask = taskMap.get(draftTaskId);
+    if (!targetTask) return;
+    const normalizedDraft = normalizeDependencyIds(draftDeps).filter(
+      (id) => id !== draftTaskId && taskMap.has(id),
+    );
+    const previousDeps = Array.isArray(targetTask.dependencyIds)
+      ? targetTask.dependencyIds
+      : [];
+    const changed =
+      previousDeps.length !== normalizedDraft.length ||
+      previousDeps.some((id) => !normalizedDraft.includes(id));
+    if (changed) {
+      dependencyUpdates.push({ task: targetTask, deps: normalizedDraft });
+    }
+  });
+
+  const dateChanged =
+    task.startDate !== nextStartDate || task.endDate !== nextEndDate;
+  const currentDepsUpdate = dependencyUpdates.find(
+    (entry) => entry.task.id === task.id,
+  );
+
+  if (!dateChanged && dependencyUpdates.length === 0) {
     closeTaskModal();
     return;
   }
 
-  task.startDate = nextStartDate;
-  task.endDate = nextEndDate;
-  task.dependencyIds = validDependencyIds;
-  task.updatedAt = new Date().toISOString();
-  logTaskUpdate(task, {
-    startDate: nextStartDate,
-    endDate: nextEndDate,
-    dependencies: validDependencyIds,
+  if (dateChanged || currentDepsUpdate) {
+    if (dateChanged) {
+      task.startDate = nextStartDate;
+      task.endDate = nextEndDate;
+    }
+    if (currentDepsUpdate) {
+      task.dependencyIds = currentDepsUpdate.deps;
+    }
+    task.updatedAt = new Date().toISOString();
+    const metadata = {};
+    if (dateChanged) {
+      metadata.startDate = nextStartDate;
+      metadata.endDate = nextEndDate;
+    }
+    if (currentDepsUpdate) {
+      metadata.dependencies = currentDepsUpdate.deps;
+    }
+    if (Object.keys(metadata).length) {
+      logTaskUpdate(task, metadata);
+    }
+  }
+
+  dependencyUpdates.forEach(({ task: targetTask, deps }) => {
+    if (targetTask.id === task.id) return;
+    targetTask.dependencyIds = deps;
+    targetTask.updatedAt = new Date().toISOString();
+    logTaskUpdate(targetTask, { dependencies: deps });
   });
   saveState();
   renderTasksPanel();
@@ -12182,6 +12481,14 @@ const bindEvents = () => {
     updateTaskSelectionState(),
   );
   elements.taskModalForm?.addEventListener("submit", handleTaskModalSubmit);
+  elements.taskStartDate?.addEventListener(
+    "change",
+    updateTaskDateSummaryFromInputs,
+  );
+  elements.taskEndDate?.addEventListener(
+    "change",
+    updateTaskDateSummaryFromInputs,
+  );
   elements.taskModalClose?.addEventListener("click", closeTaskModal);
   elements.taskModalCancel?.addEventListener("click", closeTaskModal);
   elements.taskModal?.addEventListener("click", (event) => {
@@ -12189,6 +12496,23 @@ const bindEvents = () => {
       closeTaskModal();
     }
   });
+  elements.taskModalChat?.addEventListener("click", () => {
+    const task = getTaskFromModal();
+    if (!task) return;
+    openChatModal({ scope: "task", taskId: task.id });
+  });
+  elements.taskDependencyToggle?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleDependencyPicker();
+  });
+  elements.taskDependencyClose?.addEventListener(
+    "click",
+    closeDependencyPicker,
+  );
+  elements.emailUnlinkedToggle?.addEventListener(
+    "click",
+    toggleEmailUnlinkedPanel,
+  );
   elements.ganttChart?.addEventListener("pointerdown", handleGanttPointerDown);
   elements.roomChatTrigger?.addEventListener("click", () => {
     if (!state.activeRoomId) return;
@@ -12217,6 +12541,23 @@ const bindEvents = () => {
       closeHelpModal();
     }
   });
+  elements.emailAccountsButton?.addEventListener(
+    "click",
+    openEmailAccountsModal,
+  );
+  elements.emailAccountsClose?.addEventListener(
+    "click",
+    closeEmailAccountsModal,
+  );
+  elements.emailAccountsModal?.addEventListener("click", (event) => {
+    if (event.target === elements.emailAccountsModal) {
+      closeEmailAccountsModal();
+    }
+  });
+  elements.emailAccountsRefresh?.addEventListener(
+    "click",
+    handleEmailAccountsRefresh,
+  );
   elements.securityModal?.addEventListener("click", (event) => {
     if (event.target === elements.securityModal) {
       closeSecurityModal();
@@ -12289,6 +12630,9 @@ const bindEvents = () => {
     if (taskPlanMenuState.isOpen) {
       closeTaskPlanMenu();
     }
+    if (taskModalState.dependencyPickerOpen) {
+      closeDependencyPicker();
+    }
     if (imageModalState.isOpen) {
       closeImageModal();
     }
@@ -12308,6 +12652,13 @@ const bindEvents = () => {
       !elements.taskPlanMenu?.contains(event.target)
     ) {
       closeTaskPlanMenu();
+    }
+    if (
+      taskModalState.dependencyPickerOpen &&
+      !elements.taskDependencyPicker?.contains(event.target) &&
+      !elements.taskDependencyToggle?.contains(event.target)
+    ) {
+      closeDependencyPicker();
     }
   });
   window.addEventListener("resize", closeCommentContextMenu);

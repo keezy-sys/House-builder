@@ -130,6 +130,7 @@
             <span class="auth-label">Angemeldet als</span>
             <span id="auth-user-name" class="user-name"></span>
           </div>
+          <button id="email-accounts-button" type="button">E-Mail</button>
           <button id="sign-out" type="button">Abmelden</button>
         </div>
       </div>
@@ -507,9 +508,6 @@
                 <h2>Aufgabenübersicht</h2>
                 <p id="task-count" class="helper">0 Aufgaben</p>
               </div>
-              <button id="tasks-reset" type="button">
-                Filter zurücksetzen
-              </button>
             </div>
             <form id="task-create-form" class="task-create">
               <label>
@@ -529,107 +527,119 @@
             <p class="helper task-create-hint">
               Hashtags werden als Tags übernommen.
             </p>
-            <div class="task-views">
-              <span class="task-views-label">Ansichten</span>
-              <div
-                class="segmented-control"
-                role="tablist"
-                aria-label="Aufgabenansichten"
-              >
-                <button
-                  class="segmented-option is-active"
-                  type="button"
-                  data-task-view="all"
-                  aria-selected="true"
-                >
-                  Alle
-                </button>
-                <button
-                  class="segmented-option"
-                  type="button"
-                  data-task-view="materials"
-                  aria-selected="false"
-                >
-                  Material
-                </button>
-                <button
-                  class="segmented-option"
-                  type="button"
-                  data-task-view="devices"
-                  aria-selected="false"
-                >
-                  Geraete
-                </button>
-                <button
-                  class="segmented-option"
-                  type="button"
-                  data-task-view="permits"
-                  aria-selected="false"
-                >
-                  Genehmigungen
-                </button>
-                <button
-                  class="segmented-option"
-                  type="button"
-                  data-task-view="contractors"
-                  aria-selected="false"
-                >
-                  Handwerker
-                </button>
-              </div>
-            </div>
-            <div class="task-filters">
-              <label>
-                Raum
-                <select id="task-filter-room"></select>
-              </label>
-              <label>
-                Status
-                <select id="task-filter-status"></select>
-              </label>
-              <label>
-                Zuständig
-                <select id="task-filter-assignee"></select>
-              </label>
-              <label>
-                Tag
-                <select id="task-filter-tag"></select>
-              </label>
-              <label>
-                Suche
-                <input
-                  type="search"
-                  id="task-filter-search"
-                  placeholder="Nach Titel oder Notiz suchen"
-                />
-              </label>
-            </div>
-            <div class="task-bulk-actions">
-              <label class="task-select-all">
-                <input type="checkbox" id="task-select-all" />
-                <span>Alle auswählen</span>
-              </label>
-              <span id="task-selection-count" class="helper"
-                >Keine Auswahl</span
-              >
-              <div class="task-bulk-row">
-                <button id="task-bulk-done" type="button" disabled>
-                  Erledigt markieren
-                </button>
-                <div class="task-bulk-field">
-                  <select id="task-bulk-assignee"></select>
-                  <button id="task-bulk-assign" type="button" disabled>
-                    Zuweisen
+            <details class="task-advanced" id="task-advanced">
+              <summary>
+                <span>Filter &amp; Ansicht</span>
+              </summary>
+              <div class="task-advanced-body">
+                <div class="task-advanced-actions">
+                  <button id="tasks-reset" type="button">
+                    Filter zurücksetzen
                   </button>
                 </div>
-                <div class="task-bulk-field">
-                  <input type="date" id="task-bulk-due" />
-                  <button id="task-bulk-due-apply" type="button" disabled>
-                    Fällig setzen
-                  </button>
+                <div class="task-views">
+                  <span class="task-views-label">Ansichten</span>
+                  <div
+                    class="segmented-control"
+                    role="tablist"
+                    aria-label="Aufgabenansichten"
+                  >
+                    <button
+                      class="segmented-option is-active"
+                      type="button"
+                      data-task-view="all"
+                      aria-selected="true"
+                    >
+                      Alle
+                    </button>
+                    <button
+                      class="segmented-option"
+                      type="button"
+                      data-task-view="materials"
+                      aria-selected="false"
+                    >
+                      Material
+                    </button>
+                    <button
+                      class="segmented-option"
+                      type="button"
+                      data-task-view="devices"
+                      aria-selected="false"
+                    >
+                      Geraete
+                    </button>
+                    <button
+                      class="segmented-option"
+                      type="button"
+                      data-task-view="permits"
+                      aria-selected="false"
+                    >
+                      Genehmigungen
+                    </button>
+                    <button
+                      class="segmented-option"
+                      type="button"
+                      data-task-view="contractors"
+                      aria-selected="false"
+                    >
+                      Handwerker
+                    </button>
+                  </div>
+                </div>
+                <div class="task-filters">
+                  <label>
+                    Raum
+                    <select id="task-filter-room"></select>
+                  </label>
+                  <label>
+                    Status
+                    <select id="task-filter-status"></select>
+                  </label>
+                  <label>
+                    Zuständig
+                    <select id="task-filter-assignee"></select>
+                  </label>
+                  <label>
+                    Tag
+                    <select id="task-filter-tag"></select>
+                  </label>
+                  <label>
+                    Suche
+                    <input
+                      type="search"
+                      id="task-filter-search"
+                      placeholder="Nach Titel oder Notiz suchen"
+                    />
+                  </label>
+                </div>
+                <div class="task-bulk-actions">
+                  <label class="task-select-all">
+                    <input type="checkbox" id="task-select-all" />
+                    <span>Alle auswählen</span>
+                  </label>
+                  <span id="task-selection-count" class="helper"
+                    >Keine Auswahl</span
+                  >
+                  <div class="task-bulk-row">
+                    <button id="task-bulk-done" type="button" disabled>
+                      Erledigt markieren
+                    </button>
+                    <div class="task-bulk-field">
+                      <select id="task-bulk-assignee"></select>
+                      <button id="task-bulk-assign" type="button" disabled>
+                        Zuweisen
+                      </button>
+                    </div>
+                    <div class="task-bulk-field">
+                      <input type="date" id="task-bulk-due" />
+                      <button id="task-bulk-due-apply" type="button" disabled>
+                        Fällig setzen
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            </details>
             <div class="tasks-layout">
               <div class="tasks-board">
                 <div class="task-board-scroll">
@@ -847,20 +857,64 @@
       >
         <div class="modal-header">
           <h3 id="task-modal-title">Aufgabe planen</h3>
-          <button type="button" id="task-modal-close">Schließen</button>
+          <div class="modal-header-actions">
+            <button
+              type="button"
+              id="task-modal-chat"
+              class="chat-trigger"
+              aria-label="ChatGPT Chat zur Aufgabe"
+              title="ChatGPT Chat zur Aufgabe"
+            ></button>
+            <button type="button" id="task-modal-close">Schließen</button>
+          </div>
         </div>
         <form id="task-modal-form" class="modal-form">
-          <label>
-            Startdatum
-            <input type="date" id="task-start-date" />
-          </label>
-          <label>
-            Enddatum
-            <input type="date" id="task-end-date" />
-          </label>
+          <details class="task-date-panel" id="task-date-panel">
+            <summary>
+              <span id="task-date-summary">Termin hinzufügen</span>
+            </summary>
+            <div class="task-date-fields">
+              <label>
+                Startdatum
+                <input type="date" id="task-start-date" />
+              </label>
+              <label>
+                Enddatum
+                <input type="date" id="task-end-date" />
+              </label>
+            </div>
+          </details>
           <div class="dependency-panel">
-            <div class="dependency-title">Abhängigkeiten</div>
-            <div id="task-dependency-list" class="dependency-list"></div>
+            <div class="dependency-header">
+              <div class="dependency-title">Abhängigkeiten</div>
+              <button
+                type="button"
+                id="task-dependency-toggle"
+                aria-haspopup="dialog"
+                aria-expanded="false"
+                aria-controls="task-dependency-picker"
+              >
+                Auswählen
+              </button>
+            </div>
+            <p id="task-dependency-summary" class="helper"></p>
+            <div id="task-dependency-picker" class="dependency-picker" hidden>
+              <div class="dependency-picker-header">
+                <span>Aufgaben verknüpfen</span>
+                <button type="button" id="task-dependency-close">
+                  Schließen
+                </button>
+              </div>
+              <div class="dependency-legend">
+                <span class="dependency-legend-item"
+                  >-&gt; Diese Aufgabe hängt von der Auswahl ab</span
+                >
+                <span class="dependency-legend-item"
+                  >&lt;- Auswahl hängt von dieser Aufgabe ab</span
+                >
+              </div>
+              <div id="task-dependency-list" class="dependency-list"></div>
+            </div>
           </div>
           <div class="task-file-panel">
             <div class="task-file-header">
@@ -886,34 +940,38 @@
           </div>
           <div class="task-email-panel" id="task-email-panel">
             <div class="task-email-header">
-              <div class="task-email-title">E-Mail-Integration</div>
-              <button type="button" id="email-panel-refresh">
-                Aktualisieren
-              </button>
+              <div class="task-email-title">E-Mail-Threads</div>
+              <div class="task-email-actions">
+                <button type="button" id="email-panel-refresh">
+                  Aktualisieren
+                </button>
+                <button
+                  type="button"
+                  id="email-unlinked-toggle"
+                  aria-expanded="false"
+                  aria-controls="email-unlinked-panel"
+                >
+                  + Thread verknüpfen
+                </button>
+              </div>
             </div>
             <p id="email-panel-status" class="helper" hidden></p>
-            <div class="email-accounts" id="email-accounts"></div>
-            <div class="email-connect-actions" id="email-connect-actions">
-              <button id="email-connect-gmail" type="button">
-                Gmail verbinden
-              </button>
-              <button id="email-connect-microsoft" type="button">
-                Outlook verbinden
-              </button>
-            </div>
-            <div class="email-section">
-              <div class="email-section-title">Unverknüpfte Lugano-Threads</div>
-              <p class="helper">
-                Zeigt Gespräche im Lugano-Ordner/Label, die noch keiner Aufgabe
-                zugeordnet sind.
-              </p>
-              <ul id="email-unlinked-threads" class="email-thread-list"></ul>
-            </div>
             <div class="email-section">
               <div class="email-section-title">
                 Mit dieser Aufgabe verknüpft
               </div>
               <ul id="email-linked-threads" class="email-thread-list"></ul>
+            </div>
+            <div
+              class="email-section email-unlinked-panel"
+              id="email-unlinked-panel"
+              hidden
+            >
+              <div class="email-section-title">Weitere Threads</div>
+              <p class="helper">
+                Nur E-Mails im Ordner/Label „Lugano“ erscheinen hier.
+              </p>
+              <ul id="email-unlinked-threads" class="email-thread-list"></ul>
             </div>
             <div id="email-thread-view" class="email-thread-view" hidden>
               <div id="email-thread-meta" class="email-thread-meta"></div>
@@ -963,15 +1021,43 @@
                 <span id="email-reply-status" class="helper"></span>
               </div>
             </div>
-            <p class="helper">
-              Nur E-Mails im Ordner/Label „Lugano“ erscheinen hier.
-            </p>
           </div>
           <div class="modal-actions">
             <button type="button" id="task-modal-cancel">Abbrechen</button>
             <button type="submit" class="primary">Speichern</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <div id="email-accounts-modal" class="modal" hidden>
+      <div
+        class="modal-surface"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="email-accounts-title"
+      >
+        <div class="modal-header">
+          <h3 id="email-accounts-title">E-Mail-Konten</h3>
+          <button type="button" id="email-accounts-close">Schließen</button>
+        </div>
+        <div class="email-accounts-panel">
+          <p id="email-accounts-status" class="helper" hidden></p>
+          <div class="email-accounts-toolbar">
+            <button type="button" id="email-accounts-refresh">
+              Aktualisieren
+            </button>
+          </div>
+          <div class="email-accounts" id="email-accounts"></div>
+          <div class="email-connect-actions" id="email-connect-actions">
+            <button id="email-connect-gmail" type="button">
+              Gmail verbinden
+            </button>
+            <button id="email-connect-microsoft" type="button">
+              Outlook verbinden
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 

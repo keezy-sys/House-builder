@@ -70,6 +70,15 @@ const addTasks = async (page, tasks) => {
   }
 };
 
+const openTaskAdvanced = async (page) => {
+  const advanced = page.locator("#task-advanced");
+  await expect(advanced).toBeVisible();
+  const isOpen = await advanced.evaluate((element) => element.open);
+  if (!isOpen) {
+    await advanced.locator("summary").click();
+  }
+};
+
 test("app loads ohne Absturz", async ({ page }) => {
   await preparePage(page);
   await expect(page.locator("body")).toBeVisible();
@@ -137,6 +146,7 @@ test("Aufgaben erstellen, filtern und erledigen", async ({ page }) => {
   await expect(page.locator("#room-tasks")).toContainText("Aufgabe Bad");
 
   await page.locator("#view-tasks").click();
+  await openTaskAdvanced(page);
   await page.selectOption("#task-filter-room", firstRoomId);
 
   const taskList = page.locator("#task-list");
@@ -155,6 +165,7 @@ test("Aufgabenuebersicht erstellt neue Aufgabe trotz Filter", async ({
 
   await page.locator("#view-tasks").click();
   await expect(page.locator("#tasks-view")).toBeVisible();
+  await openTaskAdvanced(page);
 
   await page.selectOption("#task-filter-status", "Planned");
   await page.locator("#task-create-input").fill("Neue Aufgabe Uebersicht");
@@ -176,6 +187,7 @@ test("saved views filtern Tasks nach Tags und Status", async ({ page }) => {
   ]);
 
   await page.locator("#view-tasks").click();
+  await openTaskAdvanced(page);
 
   const taskList = page.locator("#task-list");
   const paintTask = taskList.locator("[data-task-title='Order paint']");
@@ -234,6 +246,7 @@ test("bulk actions setzen Status, Zuweisung und Faelligkeit", async ({
   await addTasks(page, ["Bulk task A #materials", "Bulk task B #permit"]);
 
   await page.locator("#view-tasks").click();
+  await openTaskAdvanced(page);
 
   const taskList = page.locator("#task-list");
   const taskA = taskList.locator("[data-task-title='Bulk task A']");
