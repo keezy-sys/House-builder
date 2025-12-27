@@ -138,6 +138,9 @@ const DEFAULT_CHAT_CONFIG = {
   reasoningEffort: "auto",
 };
 const CHAT_MESSAGE_LIMIT = 20;
+const EVIDENCE_ROOM_ACTIVE = "active";
+const EVIDENCE_ROOM_NONE = "none";
+const EVIDENCE_TASK_NONE = "none";
 
 const TASK_TAG_GROUPS = {
   materials: ["material"],
@@ -717,6 +720,8 @@ const emailState = {
   loadingAccounts: false,
   loadingThreads: false,
   loadingMessages: false,
+  translatingMessageIds: new Set(),
+  translatingDraft: false,
   error: "",
 };
 
@@ -811,6 +816,12 @@ const commentContextState = {
   isOpen: false,
 };
 
+const taskPlanMenuState = {
+  taskId: null,
+  isOpen: false,
+  trigger: null,
+};
+
 const dragState = {
   active: false,
   didMove: false,
@@ -872,6 +883,7 @@ const elements = {
   commentTooltipAuthor: document.getElementById("comment-tooltip-author"),
   commentTooltipText: document.getElementById("comment-tooltip-text"),
   commentContextMenu: document.getElementById("comment-context-menu"),
+  taskPlanMenu: document.getElementById("task-plan-menu"),
   decisionList: document.getElementById("decision-list"),
   decisionForm: document.getElementById("decision-form"),
   decisionTitleInput: document.getElementById("decision-title"),
@@ -886,6 +898,8 @@ const elements = {
   uploadImageInput: document.getElementById("upload-image"),
   generateImageBtn: document.getElementById("generate-image"),
   addEvidenceLinkBtn: document.getElementById("add-evidence-link"),
+  evidenceRoomSelect: document.getElementById("evidence-room-select"),
+  evidenceTaskSelect: document.getElementById("evidence-task-select"),
   architectToggleLabel: document.getElementById("architect-toggle-label"),
   toggleArchitect: document.getElementById("toggle-architect"),
   helpButton: document.getElementById("help-button"),
@@ -977,6 +991,10 @@ const elements = {
   taskModalTitle: document.getElementById("task-modal-title"),
   taskModalClose: document.getElementById("task-modal-close"),
   taskModalCancel: document.getElementById("task-modal-cancel"),
+  taskFileList: document.getElementById("task-file-list"),
+  taskFileEmpty: document.getElementById("task-file-empty"),
+  taskFileUpload: document.getElementById("task-file-upload"),
+  taskFileLink: document.getElementById("task-file-link"),
   taskStartDate: document.getElementById("task-start-date"),
   taskEndDate: document.getElementById("task-end-date"),
   taskDependencyList: document.getElementById("task-dependency-list"),
@@ -992,6 +1010,12 @@ const elements = {
   emailThreadMeta: document.getElementById("email-thread-meta"),
   emailThreadMessages: document.getElementById("email-thread-messages"),
   emailReplyText: document.getElementById("email-reply-text"),
+  emailReplyTextIt: document.getElementById("email-reply-text-it"),
+  emailReplyTranslation: document.getElementById("email-reply-translation"),
+  emailReplyTranslate: document.getElementById("email-reply-translate"),
+  emailReplyTranslateStatus: document.getElementById(
+    "email-reply-translate-status",
+  ),
   emailReplySend: document.getElementById("email-reply-send"),
   emailReplyStatus: document.getElementById("email-reply-status"),
   chatModal: document.getElementById("chat-modal"),
@@ -1066,7 +1090,10 @@ const defaultRoomData = () => ({
 });
 
 const createTaskId = () => {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
     return `task-${crypto.randomUUID()}`;
   }
   return `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -2554,6 +2581,29 @@ const readJson = async (response) => {
   }
 };
 
+const stripHtml = (value) => {
+  const raw = String(value || "");
+  if (!raw) return "";
+  const withoutScripts = raw
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, " ");
+  const withBreaks = withoutScripts
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n");
+  const withoutTags = withBreaks.replace(/<[^>]+>/g, " ");
+  return withoutTags
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&#39;/gi, "'")
+    .replace(/&quot;/gi, '"')
+    .replace(/\s+\n/g, "\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+};
+
 const createEmailOAuthState = () => {
   if (window.crypto?.getRandomValues) {
     const bytes = new Uint8Array(16);
@@ -2583,13 +2633,20 @@ const setEmailReplyStatus = (message, isError = false) => {
   elements.emailReplyStatus.hidden = !message;
 };
 
-const setReauthStatus = (message, isError = false) => {
-  if (!elements.reauthStatus) return;
-  elements.reauthStatus.textContent = message || "";
-  elements.reauthStatus.classList.toggle(
+const setEmailReplyTranslateStatus = (message, isError = false) => {
+  if (!elements.emailReplyTranslateStatus) return;
+  elements.emailReplyTranslateStatus.textContent = message || "";
+  elements.emailReplyTranslateStatus.classList.toggle(
     "error",
     Boolean(message && isError),
   );
+  elements.emailReplyTranslateStatus.hidden = !message;
+};
+
+const setReauthStatus = (message, isError = false) => {
+  if (!elements.reauthStatus) return;
+  elements.reauthStatus.textContent = message || "";
+  elements.reauthStatus.classList.toggle("error", Boolean(message && isError));
   elements.reauthStatus.hidden = !message;
 };
 
@@ -2657,8 +2714,74 @@ const getEmailOAuthErrorMessage = (response, data, fallback) => {
   if (code === "oauth_connect_failed") {
     return "OAuth konnte nicht abgeschlossen werden.";
   }
+  const rawText = String(data?._rawText || "").trim();
+  if (rawText && !rawText.startsWith("<")) {
+    return `Fehler: ${rawText.slice(0, 160)}`;
+  }
+  if (data?.error) {
+    return `Fehler: ${String(data.error).slice(0, 160)}`;
+  }
   if (response?.status) {
     return `${fallback} (HTTP ${response.status})`;
+  }
+  return fallback;
+};
+
+const getEmailApiErrorMessage = (response, data, fallback) => {
+  const code = String(data?.code || "").trim();
+  if (code === "missing_supabase_config") {
+    return "Supabase-Konfiguration fehlt.";
+  }
+  if (code === "missing_access_token" || code === "invalid_access_token") {
+    return "Sitzung abgelaufen. Bitte neu anmelden.";
+  }
+  if (code === "reauth_required") {
+    return "Bestätigung erforderlich. Bitte erneut bestätigen.";
+  }
+  if (code === "missing_api_key") {
+    return "OpenAI API-Schlüssel fehlt.";
+  }
+  if (code === "openai_network_error") {
+    return "OpenAI ist nicht erreichbar.";
+  }
+  if (code === "openai_error") {
+    return "OpenAI-Fehler.";
+  }
+  if (code === "missing_translation_data") {
+    return "Übersetzungsdaten fehlen.";
+  }
+  if (code === "unsupported_target") {
+    return "Übersetzungssprache nicht unterstützt.";
+  }
+  if (code === "message_not_found") {
+    return "Nachricht nicht gefunden.";
+  }
+  if (code === "missing_message_body") {
+    return "Nachricht enthält keinen Text.";
+  }
+  if (code === "missing_text") {
+    return "Kein Text zum Übersetzen vorhanden.";
+  }
+  if (code === "missing_target") {
+    return "Zielsprache fehlt.";
+  }
+  const rawText = String(data?._rawText || "").trim();
+  if (rawText && !rawText.startsWith("<")) {
+    return `Fehler: ${rawText.slice(0, 160)}`;
+  }
+  if (data?.error) {
+    return `Fehler: ${String(data.error).slice(0, 160)}`;
+  }
+  if (response?.status) {
+    return `${fallback} (HTTP ${response.status})`;
+  }
+  return fallback;
+};
+
+const getEmailFetchErrorMessage = (error, fallback) => {
+  const message = String(error?.message || "");
+  if (message.includes("Failed to fetch")) {
+    return "Server nicht erreichbar. Bitte neu laden.";
   }
   return fallback;
 };
@@ -2669,10 +2792,7 @@ const isLocalReauthFresh = () => {
   const stamp = sessionStorage.getItem("2fa_verified_at");
   if (!stamp) return false;
   const timestamp = new Date(stamp).getTime();
-  return (
-    Number.isFinite(timestamp) &&
-    timestamp > Date.now() - 30 * 60 * 1000
-  );
+  return Number.isFinite(timestamp) && timestamp > Date.now() - 30 * 60 * 1000;
 };
 
 const getProviderLabel = (provider) =>
@@ -2768,9 +2888,12 @@ const resetEmailState = () => {
   emailState.loadingAccounts = false;
   emailState.loadingThreads = false;
   emailState.loadingMessages = false;
+  emailState.translatingMessageIds = new Set();
+  emailState.translatingDraft = false;
   emailState.error = "";
   setEmailPanelStatus("", false);
   setEmailReplyStatus("", false);
+  setEmailReplyTranslateStatus("", false);
   if (elements.emailUnlinkedThreads) {
     elements.emailUnlinkedThreads.innerHTML = "";
   }
@@ -2847,7 +2970,10 @@ const exchangeEmailCode = async (provider, code) => {
       await refreshEmailPanel(activeTask, { force: true });
     }
   } catch (error) {
-    emailState.error = error?.message || "E-Mail-Verbindung fehlgeschlagen.";
+    emailState.error = getEmailFetchErrorMessage(
+      error,
+      error?.message || "E-Mail-Verbindung fehlgeschlagen.",
+    );
     setEmailPanelStatus(emailState.error, true);
   }
 };
@@ -2866,10 +2992,7 @@ const startEmailConnect = async (provider) => {
   }
   const token = getAuthToken();
   if (!token) {
-    setEmailPanelStatus(
-      "Anmeldung abgelaufen. Bitte erneut anmelden.",
-      true,
-    );
+    setEmailPanelStatus("Anmeldung abgelaufen. Bitte erneut anmelden.", true);
     return;
   }
   const stateToken = createEmailOAuthState();
@@ -2899,7 +3022,10 @@ const startEmailConnect = async (provider) => {
     window.location.assign(data.url);
   } catch (error) {
     setEmailPanelStatus(
-      error?.message || "OAuth konnte nicht gestartet werden.",
+      getEmailFetchErrorMessage(
+        error,
+        error?.message || "OAuth konnte nicht gestartet werden.",
+      ),
       true,
     );
   }
@@ -2924,14 +3050,22 @@ const loadEmailAccounts = async () => {
       return;
     }
     if (!response.ok) {
-      throw new Error("Konten konnten nicht geladen werden.");
+      throw new Error(
+        getEmailApiErrorMessage(
+          response,
+          data,
+          "Konten konnten nicht geladen werden.",
+        ),
+      );
     }
     emailState.accounts = Array.isArray(data?.accounts) ? data.accounts : [];
     emailState.error = "";
   } catch (error) {
     emailState.accounts = [];
-    emailState.error =
-      error?.message || "Konten konnten nicht geladen werden.";
+    emailState.error = getEmailFetchErrorMessage(
+      error,
+      error?.message || "Konten konnten nicht geladen werden.",
+    );
     setEmailPanelStatus(emailState.error, true);
   } finally {
     emailState.loadingAccounts = false;
@@ -3324,10 +3458,7 @@ const handleReauthSubmit = async (event) => {
       await handler();
     }
   } catch (error) {
-    setReauthStatus(
-      error?.message || "Bestätigung fehlgeschlagen.",
-      true,
-    );
+    setReauthStatus(error?.message || "Bestätigung fehlgeschlagen.", true);
   }
 };
 
@@ -3623,7 +3754,11 @@ const handleSessionChange = async (session) => {
   await completePendingEmailOAuth();
   await loadEmailAccounts();
   await loadSecuritySettings();
-  if (!authState.isRecovery && securityState.totpEnabled && !isLocalReauthFresh()) {
+  if (
+    !authState.isRecovery &&
+    securityState.totpEnabled &&
+    !isLocalReauthFresh()
+  ) {
     openReauthModal({ context: "login", method: "totp" });
   }
 
@@ -4250,6 +4385,7 @@ const renderRoomPanel = () => {
       elements.threeDPanel.hidden = true;
     }
     updateRoomTabs();
+    renderEvidenceUploadTargets();
     return;
   }
   const roomData = ensureRoomData(state.activeRoomId);
@@ -4294,6 +4430,7 @@ const renderRoomPanel = () => {
   renderDecisionTaskOptions();
   renderRoomActivity();
   updateRoomTabs();
+  renderEvidenceUploadTargets();
 };
 
 const getCommentAuthorLabel = (comment) => {
@@ -4644,6 +4781,45 @@ const buildChatIcon = () => {
   return svg;
 };
 
+const buildPlanIcon = () => {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+
+  const outline = document.createElementNS(SVG_NS, "rect");
+  outline.setAttribute("x", "3.5");
+  outline.setAttribute("y", "4.5");
+  outline.setAttribute("width", "17");
+  outline.setAttribute("height", "15");
+  outline.setAttribute("rx", "2");
+  outline.setAttribute("fill", "none");
+  outline.setAttribute("stroke", "currentColor");
+  outline.setAttribute("stroke-width", "1.5");
+  outline.setAttribute("stroke-linejoin", "round");
+  svg.appendChild(outline);
+
+  const header = document.createElementNS(SVG_NS, "line");
+  header.setAttribute("x1", "3.5");
+  header.setAttribute("x2", "20.5");
+  header.setAttribute("y1", "8.5");
+  header.setAttribute("y2", "8.5");
+  header.setAttribute("stroke", "currentColor");
+  header.setAttribute("stroke-width", "1.5");
+  header.setAttribute("stroke-linecap", "round");
+  svg.appendChild(header);
+
+  const check = document.createElementNS(SVG_NS, "path");
+  check.setAttribute("d", "M8.5 13.5l2 2 4.5-4.5");
+  check.setAttribute("fill", "none");
+  check.setAttribute("stroke", "currentColor");
+  check.setAttribute("stroke-width", "1.5");
+  check.setAttribute("stroke-linecap", "round");
+  check.setAttribute("stroke-linejoin", "round");
+  svg.appendChild(check);
+
+  return svg;
+};
+
 const buildChatTrigger = ({ scope, roomId, taskId, commentId, label } = {}) => {
   const button = document.createElement("button");
   button.type = "button";
@@ -4654,6 +4830,87 @@ const buildChatTrigger = ({ scope, roomId, taskId, commentId, label } = {}) => {
   button.addEventListener("click", (event) => {
     event.stopPropagation();
     openChatModal({ scope, roomId, taskId, commentId });
+  });
+  button.addEventListener("pointerdown", (event) => event.stopPropagation());
+  button.addEventListener("dragstart", (event) => event.preventDefault());
+  return button;
+};
+
+const positionTaskPlanMenu = (trigger) => {
+  if (!elements.taskPlanMenu || !trigger) return;
+  const menu = elements.taskPlanMenu;
+  const rect = trigger.getBoundingClientRect();
+  const offset = 8;
+  menu.style.left = `${rect.right}px`;
+  menu.style.top = `${rect.bottom + offset}px`;
+  const menuRect = menu.getBoundingClientRect();
+  const margin = 12;
+  const maxX = Math.max(margin, window.innerWidth - menuRect.width - margin);
+  let x = clamp(rect.right - menuRect.width, margin, maxX);
+  let y = rect.bottom + offset;
+  if (y + menuRect.height > window.innerHeight - margin) {
+    y = rect.top - menuRect.height - offset;
+  }
+  const maxY = Math.max(margin, window.innerHeight - menuRect.height - margin);
+  y = clamp(y, margin, maxY);
+  menu.style.left = `${x}px`;
+  menu.style.top = `${y}px`;
+};
+
+const openTaskPlanMenu = (trigger, taskId) => {
+  if (!elements.taskPlanMenu || !trigger || !taskId) return;
+  closeTaskPlanMenu();
+  elements.taskPlanMenu.hidden = false;
+  elements.taskPlanMenu.setAttribute("aria-hidden", "false");
+  taskPlanMenuState.taskId = taskId;
+  taskPlanMenuState.isOpen = true;
+  taskPlanMenuState.trigger = trigger;
+  trigger.setAttribute("aria-expanded", "true");
+  positionTaskPlanMenu(trigger);
+};
+
+const closeTaskPlanMenu = () => {
+  if (!elements.taskPlanMenu || !taskPlanMenuState.isOpen) return;
+  elements.taskPlanMenu.hidden = true;
+  elements.taskPlanMenu.setAttribute("aria-hidden", "true");
+  taskPlanMenuState.trigger?.setAttribute("aria-expanded", "false");
+  taskPlanMenuState.taskId = null;
+  taskPlanMenuState.isOpen = false;
+  taskPlanMenuState.trigger = null;
+};
+
+const handleTaskPlanMenuAction = (action) => {
+  const taskId = taskPlanMenuState.taskId;
+  if (!taskId || !action) return;
+  if (action === "plan") {
+    openTaskModal(taskId);
+    return;
+  }
+  if (action === "chat") {
+    openChatModal({ scope: "task", taskId });
+  }
+};
+
+const toggleTaskPlanMenu = (trigger, taskId) => {
+  if (taskPlanMenuState.isOpen && taskPlanMenuState.taskId === taskId) {
+    closeTaskPlanMenu();
+    return;
+  }
+  openTaskPlanMenu(trigger, taskId);
+};
+
+const buildTaskPlanTrigger = ({ taskId, label } = {}) => {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "chat-trigger plan-trigger";
+  button.setAttribute("aria-label", label || "Planen");
+  button.title = label || "Planen";
+  button.setAttribute("aria-haspopup", "menu");
+  button.setAttribute("aria-expanded", "false");
+  button.appendChild(buildPlanIcon());
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleTaskPlanMenu(button, taskId);
   });
   button.addEventListener("pointerdown", (event) => event.stopPropagation());
   button.addEventListener("dragstart", (event) => event.preventDefault());
@@ -5062,97 +5319,145 @@ const formatEvidenceDetails = (file) => {
   return details.join(" · ");
 };
 
+const getEvidenceTaskLabel = (file, taskMap) => {
+  const taskId =
+    typeof file?.taskId === "string" && file.taskId.trim()
+      ? file.taskId.trim()
+      : "";
+  if (taskId && taskMap?.has(taskId)) {
+    return taskMap.get(taskId).title;
+  }
+  const fallback =
+    typeof file?.taskTitle === "string" ? file.taskTitle.trim() : "";
+  return fallback || "";
+};
+
 const getPinSurfaceLabel = (pin) => {
   if (!pin?.surface) return "";
   return IMAGE_PIN_SURFACE_LABELS[pin.surface] || "Wand";
 };
 
+const buildEvidenceCard = (
+  file,
+  { roomId = state.activeRoomId, taskMap = null, showTaskTag = false } = {},
+) => {
+  const card = document.createElement("div");
+  card.className = "image-card";
+
+  const label = file.label || file.name || "Datei";
+  const isImage = Boolean(file.url && isEvidenceImage(file));
+  const resolvedRoomId =
+    typeof file.roomId === "string" && file.roomId.trim()
+      ? file.roomId.trim()
+      : roomId;
+  let previewWrapper = null;
+  if (isImage) {
+    previewWrapper = document.createElement("button");
+    previewWrapper.type = "button";
+    previewWrapper.className = "image-preview";
+    previewWrapper.addEventListener("click", () =>
+      openImageModal(file.id, resolvedRoomId),
+    );
+  } else if (file.url) {
+    previewWrapper = document.createElement("a");
+    previewWrapper.href = file.url;
+    previewWrapper.rel = "noreferrer";
+    previewWrapper.className = "evidence-link";
+  } else {
+    previewWrapper = document.createElement("div");
+  }
+
+  if (isImage) {
+    const img = document.createElement("img");
+    img.src = file.url;
+    img.alt = label;
+    previewWrapper.appendChild(img);
+  } else {
+    const placeholder = document.createElement("div");
+    placeholder.className = "evidence-placeholder";
+    placeholder.textContent =
+      String(file.type || "File")
+        .split("/")
+        .pop()
+        ?.toUpperCase() || "FILE";
+    previewWrapper.appendChild(placeholder);
+  }
+  card.appendChild(previewWrapper);
+
+  const meta = document.createElement("div");
+  meta.className = "evidence-meta";
+  const caption = document.createElement("div");
+  caption.textContent = label;
+  meta.appendChild(caption);
+  const detailsText = formatEvidenceDetails(file);
+  if (detailsText) {
+    const details = document.createElement("div");
+    details.className = "evidence-details";
+    details.textContent = detailsText;
+    meta.appendChild(details);
+  }
+  if (showTaskTag) {
+    const taskLabel = getEvidenceTaskLabel(file, taskMap);
+    if (taskLabel) {
+      const taskTag = document.createElement("div");
+      taskTag.className = "evidence-task";
+      taskTag.textContent = `Aufgabe: ${taskLabel}`;
+      meta.appendChild(taskTag);
+    }
+  }
+  const pinLabel = getPinSurfaceLabel(file.pin);
+  if (pinLabel) {
+    const pin = document.createElement("div");
+    pin.className = "image-pin-chip";
+    pin.textContent = `📌 ${pinLabel}`;
+    meta.appendChild(pin);
+  }
+  card.appendChild(meta);
+
+  const actions = document.createElement("div");
+  actions.className = "image-actions";
+  if (isImage) {
+    const editButton = document.createElement("button");
+    editButton.type = "button";
+    editButton.textContent = "Bearbeiten";
+    editButton.addEventListener("click", () =>
+      openImageModal(file.id, resolvedRoomId),
+    );
+    actions.appendChild(editButton);
+
+    const pinButton = document.createElement("button");
+    pinButton.type = "button";
+    pinButton.textContent = file.pin ? "Pin ändern" : "Pin setzen";
+    pinButton.addEventListener("click", () =>
+      openImageModal(file.id, resolvedRoomId),
+    );
+    actions.appendChild(pinButton);
+  }
+
+  const deleteButton = document.createElement("button");
+  deleteButton.type = "button";
+  deleteButton.textContent = "Löschen";
+  deleteButton.className = "image-delete";
+  deleteButton.addEventListener("click", () =>
+    removeImage(file.id, resolvedRoomId),
+  );
+  actions.appendChild(deleteButton);
+  card.appendChild(actions);
+
+  return card;
+};
+
 const renderImages = (roomData) => {
   elements.imageGallery.innerHTML = "";
+  const taskMap = buildTaskMap();
   roomData.images.forEach((file) => {
-    const card = document.createElement("div");
-    card.className = "image-card";
-
-    const label = file.label || file.name || "Datei";
-    const isImage = Boolean(file.url && isEvidenceImage(file));
-    let previewWrapper = null;
-    if (isImage) {
-      previewWrapper = document.createElement("button");
-      previewWrapper.type = "button";
-      previewWrapper.className = "image-preview";
-      previewWrapper.addEventListener("click", () => openImageModal(file.id));
-    } else if (file.url) {
-      previewWrapper = document.createElement("a");
-      previewWrapper.href = file.url;
-      previewWrapper.rel = "noreferrer";
-      previewWrapper.className = "evidence-link";
-    } else {
-      previewWrapper = document.createElement("div");
-    }
-
-    if (isImage) {
-      const img = document.createElement("img");
-      img.src = file.url;
-      img.alt = label;
-      previewWrapper.appendChild(img);
-    } else {
-      const placeholder = document.createElement("div");
-      placeholder.className = "evidence-placeholder";
-      placeholder.textContent =
-        String(file.type || "File")
-          .split("/")
-          .pop()
-          ?.toUpperCase() || "FILE";
-      previewWrapper.appendChild(placeholder);
-    }
-    card.appendChild(previewWrapper);
-
-    const meta = document.createElement("div");
-    meta.className = "evidence-meta";
-    const caption = document.createElement("div");
-    caption.textContent = label;
-    meta.appendChild(caption);
-    const detailsText = formatEvidenceDetails(file);
-    if (detailsText) {
-      const details = document.createElement("div");
-      details.className = "evidence-details";
-      details.textContent = detailsText;
-      meta.appendChild(details);
-    }
-    const pinLabel = getPinSurfaceLabel(file.pin);
-    if (pinLabel) {
-      const pin = document.createElement("div");
-      pin.className = "image-pin-chip";
-      pin.textContent = `📌 ${pinLabel}`;
-      meta.appendChild(pin);
-    }
-    card.appendChild(meta);
-
-    const actions = document.createElement("div");
-    actions.className = "image-actions";
-    if (isImage) {
-      const editButton = document.createElement("button");
-      editButton.type = "button";
-      editButton.textContent = "Bearbeiten";
-      editButton.addEventListener("click", () => openImageModal(file.id));
-      actions.appendChild(editButton);
-
-      const pinButton = document.createElement("button");
-      pinButton.type = "button";
-      pinButton.textContent = file.pin ? "Pin ändern" : "Pin setzen";
-      pinButton.addEventListener("click", () => openImageModal(file.id));
-      actions.appendChild(pinButton);
-    }
-
-    const deleteButton = document.createElement("button");
-    deleteButton.type = "button";
-    deleteButton.textContent = "Löschen";
-    deleteButton.className = "image-delete";
-    deleteButton.addEventListener("click", () => removeImage(file.id));
-    actions.appendChild(deleteButton);
-    card.appendChild(actions);
-
-    elements.imageGallery.appendChild(card);
+    elements.imageGallery.appendChild(
+      buildEvidenceCard(file, {
+        roomId: state.activeRoomId,
+        taskMap,
+        showTaskTag: true,
+      }),
+    );
   });
 };
 
@@ -5984,6 +6289,74 @@ const buildRoomFilterOptions = () => {
 
 const buildTaskCreateRoomOptions = () =>
   buildRoomFilterOptions().filter((option) => option.value !== "all");
+
+const buildEvidenceRoomOptions = () => {
+  const options = [{ value: EVIDENCE_ROOM_ACTIVE, label: "Aktiver Raum" }];
+  buildRoomFilterOptions()
+    .filter((option) => option.value !== "all" && option.value !== "none")
+    .forEach((option) => {
+      options.push(option);
+    });
+  return options;
+};
+
+const resolveEvidenceRoomSelection = (value) => {
+  if (!value || value === EVIDENCE_ROOM_ACTIVE) {
+    return state.activeRoomId;
+  }
+  if (value === EVIDENCE_ROOM_NONE) return null;
+  return value;
+};
+
+const buildEvidenceTaskOptions = (roomId) => {
+  const options = [{ value: EVIDENCE_TASK_NONE, label: "Keine Aufgabe" }];
+  if (!roomId) return options;
+  state.tasks.forEach((task) => {
+    if (task.roomId !== roomId) return;
+    options.push({ value: task.id, label: task.title });
+  });
+  return options;
+};
+
+const renderEvidenceUploadTargets = () => {
+  if (!elements.evidenceRoomSelect || !elements.evidenceTaskSelect) return;
+  const currentRoomValue =
+    elements.evidenceRoomSelect.value || EVIDENCE_ROOM_ACTIVE;
+  const roomValue = setSelectOptions(
+    elements.evidenceRoomSelect,
+    buildEvidenceRoomOptions(),
+    currentRoomValue,
+  );
+  const resolvedRoomId = resolveEvidenceRoomSelection(roomValue);
+  const currentTaskValue =
+    elements.evidenceTaskSelect.value || EVIDENCE_TASK_NONE;
+  const taskOptions = buildEvidenceTaskOptions(resolvedRoomId);
+  setSelectOptions(elements.evidenceTaskSelect, taskOptions, currentTaskValue);
+  elements.evidenceTaskSelect.disabled = taskOptions.length <= 1;
+  return resolvedRoomId;
+};
+
+const resolveEvidenceUploadTarget = () => {
+  const roomValue = elements.evidenceRoomSelect?.value || EVIDENCE_ROOM_ACTIVE;
+  const resolvedRoomId = resolveEvidenceRoomSelection(roomValue);
+  const taskValue = elements.evidenceTaskSelect?.value || EVIDENCE_TASK_NONE;
+  const task =
+    taskValue && taskValue !== EVIDENCE_TASK_NONE
+      ? state.tasks.find((item) => item.id === taskValue)
+      : null;
+  const roomId = task?.roomId || resolvedRoomId || state.activeRoomId;
+  if (!roomId) {
+    window.alert(
+      "Bitte einen Raum oder eine Aufgabe mit Raum auswählen, bevor Sie eine Datei hinzufügen.",
+    );
+    return null;
+  }
+  return {
+    roomId,
+    taskId: task?.id || null,
+    taskTitle: task?.title || "",
+  };
+};
 
 const buildStatusFilterOptions = () => [
   { value: "all", label: "Alle Stati" },
@@ -6837,10 +7210,9 @@ const buildTaskItem = (
   const headerActions = document.createElement("div");
   headerActions.className = "task-header-actions";
   headerActions.appendChild(
-    buildChatTrigger({
-      scope: "task",
+    buildTaskPlanTrigger({
       taskId: task.id,
-      label: "ChatGPT Chat zur Aufgabe",
+      label: "Planen",
     }),
   );
   header.appendChild(headerActions);
@@ -6935,12 +7307,6 @@ const buildTaskItem = (
   controls.className = "task-controls";
   controls.appendChild(buildStatusSelect(task));
   controls.appendChild(buildAssigneeSelect(task));
-
-  const planButton = document.createElement("button");
-  planButton.type = "button";
-  planButton.textContent = "Planen";
-  planButton.addEventListener("click", () => openTaskModal(task.id));
-  controls.appendChild(planButton);
 
   const removeButton = document.createElement("button");
   removeButton.type = "button";
@@ -7123,6 +7489,7 @@ const renderTaskList = () => {
 };
 
 const renderTasksPanel = () => {
+  closeTaskPlanMenu();
   updateViewUI();
   renderRoomTasks();
   renderDecisionTaskOptions();
@@ -7132,12 +7499,69 @@ const renderTasksPanel = () => {
   } else if (elements.timelineList) {
     elements.timelineList.innerHTML = "";
   }
+  renderEvidenceUploadTargets();
 };
 
 const getTaskFromModal = () => {
   const taskId = taskModalState.taskId;
   if (!taskId) return null;
   return state.tasks.find((item) => item.id === taskId) || null;
+};
+
+const collectTaskEvidenceFiles = (taskId) => {
+  if (!taskId) return [];
+  const entries = [];
+  Object.entries(state.roomData || {}).forEach(([roomId, roomData]) => {
+    if (!roomData?.images) return;
+    roomData.images.forEach((file) => {
+      if (file?.taskId !== taskId) return;
+      entries.push({ file, roomId });
+    });
+  });
+  return entries.sort(
+    (a, b) =>
+      parseTimestamp(b.file?.createdAt) - parseTimestamp(a.file?.createdAt),
+  );
+};
+
+const renderTaskFiles = (task) => {
+  if (!elements.taskFileList || !elements.taskFileEmpty) return;
+  elements.taskFileList.innerHTML = "";
+  const entries = collectTaskEvidenceFiles(task?.id);
+  if (!entries.length) {
+    elements.taskFileEmpty.hidden = false;
+    return;
+  }
+  elements.taskFileEmpty.hidden = true;
+  entries.forEach(({ file, roomId }) => {
+    elements.taskFileList.appendChild(
+      buildEvidenceCard(file, { roomId, showTaskTag: false }),
+    );
+  });
+};
+
+const maybeUpdateTaskModalFiles = (taskId) => {
+  if (!taskId || taskModalState.taskId !== taskId) return;
+  const task = state.tasks.find((item) => item.id === taskId);
+  if (!task) return;
+  renderTaskFiles(task);
+};
+
+const resolveTaskEvidenceTarget = () => {
+  const task = getTaskFromModal();
+  if (!task) return null;
+  if (!task.roomId) {
+    window.alert(
+      "Bitte zuerst einen Raum für diese Aufgabe auswählen, bevor Dateien hinzugefügt werden.",
+    );
+    return null;
+  }
+  return {
+    task,
+    roomId: task.roomId,
+    taskId: task.id,
+    taskTitle: task.title,
+  };
 };
 
 const setEmailThreadViewVisible = (isVisible) => {
@@ -7154,11 +7578,23 @@ const clearEmailThreadView = () => {
   }
   if (elements.emailReplyText) {
     elements.emailReplyText.disabled = true;
+    elements.emailReplyText.value = "";
+  }
+  if (elements.emailReplyTextIt) {
+    elements.emailReplyTextIt.disabled = true;
+    elements.emailReplyTextIt.value = "";
+  }
+  if (elements.emailReplyTranslation) {
+    elements.emailReplyTranslation.hidden = true;
+  }
+  if (elements.emailReplyTranslate) {
+    elements.emailReplyTranslate.disabled = true;
   }
   if (elements.emailReplySend) {
     elements.emailReplySend.disabled = true;
   }
   setEmailReplyStatus("", false);
+  setEmailReplyTranslateStatus("", false);
   setEmailThreadViewVisible(false);
 };
 
@@ -7192,6 +7628,62 @@ const renderEmailThreadMeta = (link) => {
   }
 };
 
+const handleEmailMessageTranslate = async (message) => {
+  const messageCacheId = message?.messageCacheId;
+  if (!messageCacheId) return;
+  if (emailState.translatingMessageIds.has(messageCacheId)) return;
+  const token = getAuthToken();
+  if (!token) return;
+  if (message?.translations?.de?.bodyText) return;
+  emailState.translatingMessageIds.add(messageCacheId);
+  renderEmailThreadMessages();
+  try {
+    const response = await fetch("/api/translate/message", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messageCacheId,
+        targetLang: "de",
+      }),
+    });
+    const data = await readJson(response);
+    if (handleEmailReauthRequired(response, data)) {
+      return;
+    }
+    if (!response.ok) {
+      throw new Error(
+        getEmailApiErrorMessage(
+          response,
+          data,
+          "Übersetzung konnte nicht erstellt werden.",
+        ),
+      );
+    }
+    const translation = data?.translation;
+    if (translation?.bodyText) {
+      message.translations = {
+        ...(message.translations || {}),
+        de: translation,
+      };
+    }
+    setEmailPanelStatus("", false);
+  } catch (error) {
+    setEmailPanelStatus(
+      getEmailFetchErrorMessage(
+        error,
+        error?.message || "Übersetzung konnte nicht erstellt werden.",
+      ),
+      true,
+    );
+  } finally {
+    emailState.translatingMessageIds.delete(messageCacheId);
+    renderEmailThreadMessages();
+  }
+};
+
 const renderEmailThreadMessages = () => {
   if (!elements.emailThreadMessages) return;
   elements.emailThreadMessages.innerHTML = "";
@@ -7209,8 +7701,7 @@ const renderEmailThreadMessages = () => {
     const header = document.createElement("div");
     header.className = "email-message-header";
     const from = document.createElement("span");
-    const fromText =
-      message?.from?.email || message?.from?.name || "Unbekannt";
+    const fromText = message?.from?.email || message?.from?.name || "Unbekannt";
     from.textContent = fromText;
     const date = document.createElement("span");
     date.textContent = message?.sentAt
@@ -7227,8 +7718,51 @@ const renderEmailThreadMessages = () => {
       item.appendChild(subjectEl);
     }
 
+    const actions = document.createElement("div");
+    actions.className = "email-message-actions";
+    const translateButton = document.createElement("button");
+    translateButton.type = "button";
+    translateButton.className = "email-message-translate";
+    const translationEntry =
+      message?.translations && typeof message.translations === "object"
+        ? message.translations.de
+        : null;
+    const hasTranslation = Boolean(translationEntry?.bodyText);
+    const isTranslating =
+      message?.messageCacheId &&
+      emailState.translatingMessageIds.has(message.messageCacheId);
+    translateButton.textContent = hasTranslation
+      ? "🇩🇪 Übersetzt"
+      : "🇩🇪 Übersetzen";
+    translateButton.disabled =
+      !message?.messageCacheId || isTranslating || hasTranslation;
+    translateButton.addEventListener("click", () => {
+      void handleEmailMessageTranslate(message);
+    });
+    actions.appendChild(translateButton);
+    item.appendChild(actions);
+
+    if (hasTranslation) {
+      const translation = document.createElement("div");
+      translation.className = "email-message-translation";
+      const translationLabel = document.createElement("div");
+      translationLabel.className = "email-message-translation-label";
+      translationLabel.textContent = "Übersetzung (DE)";
+      const translationBody = document.createElement("div");
+      translationBody.className = "email-message-body";
+      translationBody.textContent = translationEntry.bodyText;
+      translation.appendChild(translationLabel);
+      translation.appendChild(translationBody);
+      item.appendChild(translation);
+    }
+
     const body = document.createElement("div");
-    body.textContent = message.bodyText || message.snippet || "";
+    body.className = "email-message-body";
+    body.textContent =
+      message.bodyText ||
+      stripHtml(message.bodyHtml || "") ||
+      message.snippet ||
+      "";
     item.appendChild(body);
 
     elements.emailThreadMessages.appendChild(item);
@@ -7244,6 +7778,18 @@ const renderEmailThreadView = () => {
   renderEmailThreadMessages();
   if (elements.emailReplyText) {
     elements.emailReplyText.disabled = false;
+  }
+  if (elements.emailReplyTextIt) {
+    elements.emailReplyTextIt.disabled = false;
+  }
+  if (elements.emailReplyTranslate) {
+    elements.emailReplyTranslate.disabled = false;
+  }
+  if (elements.emailReplyTranslation) {
+    const hasTranslation = Boolean(
+      elements.emailReplyTextIt?.value?.trim(),
+    );
+    elements.emailReplyTranslation.hidden = !hasTranslation;
   }
   if (elements.emailReplySend) {
     elements.emailReplySend.disabled = false;
@@ -7399,12 +7945,22 @@ const loadLinkedThreads = async (taskId) => {
     return;
   }
   if (!response.ok) {
-    throw new Error("Verknüpfungen konnten nicht geladen werden.");
+    throw new Error(
+      getEmailApiErrorMessage(
+        response,
+        data,
+        "Verknüpfungen konnten nicht geladen werden.",
+      ),
+    );
   }
   emailState.linkedThreads = Array.isArray(data?.links) ? data.links : [];
   emailState.linkedThreads.sort((a, b) => {
-    const aTime = a?.last_message_at ? new Date(a.last_message_at).getTime() : 0;
-    const bTime = b?.last_message_at ? new Date(b.last_message_at).getTime() : 0;
+    const aTime = a?.last_message_at
+      ? new Date(a.last_message_at).getTime()
+      : 0;
+    const bTime = b?.last_message_at
+      ? new Date(b.last_message_at).getTime()
+      : 0;
     return bTime - aTime;
   });
   if (emailState.activeThread) {
@@ -7417,7 +7973,9 @@ const loadLinkedThreads = async (taskId) => {
   }
   if (
     emailState.activeThread &&
-    !emailState.linkedThreads.some((link) => link.id === emailState.activeThread.id)
+    !emailState.linkedThreads.some(
+      (link) => link.id === emailState.activeThread.id,
+    )
   ) {
     emailState.activeThread = null;
     emailState.threadMessages = [];
@@ -7445,7 +8003,13 @@ const loadUnlinkedThreads = async (task) => {
       return;
     }
     if (!response.ok) {
-      throw new Error("Threads konnten nicht geladen werden.");
+      throw new Error(
+        getEmailApiErrorMessage(
+          response,
+          data,
+          "Threads konnten nicht geladen werden.",
+        ),
+      );
     }
     (data?.threads || []).forEach((thread) => {
       threads.push({ ...thread, provider: account.provider });
@@ -7517,7 +8081,13 @@ const loadEmailThreadMessages = async (linkId) => {
       return;
     }
     if (!response.ok) {
-      throw new Error("Thread konnte nicht geladen werden.");
+      throw new Error(
+        getEmailApiErrorMessage(
+          response,
+          data,
+          "Thread konnte nicht geladen werden.",
+        ),
+      );
     }
     emailState.threadMessages = Array.isArray(data?.messages)
       ? data.messages
@@ -7526,7 +8096,10 @@ const loadEmailThreadMessages = async (linkId) => {
     renderEmailThreadView();
   } catch (error) {
     setEmailPanelStatus(
-      error?.message || "Thread konnte nicht geladen werden.",
+      getEmailFetchErrorMessage(
+        error,
+        error?.message || "Thread konnte nicht geladen werden.",
+      ),
       true,
     );
     clearEmailThreadView();
@@ -7559,7 +8132,13 @@ const handleEmailLink = async (taskId, provider, threadId) => {
       return;
     }
     if (!response.ok) {
-      throw new Error("Thread konnte nicht verknüpft werden.");
+      throw new Error(
+        getEmailApiErrorMessage(
+          response,
+          data,
+          "Thread konnte nicht verknüpft werden.",
+        ),
+      );
     }
     const task = getTaskFromModal();
     if (task) {
@@ -7567,7 +8146,10 @@ const handleEmailLink = async (taskId, provider, threadId) => {
     }
   } catch (error) {
     setEmailPanelStatus(
-      error?.message || "Thread konnte nicht verknüpft werden.",
+      getEmailFetchErrorMessage(
+        error,
+        error?.message || "Thread konnte nicht verknüpft werden.",
+      ),
       true,
     );
   }
@@ -7595,7 +8177,13 @@ const handleEmailUnlink = async (linkId) => {
       return;
     }
     if (!response.ok) {
-      throw new Error("Verknüpfung konnte nicht gelöst werden.");
+      throw new Error(
+        getEmailApiErrorMessage(
+          response,
+          data,
+          "Verknüpfung konnte nicht gelöst werden.",
+        ),
+      );
     }
     const task = getTaskFromModal();
     if (task) {
@@ -7603,20 +8191,101 @@ const handleEmailUnlink = async (linkId) => {
     }
   } catch (error) {
     setEmailPanelStatus(
-      error?.message || "Verknüpfung konnte nicht gelöst werden.",
+      getEmailFetchErrorMessage(
+        error,
+        error?.message || "Verknüpfung konnte nicht gelöst werden.",
+      ),
       true,
     );
+  }
+};
+
+const handleEmailReplyTranslate = async () => {
+  const draftText = elements.emailReplyText?.value?.trim() || "";
+  if (!draftText) {
+    setEmailReplyTranslateStatus(
+      "Bitte zuerst eine deutsche Antwort schreiben.",
+      true,
+    );
+    return;
+  }
+  if (emailState.translatingDraft) return;
+  const token = getAuthToken();
+  if (!token) return;
+  emailState.translatingDraft = true;
+  if (elements.emailReplyTranslate) {
+    elements.emailReplyTranslate.disabled = true;
+  }
+  setEmailReplyTranslateStatus("Übersetzung wird erstellt ...", false);
+  try {
+    const response = await fetch("/api/translate/text", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        text: draftText,
+        targetLang: "it",
+      }),
+    });
+    const data = await readJson(response);
+    if (handleEmailReauthRequired(response, data)) {
+      setEmailReplyTranslateStatus("", false);
+      return;
+    }
+    if (!response.ok) {
+      throw new Error(
+        getEmailApiErrorMessage(
+          response,
+          data,
+          "Übersetzung konnte nicht erstellt werden.",
+        ),
+      );
+    }
+    const translatedText = String(data?.translatedText || "").trim();
+    if (!translatedText) {
+      throw new Error("Übersetzung konnte nicht erstellt werden.");
+    }
+    if (elements.emailReplyTextIt) {
+      elements.emailReplyTextIt.value = translatedText;
+    }
+    if (elements.emailReplyTranslation) {
+      elements.emailReplyTranslation.hidden = false;
+    }
+    setEmailReplyTranslateStatus("Übersetzung erstellt.", false);
+  } catch (error) {
+    setEmailReplyTranslateStatus(
+      getEmailFetchErrorMessage(
+        error,
+        error?.message || "Übersetzung konnte nicht erstellt werden.",
+      ),
+      true,
+    );
+  } finally {
+    emailState.translatingDraft = false;
+    if (elements.emailReplyTranslate) {
+      elements.emailReplyTranslate.disabled = false;
+    }
   }
 };
 
 const handleEmailReplySend = async () => {
   const link = emailState.activeThread;
   if (!link) return;
-  const replyText = elements.emailReplyText?.value?.trim() || "";
-  if (!replyText) {
+  const replyTextIt = elements.emailReplyTextIt?.value?.trim() || "";
+  const replyTextDe = elements.emailReplyText?.value?.trim() || "";
+  if (!replyTextIt && !replyTextDe) {
     setEmailReplyStatus("Bitte eine Antwort eingeben.", true);
     return;
   }
+  if (!replyTextIt) {
+    const confirmSend = window.confirm(
+      "Keine italienische Übersetzung vorhanden. Antwort auf Deutsch senden?",
+    );
+    if (!confirmSend) return;
+  }
+  const replyText = replyTextIt || replyTextDe;
   const token = getAuthToken();
   if (!token) return;
   setEmailReplyStatus("Antwort wird gesendet ...");
@@ -7650,6 +8319,13 @@ const handleEmailReplySend = async () => {
     if (elements.emailReplyText) {
       elements.emailReplyText.value = "";
     }
+    if (elements.emailReplyTextIt) {
+      elements.emailReplyTextIt.value = "";
+    }
+    if (elements.emailReplyTranslation) {
+      elements.emailReplyTranslation.hidden = true;
+    }
+    setEmailReplyTranslateStatus("", false);
     setEmailReplyStatus("Antwort gesendet.", false);
     await loadEmailThreadMessages(link.id);
   } catch (error) {
@@ -7713,8 +8389,16 @@ const openTaskModal = (taskId) => {
   if (elements.emailReplyText) {
     elements.emailReplyText.value = "";
   }
+  if (elements.emailReplyTextIt) {
+    elements.emailReplyTextIt.value = "";
+  }
+  if (elements.emailReplyTranslation) {
+    elements.emailReplyTranslation.hidden = true;
+  }
   setEmailReplyStatus("", false);
+  setEmailReplyTranslateStatus("", false);
   renderDependencyOptions(task);
+  renderTaskFiles(task);
   void refreshEmailPanel(task, { force: false });
   elements.taskModal.hidden = false;
   updateModalScrollLock();
@@ -8850,6 +9534,66 @@ const showTaskInputError = (input, message) => {
   input.focus();
 };
 
+const ensureTaskVisibleInFilters = (task) => {
+  if (!task) return;
+  if (applyTaskFilters([task]).length > 0) return;
+
+  const nextFilters = { ...state.taskFilters };
+  const normalizedStatus = normalizeTaskStatus(task.status);
+  const tagSet = new Set(task.tags || []);
+  const viewPreset =
+    TASK_VIEW_PRESETS[nextFilters.view] || TASK_VIEW_PRESETS.all;
+  if (
+    nextFilters.view !== "all" &&
+    viewPreset?.filter &&
+    !viewPreset.filter(task)
+  ) {
+    nextFilters.view = "all";
+  }
+  if (nextFilters.roomId !== "all") {
+    if (nextFilters.roomId === "none") {
+      if (task.roomId) {
+        nextFilters.roomId = "all";
+      }
+    } else if (task.roomId !== nextFilters.roomId) {
+      nextFilters.roomId = "all";
+    }
+  }
+  if (nextFilters.status !== "all" && normalizedStatus !== nextFilters.status) {
+    nextFilters.status = "all";
+  }
+  if (nextFilters.assignee !== "all") {
+    if (nextFilters.assignee === "unassigned") {
+      if (task.assignee) {
+        nextFilters.assignee = "all";
+      }
+    } else if (task.assignee !== nextFilters.assignee) {
+      nextFilters.assignee = "all";
+    }
+  }
+  if (nextFilters.tag !== "all" && !tagSet.has(nextFilters.tag)) {
+    nextFilters.tag = "all";
+  }
+  if (nextFilters.query) {
+    const search = nextFilters.query.trim().toLowerCase();
+    const haystack =
+      typeof task.searchIndex === "string"
+        ? task.searchIndex
+        : updateTaskSearchIndex(task);
+    if (search && !haystack.includes(search)) {
+      nextFilters.query = "";
+    }
+  }
+
+  const didChange = Object.keys(nextFilters).some(
+    (key) => nextFilters[key] !== state.taskFilters[key],
+  );
+  if (didChange) {
+    state.taskFilters = nextFilters;
+    clearTaskSelection();
+  }
+};
+
 const handleTaskCreateSubmit = (event) => {
   event.preventDefault();
   if (!elements.taskCreateInput) return;
@@ -8877,6 +9621,7 @@ const handleTaskCreateSubmit = (event) => {
     roomId,
   });
   state.tasks.unshift(task);
+  ensureTaskVisibleInFilters(task);
   logActivityEvent("task_created", {
     taskId: task.id,
     roomId: task.roomId,
@@ -9217,18 +9962,29 @@ const postEvidenceItem = async (roomId, resource, item) => {
   }
 };
 
-const persistEvidenceFile = async (roomData, record) => {
-  roomData.images.unshift(record);
+const renderImagesIfActive = (roomId, roomData) => {
+  if (!roomId || roomId !== state.activeRoomId) return;
   renderImages(roomData);
+};
+
+const persistEvidenceFile = async (roomId, roomData, record) => {
+  roomData.images.unshift(record);
+  renderImagesIfActive(roomId, roomData);
+  if (record?.taskId) {
+    maybeUpdateTaskModalFiles(record.taskId);
+  }
   saveStateLocal();
-  const apiSaved = await postEvidenceItem(state.activeRoomId, "files", record);
+  const apiSaved = await postEvidenceItem(roomId, "files", record);
   if (!apiSaved) {
     saveState();
   }
 };
 
 const persistEvidenceUpdate = async (roomId, roomData, record) => {
-  renderImages(roomData);
+  renderImagesIfActive(roomId, roomData);
+  if (record?.taskId) {
+    maybeUpdateTaskModalFiles(record.taskId);
+  }
   saveStateLocal();
   const apiSaved = await postEvidenceItem(roomId, "files", record);
   if (!apiSaved) {
@@ -9333,6 +10089,51 @@ const buildImageRecord = ({ url, prompt, source = "openai" }) => {
       source,
     },
   ];
+  return record;
+};
+
+const buildEvidenceRecord = ({
+  label,
+  url,
+  type = "",
+  size = null,
+  source = "upload",
+  roomId = null,
+  taskId = null,
+  taskTitle = "",
+} = {}) => {
+  const timestamp = new Date().toISOString();
+  const trimmedLabel = String(label || "").trim() || "Datei";
+  const record = {
+    id: `file-${Date.now()}`,
+    label: trimmedLabel,
+    name: trimmedLabel,
+    url: url || "",
+    type: type || "",
+    size: Number.isFinite(size) ? size : null,
+    createdAt: timestamp,
+    userId: authState.user?.id || null,
+    userName: getActivityActor(),
+    userEmail: authState.user?.email || "",
+    source: source || "upload",
+    roomId,
+    taskId,
+    taskTitle,
+    pin: null,
+  };
+  if (isEvidenceImage(record)) {
+    record.history = [
+      buildImageHistoryEntry({
+        prompt: trimmedLabel,
+        url: record.url,
+        createdAt: record.createdAt,
+        userId: record.userId,
+        userName: record.userName,
+        userEmail: record.userEmail,
+        source: record.source,
+      }),
+    ];
+  }
   return record;
 };
 
@@ -9706,13 +10507,13 @@ const handleImagePinApply = () => {
     file.pin = { surface, x: 0.5, y: 0.5, scale };
   }
   const roomData = ensureRoomData(imageModalState.roomId);
-  renderImages(roomData);
+  renderImagesIfActive(imageModalState.roomId, roomData);
   updateImageModalMeta(file);
   if (elements.imagePinClear) {
     elements.imagePinClear.disabled = !file.pin;
   }
   saveState();
-  if (state.show3d) {
+  if (state.show3d && imageModalState.roomId === state.activeRoomId) {
     update3DScene(imageModalState.roomId);
   }
 };
@@ -9730,16 +10531,20 @@ const removeImage = (imageId, roomId = state.activeRoomId) => {
   const index = roomData.images.findIndex((item) => item.id === imageId);
   if (index === -1) return;
   const file = roomData.images[index];
+  const taskId = file.taskId;
   const label = file.label || file.name || "Bild";
   const confirmRemove = window.confirm(`Bild "${label}" wirklich löschen?`);
   if (!confirmRemove) return;
   roomData.images.splice(index, 1);
-  renderImages(roomData);
+  renderImagesIfActive(roomId, roomData);
   saveState();
+  if (taskId) {
+    maybeUpdateTaskModalFiles(taskId);
+  }
   if (imageModalState.imageId === imageId) {
     closeImageModal();
   }
-  if (state.show3d) {
+  if (state.show3d && roomId === state.activeRoomId) {
     update3DScene(roomId);
   }
 };
@@ -9802,7 +10607,7 @@ const handleImageEditSubmit = async (event) => {
     }
     setImageStatus("Bild wurde aktualisiert.");
     setImageEditStatus("Bild wurde aktualisiert.");
-    if (state.show3d) {
+    if (state.show3d && imageModalState.roomId === state.activeRoomId) {
       update3DScene(imageModalState.roomId);
     }
   } catch (error) {
@@ -9829,11 +10634,12 @@ const handleImageEditSubmit = async (event) => {
   }
 };
 
-const generateImageWithOpenAI = async (promptText, roomData) => {
+const generateImageWithOpenAI = async (promptText, roomId, roomData) => {
   const labelText = promptText || "Idee ohne Beschreibung";
 
   if (window.location.protocol === "file:") {
     await persistEvidenceFile(
+      roomId,
       roomData,
       buildImageRecord({
         url: buildPlaceholderImage(labelText),
@@ -9853,6 +10659,7 @@ const generateImageWithOpenAI = async (promptText, roomData) => {
     elements.generateImageBtn.disabled = true;
     const imageUrl = await requestImageFromOpenAI({ prompt: labelText });
     await persistEvidenceFile(
+      roomId,
       roomData,
       buildImageRecord({ url: imageUrl, prompt: labelText, source: "openai" }),
     );
@@ -9860,6 +10667,7 @@ const generateImageWithOpenAI = async (promptText, roomData) => {
   } catch (error) {
     console.error("Bildgenerierung fehlgeschlagen:", error);
     await persistEvidenceFile(
+      roomId,
       roomData,
       buildImageRecord({
         url: buildPlaceholderImage(labelText),
@@ -9896,18 +10704,22 @@ const handleGenerateImage = () => {
     window.prompt("Beschreiben Sie das Bild, das erzeugt werden soll.") ||
     "Idee ohne Beschreibung";
 
-  const roomData = ensureRoomData(state.activeRoomId);
+  const roomId = state.activeRoomId;
+  const roomData = ensureRoomData(roomId);
   const cleanedPrompt = promptText.trim();
-  generateImageWithOpenAI(cleanedPrompt || "Idee ohne Beschreibung", roomData);
+  generateImageWithOpenAI(
+    cleanedPrompt || "Idee ohne Beschreibung",
+    roomId,
+    roomData,
+  );
 };
 
 const handleUploadImage = (event) => {
-  if (
-    !requireActiveRoom(
-      "Bitte zuerst einen Raum auswählen, bevor Sie ein Dokument hochladen.",
-    )
-  )
+  const target = resolveEvidenceUploadTarget();
+  if (!target) {
+    event.target.value = "";
     return;
+  }
   const file = event.target.files[0];
   if (!file) {
     return;
@@ -9915,89 +10727,113 @@ const handleUploadImage = (event) => {
 
   const reader = new FileReader();
   reader.onload = async (loadEvent) => {
-    const roomData = ensureRoomData(state.activeRoomId);
-    const record = {
-      id: `file-${Date.now()}`,
+    const roomData = ensureRoomData(target.roomId);
+    const record = buildEvidenceRecord({
       label: file.name,
-      name: file.name,
       url: loadEvent.target.result,
       type: file.type || "",
       size: file.size,
-      createdAt: new Date().toISOString(),
-      userId: authState.user?.id || null,
-      userName: getActivityActor(),
-      userEmail: authState.user?.email || "",
       source: "upload",
-      pin: null,
-    };
-    if (isEvidenceImage(record)) {
-      record.history = [
-        buildImageHistoryEntry({
-          prompt: file.name,
-          url: record.url,
-          createdAt: record.createdAt,
-          userId: record.userId,
-          userName: record.userName,
-          userEmail: record.userEmail,
-          source: "upload",
-        }),
-      ];
-    }
+      roomId: target.roomId,
+      taskId: target.taskId,
+      taskTitle: target.taskTitle,
+    });
     logActivityEvent("file_uploaded", {
-      roomId: state.activeRoomId,
+      roomId: target.roomId,
+      taskId: target.taskId,
       metadata: { filename: file.name },
     });
-    await persistEvidenceFile(roomData, record);
+    await persistEvidenceFile(target.roomId, roomData, record);
   };
   reader.readAsDataURL(file);
   event.target.value = "";
 };
 
 const handleAddEvidenceLink = async () => {
-  if (
-    !requireActiveRoom(
-      "Bitte zuerst einen Raum auswählen, bevor Sie einen Link hinzufügen.",
-    )
-  )
-    return;
+  const target = resolveEvidenceUploadTarget();
+  if (!target) return;
   const url = window.prompt("Link zur Datei oder Referenz einfügen:");
   if (!url) return;
   const label = window.prompt("Titel für den Link:", url.trim()) || url.trim();
   if (!label) return;
 
-  const roomData = ensureRoomData(state.activeRoomId);
-  const record = {
-    id: `file-${Date.now()}`,
+  const roomData = ensureRoomData(target.roomId);
+  const record = buildEvidenceRecord({
     label,
-    name: label,
     url: url.trim(),
     type: "link",
     size: null,
-    createdAt: new Date().toISOString(),
-    userId: authState.user?.id || null,
-    userName: getActivityActor(),
-    userEmail: authState.user?.email || "",
     source: "link",
-    pin: null,
-  };
-  if (isEvidenceImage(record)) {
-    record.history = [
-      buildImageHistoryEntry({
-        prompt: label,
-        url: record.url,
-        createdAt: record.createdAt,
-        userId: record.userId,
-        userName: record.userName,
-        userEmail: record.userEmail,
-        source: "link",
-      }),
-    ];
-  }
+    roomId: target.roomId,
+    taskId: target.taskId,
+    taskTitle: target.taskTitle,
+  });
   logActivityEvent("file_uploaded", {
-    roomId: state.activeRoomId,
+    roomId: target.roomId,
+    taskId: target.taskId,
     metadata: { filename: label },
   });
-  await persistEvidenceFile(roomData, record);
+  await persistEvidenceFile(target.roomId, roomData, record);
+};
+
+const handleTaskFileUpload = (event) => {
+  const target = resolveTaskEvidenceTarget();
+  if (!target) {
+    event.target.value = "";
+    return;
+  }
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = async (loadEvent) => {
+    const roomData = ensureRoomData(target.roomId);
+    const record = buildEvidenceRecord({
+      label: file.name,
+      url: loadEvent.target.result,
+      type: file.type || "",
+      size: file.size,
+      source: "upload",
+      roomId: target.roomId,
+      taskId: target.taskId,
+      taskTitle: target.taskTitle,
+    });
+    logActivityEvent("file_uploaded", {
+      roomId: target.roomId,
+      taskId: target.taskId,
+      metadata: { filename: file.name },
+    });
+    await persistEvidenceFile(target.roomId, roomData, record);
+  };
+  reader.readAsDataURL(file);
+  event.target.value = "";
+};
+
+const handleTaskFileLink = async () => {
+  const target = resolveTaskEvidenceTarget();
+  if (!target) return;
+  const url = window.prompt("Link zur Datei oder Referenz einfügen:");
+  if (!url) return;
+  const label = window.prompt("Titel für den Link:", url.trim()) || url.trim();
+  if (!label) return;
+
+  const roomData = ensureRoomData(target.roomId);
+  const record = buildEvidenceRecord({
+    label,
+    url: url.trim(),
+    type: "link",
+    size: null,
+    source: "link",
+    roomId: target.roomId,
+    taskId: target.taskId,
+    taskTitle: target.taskTitle,
+  });
+  logActivityEvent("file_uploaded", {
+    roomId: target.roomId,
+    taskId: target.taskId,
+    metadata: { filename: label },
+  });
+  await persistEvidenceFile(target.roomId, roomData, record);
 };
 
 const applyArchitectAdjustments = ({
@@ -10792,6 +11628,16 @@ const bindEvents = () => {
     closeCommentContextMenu();
   });
 
+  elements.taskPlanMenu?.addEventListener("click", (event) => {
+    const target = event.target;
+    const actionButton = target?.closest?.("button[data-action]");
+    if (!actionButton || actionButton.disabled) return;
+    const action = actionButton.dataset.action;
+    if (!action) return;
+    closeTaskPlanMenu();
+    handleTaskPlanMenuAction(action);
+  });
+
   elements.clearSelectionBtn.addEventListener("click", () => {
     selectRoom(null);
   });
@@ -10996,6 +11842,9 @@ const bindEvents = () => {
     if (commentContextState.isOpen) {
       closeCommentContextMenu();
     }
+    if (taskPlanMenuState.isOpen) {
+      closeTaskPlanMenu();
+    }
     if (imageModalState.isOpen) {
       closeImageModal();
     }
@@ -11004,17 +11853,33 @@ const bindEvents = () => {
     }
   });
   document.addEventListener("click", (event) => {
-    if (!commentContextState.isOpen) return;
-    if (elements.commentContextMenu?.contains(event.target)) return;
-    closeCommentContextMenu();
+    if (
+      commentContextState.isOpen &&
+      !elements.commentContextMenu?.contains(event.target)
+    ) {
+      closeCommentContextMenu();
+    }
+    if (
+      taskPlanMenuState.isOpen &&
+      !elements.taskPlanMenu?.contains(event.target)
+    ) {
+      closeTaskPlanMenu();
+    }
   });
   window.addEventListener("resize", closeCommentContextMenu);
+  window.addEventListener("resize", closeTaskPlanMenu);
   window.addEventListener("scroll", closeCommentContextMenu, true);
+  window.addEventListener("scroll", closeTaskPlanMenu, true);
 
   elements.decisionForm?.addEventListener("submit", handleDecisionSubmit);
   elements.generateImageBtn.addEventListener("click", handleGenerateImage);
   elements.uploadImageInput.addEventListener("change", handleUploadImage);
   elements.addEvidenceLinkBtn?.addEventListener("click", handleAddEvidenceLink);
+  elements.evidenceRoomSelect?.addEventListener("change", () => {
+    renderEvidenceUploadTargets();
+  });
+  elements.taskFileUpload?.addEventListener("change", handleTaskFileUpload);
+  elements.taskFileLink?.addEventListener("click", handleTaskFileLink);
   elements.setApiKeyBtn?.addEventListener("click", handleSetApiKey);
   elements.loginForm?.addEventListener("submit", handleLogin);
   elements.magicLinkBtn?.addEventListener("click", handleMagicLink);
@@ -11038,7 +11903,14 @@ const bindEvents = () => {
   elements.emailConnectMicrosoft?.addEventListener("click", () =>
     startEmailConnect("microsoft"),
   );
-  elements.emailPanelRefresh?.addEventListener("click", handleEmailPanelRefresh);
+  elements.emailPanelRefresh?.addEventListener(
+    "click",
+    handleEmailPanelRefresh,
+  );
+  elements.emailReplyTranslate?.addEventListener(
+    "click",
+    handleEmailReplyTranslate,
+  );
   elements.emailReplySend?.addEventListener("click", handleEmailReplySend);
 
   elements.toggleArchitect.addEventListener("change", (event) => {

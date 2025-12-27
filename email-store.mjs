@@ -1,7 +1,13 @@
 import qrcode from "qrcode";
 import { authenticator } from "otplib";
-import { decrypt, encrypt, generateRandomHex, hashValue } from "./lib/crypto.mjs";
+import {
+  decrypt,
+  encrypt,
+  generateRandomHex,
+  hashValue,
+} from "./lib/crypto.mjs";
 import { loadEmailClient } from "./lib/email/client.mjs";
+import { translate } from "./lib/translate.mjs";
 import * as gmailProvider from "./lib/email/providers/gmail.mjs";
 import * as microsoftProvider from "./lib/email/providers/microsoft.mjs";
 import {
@@ -60,8 +66,43 @@ const extractAccessToken = (headers) => {
 };
 
 const parseProvider = (value) => {
-  const key = String(value || "").trim().toLowerCase();
+  const key = String(value || "")
+    .trim()
+    .toLowerCase();
   return PROVIDERS[key] ? key : "";
+};
+
+const stripHtml = (value) => {
+  const raw = String(value || "");
+  if (!raw) return "";
+  const withoutScripts = raw
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, " ");
+  const withBreaks = withoutScripts
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n");
+  const withoutTags = withBreaks.replace(/<[^>]+>/g, " ");
+  return withoutTags
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&#39;/gi, "'")
+    .replace(/&quot;/gi, '"')
+    .replace(/\s+\n/g, "\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+};
+
+const resolveMessageText = (message) => {
+  if (!message) return "";
+  const bodyText = String(message.bodyText || "").trim();
+  if (bodyText) return bodyText;
+  const bodyHtml = String(message.bodyHtml || "").trim();
+  if (bodyHtml) return stripHtml(bodyHtml);
+  const snippet = String(message.snippet || "").trim();
+  return snippet;
 };
 
 const supabaseRequest = async ({
@@ -72,17 +113,20 @@ const supabaseRequest = async ({
   body,
   prefer,
 }) => {
-  const response = await fetch(`${supabaseConfig.supabaseUrl}/rest/v1/${path}`, {
-    method,
-    headers: {
-      apikey: supabaseConfig.supabaseAnonKey,
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      ...(prefer ? { Prefer: prefer } : {}),
+  const response = await fetch(
+    `${supabaseConfig.supabaseUrl}/rest/v1/${path}`,
+    {
+      method,
+      headers: {
+        apikey: supabaseConfig.supabaseAnonKey,
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...(prefer ? { Prefer: prefer } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
     },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  );
   if (!response.ok) {
     const message = await response.text();
     const error = new Error(message || "Supabase request failed.");
@@ -106,22 +150,14 @@ const fetchEmailAccount = async ({
   return rows?.[0] || null;
 };
 
-const fetchEmailAccounts = async ({
-  supabaseConfig,
-  accessToken,
-  userId,
-}) =>
+const fetchEmailAccounts = async ({ supabaseConfig, accessToken, userId }) =>
   supabaseRequest({
     supabaseConfig,
     accessToken,
     path: `${EMAIL_ACCOUNTS_TABLE}?user_id=eq.${userId}&select=id,provider,email_address,is_paused,lugano_container_id,updated_at`,
   });
 
-const upsertEmailAccount = async ({
-  supabaseConfig,
-  accessToken,
-  payload,
-}) =>
+const upsertEmailAccount = async ({ supabaseConfig, accessToken, payload }) =>
   supabaseRequest({
     supabaseConfig,
     accessToken,
@@ -130,6 +166,72 @@ const upsertEmailAccount = async ({
     prefer: "resolution=merge-duplicates,return=representation",
     body: payload,
   });
+
+const buildMessageCacheRows = (messages, linkId) =>
+  (messages || [])
+    .map((message) => {
+      const providerId = String(message?.id || "").trim();
+      if (!providerId) return null;
+      return {
+        thread_link_id: linkId,
+        provider_message_id: providerId,
+        sent_at: message?.sentAt || null,
+        from: message?.from || null,
+        to: Array.isArray(message?.to) ? message.to : [],
+        cc: Array.isArray(message?.cc) ? message.cc : [],
+        subject: message?.subject || "",
+        snippet: message?.snippet || "",
+        body_html: message?.bodyHtml || null,
+        body_text: resolveMessageText(message) || null,
+      };
+    })
+    .filter(Boolean);
+
+const upsertMessageCache = async ({
+  supabaseConfig,
+  accessToken,
+  rows,
+}) => {
+  if (!rows?.length) return;
+  await supabaseRequest({
+    supabaseConfig,
+    accessToken,
+    method: "POST",
+    path: `${EMAIL_MESSAGES_CACHE_TABLE}?on_conflict=thread_link_id,provider_message_id`,
+    prefer: "resolution=merge-duplicates",
+    body: rows,
+  });
+};
+
+const fetchCachedMessages = async ({
+  supabaseConfig,
+  accessToken,
+  linkId,
+}) =>
+  supabaseRequest({
+    supabaseConfig,
+    accessToken,
+    path: `${EMAIL_MESSAGES_CACHE_TABLE}?thread_link_id=eq.${linkId}&select=*&order=sent_at.asc`,
+  });
+
+const toCachedMessageResponse = (row, threadId) => ({
+  id: row?.provider_message_id || "",
+  threadId,
+  sentAt: row?.sent_at || null,
+  from: row?.from || null,
+  to: Array.isArray(row?.to) ? row.to : [],
+  cc: Array.isArray(row?.cc) ? row.cc : [],
+  subject: row?.subject || "",
+  snippet: row?.snippet || "",
+  bodyHtml: row?.body_html || null,
+  bodyText: row?.body_text || null,
+  messageCacheId: row?.id || null,
+  translations:
+    row?.translations && typeof row.translations === "object"
+      ? row.translations
+      : {},
+  detectedLanguage: row?.detected_language || null,
+});
 
 const ensureTaskRegistryId = async ({
   supabaseConfig,
@@ -187,11 +289,7 @@ const logEmailActivity = async ({
   });
 };
 
-const getSecuritySettings = async ({
-  supabaseConfig,
-  accessToken,
-  userId,
-}) => {
+const getSecuritySettings = async ({ supabaseConfig, accessToken, userId }) => {
   const rows = await supabaseRequest({
     supabaseConfig,
     accessToken,
@@ -257,6 +355,7 @@ const shouldRequireEmailReauth = (urlPath) => {
   if (urlPath.startsWith("/api/security")) return false;
   if (urlPath.startsWith("/api/email/oauth/")) return false;
   if (urlPath === "/api/email/cron/refresh-lugano") return false;
+  if (urlPath.startsWith("/api/translate")) return true;
   if (urlPath.startsWith("/api/email")) return true;
   if (urlPath.startsWith("/api/email-links")) return true;
   return /^\/api\/tasks\/[^/]+\/email-links$/.test(urlPath);
@@ -380,12 +479,7 @@ const handleTotpDisable = async ({
   });
 };
 
-const handleReauth = async ({
-  supabaseConfig,
-  accessToken,
-  user,
-  body,
-}) => {
+const handleReauth = async ({ supabaseConfig, accessToken, user, body }) => {
   const settings = await getSecuritySettings({
     supabaseConfig,
     accessToken,
@@ -486,7 +580,8 @@ const handleEmailApi = async ({ method, urlPath, headers, body, query }) => {
     !urlPath?.startsWith("/api/email") &&
     !urlPath?.startsWith("/api/email-links") &&
     !urlPath?.startsWith("/api/security") &&
-    !urlPath?.startsWith("/api/tasks/")
+    !urlPath?.startsWith("/api/tasks/") &&
+    !urlPath?.startsWith("/api/translate")
   ) {
     return null;
   }
@@ -557,32 +652,11 @@ const handleEmailApi = async ({ method, urlPath, headers, body, query }) => {
             },
           });
           const messages = await client.getThreadMessages(thread.id);
-          await supabaseRequest({
+          await upsertMessageCache({
             supabaseConfig,
             accessToken: systemToken,
-            method: "DELETE",
-            path: `${EMAIL_MESSAGES_CACHE_TABLE}?thread_link_id=eq.${match.id}`,
+            rows: buildMessageCacheRows(messages, match.id),
           });
-          if (messages.length) {
-            await supabaseRequest({
-              supabaseConfig,
-              accessToken: systemToken,
-              method: "POST",
-              path: EMAIL_MESSAGES_CACHE_TABLE,
-              body: messages.map((message) => ({
-                thread_link_id: match.id,
-                provider_message_id: message.id,
-                sent_at: message.sentAt,
-                from: message.from,
-                to: message.to,
-                cc: message.cc,
-                subject: message.subject,
-                snippet: message.snippet,
-                body_html: message.bodyHtml,
-                body_text: message.bodyText,
-              })),
-            });
-          }
         }
       } catch {
         // Continue with next account.
@@ -633,7 +707,9 @@ const handleEmailApi = async ({ method, urlPath, headers, body, query }) => {
         });
         return { statusCode: 200, payload: setup };
       } catch (error) {
-        if (String(error?.message || "").includes("EMAIL_TOKEN_ENCRYPTION_KEY")) {
+        if (
+          String(error?.message || "").includes("EMAIL_TOKEN_ENCRYPTION_KEY")
+        ) {
           return buildError(
             500,
             "Missing EMAIL_TOKEN_ENCRYPTION_KEY.",
@@ -728,6 +804,157 @@ const handleEmailApi = async ({ method, urlPath, headers, body, query }) => {
     });
     if (!verifyRecentAuth({ settings })) {
       return buildReauthError(settings);
+    }
+  }
+
+  if (urlPath === "/api/translate/message") {
+    if (normalizedMethod !== "POST") {
+      return buildError(405, "Method not allowed.", "method_not_allowed");
+    }
+    const messageCacheId = String(body?.messageCacheId || "").trim();
+    const targetLang = String(body?.targetLang || "").trim().toLowerCase();
+    if (!messageCacheId || !targetLang) {
+      return buildError(
+        400,
+        "Missing translation data.",
+        "missing_translation_data",
+      );
+    }
+    if (targetLang !== "de") {
+      return buildError(
+        400,
+        "Unsupported target language.",
+        "unsupported_target",
+      );
+    }
+    const rows = await supabaseRequest({
+      supabaseConfig,
+      accessToken,
+      path: `${EMAIL_MESSAGES_CACHE_TABLE}?id=eq.${messageCacheId}&select=id,thread_link_id,body_text,body_html,translations,detected_language`,
+    });
+    const message = rows?.[0];
+    if (!message) {
+      return buildError(404, "Message not found.", "message_not_found");
+    }
+    const translations =
+      message.translations && typeof message.translations === "object"
+        ? message.translations
+        : {};
+    const existing = translations[targetLang];
+    if (existing?.bodyText) {
+      return {
+        statusCode: 200,
+        payload: { translation: existing, cached: true },
+      };
+    }
+    const messageText =
+      String(message.body_text || "").trim() ||
+      stripHtml(message.body_html || "");
+    if (!messageText) {
+      return buildError(
+        400,
+        "Message body missing.",
+        "missing_message_body",
+      );
+    }
+    try {
+      const result = await translate({
+        text: messageText,
+        targetLang,
+        sourceLang: message.detected_language || "",
+      });
+      const entry = {
+        bodyText: result.translatedText,
+        detectedSourceLang: result.detectedSourceLang || null,
+        createdAt: new Date().toISOString(),
+      };
+      const nextTranslations = { ...translations, [targetLang]: entry };
+      const updatePayload = { translations: nextTranslations };
+      if (!message.detected_language && entry.detectedSourceLang) {
+        updatePayload.detected_language = entry.detectedSourceLang;
+      }
+      await supabaseRequest({
+        supabaseConfig,
+        accessToken,
+        method: "PATCH",
+        path: `${EMAIL_MESSAGES_CACHE_TABLE}?id=eq.${messageCacheId}`,
+        body: updatePayload,
+      });
+      let taskId = null;
+      if (message.thread_link_id) {
+        const linkRows = await supabaseRequest({
+          supabaseConfig,
+          accessToken,
+          path: `${EMAIL_THREAD_LINKS_TABLE}?id=eq.${message.thread_link_id}&select=task_id`,
+        });
+        taskId = linkRows?.[0]?.task_id || null;
+      }
+      await logEmailActivity({
+        supabaseConfig,
+        accessToken,
+        userId: user.id,
+        taskId,
+        threadLinkId: message.thread_link_id || null,
+        action: "TRANSLATE_VIEW",
+        meta: { targetLang, messageCacheId },
+      });
+      return {
+        statusCode: 200,
+        payload: { translation: entry, cached: false },
+      };
+    } catch (error) {
+      return buildError(
+        error.statusCode || 502,
+        error.message || "Translation failed.",
+        error.code || "translation_failed",
+      );
+    }
+  }
+
+  if (urlPath === "/api/translate/text") {
+    if (normalizedMethod !== "POST") {
+      return buildError(405, "Method not allowed.", "method_not_allowed");
+    }
+    const text = String(body?.text || "").trim();
+    const targetLang = String(body?.targetLang || "").trim().toLowerCase();
+    if (!text || !targetLang) {
+      return buildError(
+        400,
+        "Missing translation data.",
+        "missing_translation_data",
+      );
+    }
+    if (targetLang !== "it") {
+      return buildError(
+        400,
+        "Unsupported target language.",
+        "unsupported_target",
+      );
+    }
+    try {
+      const result = await translate({ text, targetLang });
+      await logEmailActivity({
+        supabaseConfig,
+        accessToken,
+        userId: user.id,
+        taskId: null,
+        threadLinkId: null,
+        action: "TRANSLATE_DRAFT",
+        meta: { targetLang },
+      });
+      return {
+        statusCode: 200,
+        payload: {
+          translatedText: result.translatedText,
+          detectedSourceLang: result.detectedSourceLang || null,
+        },
+      };
+    } catch (error) {
+      return buildError(
+        error.statusCode || 502,
+        error.message || "Translation failed.",
+        error.code || "translation_failed",
+      );
     }
   }
 
@@ -844,7 +1071,10 @@ const handleEmailApi = async ({ method, urlPath, headers, body, query }) => {
         accessToken: tokens.access_token,
       });
       const emailAddress =
-        profile?.emailAddress || profile?.mail || profile?.userPrincipalName || "";
+        profile?.emailAddress ||
+        profile?.mail ||
+        profile?.userPrincipalName ||
+        "";
       const containerId = await provider.ensureLuganoContainer({
         accessToken: tokens.access_token,
       });
@@ -877,7 +1107,10 @@ const handleEmailApi = async ({ method, urlPath, headers, body, query }) => {
         taskId: null,
         threadLinkId: null,
         action: "CONNECT",
-        meta: { provider: providerKey, email: emailAddress || user.email || "" },
+        meta: {
+          provider: providerKey,
+          email: emailAddress || user.email || "",
+        },
       });
       return {
         statusCode: 200,
@@ -1092,7 +1325,9 @@ const handleEmailApi = async ({ method, urlPath, headers, body, query }) => {
     return { statusCode: 200, payload: { deleted: true } };
   }
 
-  const messagesMatch = urlPath.match(/^\/api\/email-links\/([^/]+)\/messages$/);
+  const messagesMatch = urlPath.match(
+    /^\/api\/email-links\/([^/]+)\/messages$/,
+  );
   if (messagesMatch) {
     if (normalizedMethod !== "GET") {
       return buildError(405, "Method not allowed.", "method_not_allowed");
@@ -1123,32 +1358,16 @@ const handleEmailApi = async ({ method, urlPath, headers, body, query }) => {
         account,
       });
       const messages = await client.getThreadMessages(link.provider_thread_id);
-      await supabaseRequest({
+      await upsertMessageCache({
         supabaseConfig,
         accessToken,
-        method: "DELETE",
-        path: `${EMAIL_MESSAGES_CACHE_TABLE}?thread_link_id=eq.${link.id}`,
+        rows: buildMessageCacheRows(messages, link.id),
       });
-      if (messages.length) {
-        await supabaseRequest({
-          supabaseConfig,
-          accessToken,
-          method: "POST",
-          path: EMAIL_MESSAGES_CACHE_TABLE,
-          body: messages.map((message) => ({
-            thread_link_id: link.id,
-            provider_message_id: message.id,
-            sent_at: message.sentAt,
-            from: message.from,
-            to: message.to,
-            cc: message.cc,
-            subject: message.subject,
-            snippet: message.snippet,
-            body_html: message.bodyHtml,
-            body_text: message.bodyText,
-          })),
-        });
-      }
+      const cachedRows = await fetchCachedMessages({
+        supabaseConfig,
+        accessToken,
+        linkId: link.id,
+      });
       await logEmailActivity({
         supabaseConfig,
         accessToken,
@@ -1158,7 +1377,14 @@ const handleEmailApi = async ({ method, urlPath, headers, body, query }) => {
         action: "VIEW_THREAD",
         meta: { provider: link.provider, threadId: link.provider_thread_id },
       });
-      return { statusCode: 200, payload: { messages } };
+      return {
+        statusCode: 200,
+        payload: {
+          messages: (cachedRows || []).map((row) =>
+            toCachedMessageResponse(row, link.provider_thread_id),
+          ),
+        },
+      };
     } catch (error) {
       return buildError(
         error.statusCode || 502,
@@ -1221,32 +1447,11 @@ const handleEmailApi = async ({ method, urlPath, headers, body, query }) => {
         },
       });
       const messages = await client.getThreadMessages(link.provider_thread_id);
-      await supabaseRequest({
+      await upsertMessageCache({
         supabaseConfig,
         accessToken,
-        method: "DELETE",
-        path: `${EMAIL_MESSAGES_CACHE_TABLE}?thread_link_id=eq.${link.id}`,
+        rows: buildMessageCacheRows(messages, link.id),
       });
-      if (messages.length) {
-        await supabaseRequest({
-          supabaseConfig,
-          accessToken,
-          method: "POST",
-          path: EMAIL_MESSAGES_CACHE_TABLE,
-          body: messages.map((message) => ({
-            thread_link_id: link.id,
-            provider_message_id: message.id,
-            sent_at: message.sentAt,
-            from: message.from,
-            to: message.to,
-            cc: message.cc,
-            subject: message.subject,
-            snippet: message.snippet,
-            body_html: message.bodyHtml,
-            body_text: message.bodyText,
-          })),
-        });
-      }
       return { statusCode: 200, payload: { sent: true } };
     } catch (error) {
       return buildError(

@@ -1219,6 +1219,38 @@ svg {
   border: 1px solid #eadfce;
 }
 
+.task-file-panel {
+  display: grid;
+  gap: 0.8rem;
+  padding: 0.8rem;
+  background: #fdf2e6;
+  border-radius: 0.8rem;
+  border: 1px solid #eadfce;
+}
+
+.task-file-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.task-file-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #7d6956;
+  font-weight: 700;
+}
+
+.task-file-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
 .task-email-panel {
   display: grid;
   gap: 0.8rem;
@@ -1394,7 +1426,7 @@ svg {
 
 .email-reply {
   display: grid;
-  gap: 0.4rem;
+  gap: 0.6rem;
   font-weight: 600;
 }
 
@@ -1403,6 +1435,67 @@ svg {
   border-radius: 0.6rem;
   border: 1px solid #e4d4c0;
   resize: vertical;
+}
+
+.email-message-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.email-message-translate {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.85rem;
+}
+
+.email-message-translation {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.6rem;
+  border-radius: 0.6rem;
+  border: 1px dashed #eadfce;
+  background: #fff3ea;
+}
+
+.email-message-translation-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #7d6956;
+  font-weight: 700;
+}
+
+.email-message-body {
+  color: #3b3127;
+  white-space: pre-wrap;
+}
+
+.email-reply-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.email-reply-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.email-reply-translation {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.6rem;
+  border-radius: 0.6rem;
+  border: 1px dashed #eadfce;
+  background: #fff7ee;
+}
+
+.email-reply-translation-field,
+.email-reply-original {
+  display: grid;
+  gap: 0.4rem;
 }
 
 .email-reply-actions {
@@ -1549,7 +1642,8 @@ button {
   border-radius: 0.5rem;
 }
 
-.comment-context-menu {
+.comment-context-menu,
+.task-plan-menu {
   position: fixed;
   min-width: 200px;
   padding: 0.4rem;
@@ -1562,11 +1656,13 @@ button {
   z-index: 30;
 }
 
-.comment-context-menu[hidden] {
+.comment-context-menu[hidden],
+.task-plan-menu[hidden] {
   display: none;
 }
 
-.comment-context-menu button {
+.comment-context-menu button,
+.task-plan-menu button {
   border: none;
   background: transparent;
   text-align: left;
@@ -1576,11 +1672,13 @@ button {
   color: #3b3127;
 }
 
-.comment-context-menu button:hover {
+.comment-context-menu button:hover,
+.task-plan-menu button:hover {
   background: #f3e6d7;
 }
 
-.comment-context-menu button:disabled {
+.comment-context-menu button:disabled,
+.task-plan-menu button:disabled {
   color: #b0a099;
   cursor: not-allowed;
   background: transparent;
@@ -2134,6 +2232,42 @@ button {
 .evidence-block {
   display: grid;
   gap: 0.8rem;
+}
+
+.evidence-targets {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.evidence-targets label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: #7d6956;
+}
+
+.evidence-targets select {
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.6rem;
+  border: 1px solid #e4d4c0;
+  background: #fffaf4;
+  font-weight: 600;
+  color: #3b3127;
+}
+
+.evidence-task {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: #f6e0c7;
+  color: #9a4a2b;
+  font-size: 0.7rem;
+  font-weight: 700;
+  width: fit-content;
 }
 
 .task-bulk-actions button:disabled {

@@ -122,12 +122,7 @@
         >
           ?
         </button>
-        <button
-          id="security-settings"
-          class="secondary"
-          type="button"
-          hidden
-        >
+        <button id="security-settings" class="secondary" type="button" hidden>
           Sicherheit
         </button>
         <div class="auth-info" id="auth-info" hidden>
@@ -358,13 +353,27 @@
             <div class="evidence-block">
               <h4>Bilder, Dateien &amp; Links</h4>
               <div id="image-gallery" class="image-gallery"></div>
+              <div class="evidence-targets">
+                <label>
+                  <span>Raum</span>
+                  <select id="evidence-room-select"></select>
+                </label>
+                <label>
+                  <span>Aufgabe</span>
+                  <select id="evidence-task-select"></select>
+                </label>
+              </div>
               <div class="button-row">
                 <button id="generate-image" class="primary" type="button">
                   Mit ChatGPT erzeugen
                 </button>
                 <label class="upload-btn">
                   Datei hochladen
-                  <input type="file" id="upload-image" />
+                  <input
+                    type="file"
+                    id="upload-image"
+                    accept="image/*,application/pdf"
+                  />
                 </label>
                 <button id="add-evidence-link" type="button">
                   Link hinzufügen
@@ -842,6 +851,28 @@
             <div class="dependency-title">Abhängigkeiten</div>
             <div id="task-dependency-list" class="dependency-list"></div>
           </div>
+          <div class="task-file-panel">
+            <div class="task-file-header">
+              <div class="task-file-title">Dateien &amp; Links</div>
+              <div class="task-file-actions">
+                <label class="upload-btn">
+                  Datei hochladen
+                  <input
+                    type="file"
+                    id="task-file-upload"
+                    accept="image/*,application/pdf"
+                  />
+                </label>
+                <button type="button" id="task-file-link">
+                  Link hinzufügen
+                </button>
+              </div>
+            </div>
+            <div id="task-file-list" class="image-gallery task-file-list"></div>
+            <p id="task-file-empty" class="helper" hidden>
+              Keine Dateien für diese Aufgabe.
+            </p>
+          </div>
           <div class="task-email-panel" id="task-email-panel">
             <div class="task-email-header">
               <div class="task-email-title">E-Mail-Integration</div>
@@ -868,23 +899,52 @@
               <ul id="email-unlinked-threads" class="email-thread-list"></ul>
             </div>
             <div class="email-section">
-              <div class="email-section-title">Mit dieser Aufgabe verknüpft</div>
+              <div class="email-section-title">
+                Mit dieser Aufgabe verknüpft
+              </div>
               <ul id="email-linked-threads" class="email-thread-list"></ul>
             </div>
             <div id="email-thread-view" class="email-thread-view" hidden>
               <div id="email-thread-meta" class="email-thread-meta"></div>
-              <ul
-                id="email-thread-messages"
-                class="email-thread-messages"
-              ></ul>
-              <label class="email-reply">
-                <span>Antwort</span>
-                <textarea
-                  id="email-reply-text"
-                  rows="3"
-                  placeholder="Antwort schreiben"
-                ></textarea>
-              </label>
+              <ul id="email-thread-messages" class="email-thread-messages"></ul>
+              <div class="email-reply">
+                <div class="email-reply-header">
+                  <span>Antwort</span>
+                  <div class="email-reply-header-actions">
+                    <button type="button" id="email-reply-translate">
+                      🇮🇹 Übersetzen
+                    </button>
+                    <span
+                      id="email-reply-translate-status"
+                      class="helper"
+                      hidden
+                    ></span>
+                  </div>
+                </div>
+                <div
+                  id="email-reply-translation"
+                  class="email-reply-translation"
+                  hidden
+                >
+                  <label class="email-reply-translation-field">
+                    <span>Übersetzung (Italienisch)</span>
+                    <textarea
+                      id="email-reply-text-it"
+                      rows="3"
+                      placeholder="Übersetzung auf Italienisch"
+                    ></textarea>
+                  </label>
+                  <p class="helper">Diese Version wird gesendet.</p>
+                </div>
+                <label class="email-reply-original">
+                  <span>Original (Deutsch)</span>
+                  <textarea
+                    id="email-reply-text"
+                    rows="3"
+                    placeholder="Antwort schreiben"
+                  ></textarea>
+                </label>
+              </div>
               <div class="email-reply-actions">
                 <button type="button" id="email-reply-send" class="primary">
                   Antwort senden
@@ -948,7 +1008,11 @@
               <button id="security-2fa-confirm" type="button" class="primary">
                 2FA aktivieren
               </button>
-              <div id="security-recovery-codes" class="security-recovery" hidden>
+              <div
+                id="security-recovery-codes"
+                class="security-recovery"
+                hidden
+              >
                 <div class="security-recovery-title">Recovery-Codes</div>
                 <ul
                   id="security-recovery-list"
@@ -992,7 +1056,11 @@
           </label>
           <label id="reauth-password-row" hidden>
             Passwort
-            <input id="reauth-password" type="password" autocomplete="current-password" />
+            <input
+              id="reauth-password"
+              type="password"
+              autocomplete="current-password"
+            />
           </label>
           <button type="submit" class="primary">Bestätigen</button>
         </form>
@@ -1221,6 +1289,18 @@
       <button type="button" class="danger" data-action="delete">
         Kommentar löschen
       </button>
+    </div>
+
+    <div
+      id="task-plan-menu"
+      class="task-plan-menu"
+      role="menu"
+      aria-label="Planen"
+      aria-hidden="true"
+      hidden
+    >
+      <button type="button" data-action="plan">Aufgabe planen</button>
+      <button type="button" data-action="chat">ChatGPT Chat zur Aufgabe</button>
     </div>
 
     <script src="config.js"></script>

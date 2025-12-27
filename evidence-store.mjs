@@ -175,6 +175,19 @@ const normalizeFileRecord = (input = {}) => {
     typeof input.updatedAt === "string" && input.updatedAt.trim()
       ? input.updatedAt.trim()
       : "";
+  const roomId =
+    typeof input.roomId === "string" && input.roomId.trim()
+      ? input.roomId.trim()
+      : "";
+  const taskId =
+    typeof input.taskId === "string" && input.taskId.trim()
+      ? input.taskId.trim()
+      : "";
+  const taskTitleRaw =
+    typeof input.taskTitle === "string" ? input.taskTitle.trim() : "";
+  const taskLabelRaw =
+    typeof input.taskLabel === "string" ? input.taskLabel.trim() : "";
+  const taskTitle = taskTitleRaw || taskLabelRaw;
   const normalizeHistoryEntry = (entry) => {
     if (!entry || typeof entry !== "object") return null;
     const url = String(entry.url || "").trim();
@@ -215,6 +228,9 @@ const normalizeFileRecord = (input = {}) => {
       size: Number.isFinite(size) ? size : null,
       createdAt: String(input.createdAt || new Date().toISOString()),
       updatedAt,
+      roomId: roomId || null,
+      taskId: taskId || null,
+      taskTitle,
       userName: String(input.userName || ""),
       userEmail: String(input.userEmail || ""),
       prompt,

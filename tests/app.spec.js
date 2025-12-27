@@ -148,6 +148,23 @@ test("Aufgaben erstellen, filtern und erledigen", async ({ page }) => {
   await expect(taskItem).toHaveClass(/is-done/);
 });
 
+test("Aufgabenuebersicht erstellt neue Aufgabe trotz Filter", async ({
+  page,
+}) => {
+  await preparePage(page);
+
+  await page.locator("#view-tasks").click();
+  await expect(page.locator("#tasks-view")).toBeVisible();
+
+  await page.selectOption("#task-filter-status", "Planned");
+  await page.locator("#task-create-input").fill("Neue Aufgabe Uebersicht");
+  await page.locator("#task-create-form button[type='submit']").click();
+
+  const taskList = page.locator("#task-list");
+  await expect(taskList).toContainText("Neue Aufgabe Uebersicht");
+  await expect(page.locator("#task-filter-status")).toHaveValue("all");
+});
+
 test("saved views filtern Tasks nach Tags und Status", async ({ page }) => {
   await preparePage(page);
   await addTasks(page, [
