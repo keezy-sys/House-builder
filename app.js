@@ -6847,6 +6847,12 @@ const buildTaskItem = (
   controls.appendChild(buildStatusSelect(task));
   controls.appendChild(buildAssigneeSelect(task));
 
+  const planButton = document.createElement("button");
+  planButton.type = "button";
+  planButton.textContent = "Planen";
+  planButton.addEventListener("click", () => openTaskModal(task.id));
+  controls.appendChild(planButton);
+
   const removeButton = document.createElement("button");
   removeButton.type = "button";
   removeButton.textContent = "Entfernen";
