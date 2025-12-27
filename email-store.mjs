@@ -624,13 +624,28 @@ const handleEmailApi = async ({ method, urlPath, headers, body, query }) => {
       if (normalizedMethod !== "POST") {
         return buildError(405, "Method not allowed.", "method_not_allowed");
       }
-      const setup = await handleTotpSetup({
-        supabaseConfig,
-        accessToken,
-        userId: user.id,
-        email: user.email || "user",
-      });
-      return { statusCode: 200, payload: setup };
+      try {
+        const setup = await handleTotpSetup({
+          supabaseConfig,
+          accessToken,
+          userId: user.id,
+          email: user.email || "user",
+        });
+        return { statusCode: 200, payload: setup };
+      } catch (error) {
+        if (String(error?.message || "").includes("EMAIL_TOKEN_ENCRYPTION_KEY")) {
+          return buildError(
+            500,
+            "Missing EMAIL_TOKEN_ENCRYPTION_KEY.",
+            "missing_encryption_key",
+          );
+        }
+        return buildError(
+          error.statusCode || 500,
+          error.message || "Setup failed.",
+          "setup_failed",
+        );
+      }
     }
 
     if (urlPath === "/api/security/totp/confirm") {

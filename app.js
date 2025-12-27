@@ -2596,6 +2596,29 @@ const setSecurityStatus = (message, isError = false) => {
   );
 };
 
+const getSecurityErrorMessage = (data, fallback) => {
+  const code = String(data?.code || "").trim();
+  if (code === "missing_encryption_key") {
+    return "Server-Konfiguration fehlt (EMAIL_TOKEN_ENCRYPTION_KEY).";
+  }
+  if (code === "missing_supabase_config") {
+    return "Supabase-Konfiguration fehlt.";
+  }
+  if (code === "missing_access_token" || code === "invalid_access_token") {
+    return "Sitzung abgelaufen. Bitte neu anmelden.";
+  }
+  if (code === "invalid_code") {
+    return "Der Code ist ungültig. Bitte erneut versuchen.";
+  }
+  if (code === "disable_failed") {
+    return "2FA konnte nicht deaktiviert werden.";
+  }
+  if (code === "setup_failed") {
+    return "Setup konnte nicht gestartet werden.";
+  }
+  return fallback;
+};
+
 const isLocalReauthFresh = () => {
   const userId = sessionStorage.getItem("2fa_user_id");
   if (!authState.user || userId !== authState.user.id) return false;
@@ -3000,7 +3023,9 @@ const handleSecurityStart = async () => {
     });
     const data = await readJson(response);
     if (!response.ok) {
-      throw new Error("Setup konnte nicht gestartet werden.");
+      throw new Error(
+        getSecurityErrorMessage(data, "Setup konnte nicht gestartet werden."),
+      );
     }
     securityState.setup = data;
     securityState.recoveryCodes = [];
@@ -3032,7 +3057,9 @@ const handleSecurityConfirm = async () => {
     });
     const data = await readJson(response);
     if (!response.ok) {
-      throw new Error("Code konnte nicht bestätigt werden.");
+      throw new Error(
+        getSecurityErrorMessage(data, "Code konnte nicht bestätigt werden."),
+      );
     }
     securityState.totpEnabled = true;
     securityState.setup = null;
@@ -3147,7 +3174,9 @@ const handleReauthSubmit = async (event) => {
       });
       const data = await readJson(response);
       if (!response.ok) {
-        throw new Error("2FA konnte nicht deaktiviert werden.");
+        throw new Error(
+          getSecurityErrorMessage(data, "2FA konnte nicht deaktiviert werden."),
+        );
       }
       securityState.totpEnabled = false;
       securityState.recoveryCodesRemaining = 0;
@@ -4494,22 +4523,37 @@ const buildChatIcon = () => {
   const svg = document.createElementNS(SVG_NS, "svg");
   svg.setAttribute("viewBox", "0 0 24 24");
   svg.setAttribute("aria-hidden", "true");
-  const circle = document.createElementNS(SVG_NS, "circle");
-  circle.setAttribute("cx", "12");
-  circle.setAttribute("cy", "12");
-  circle.setAttribute("r", "9");
-  circle.setAttribute("fill", "none");
-  circle.setAttribute("stroke", "currentColor");
-  circle.setAttribute("stroke-width", "1.5");
-  svg.appendChild(circle);
-  [8, 12, 16].forEach((cx) => {
-    const dot = document.createElementNS(SVG_NS, "circle");
-    dot.setAttribute("cx", String(cx));
-    dot.setAttribute("cy", "12");
-    dot.setAttribute("r", "1.2");
-    dot.setAttribute("fill", "currentColor");
-    svg.appendChild(dot);
-  });
+  const bubble = document.createElementNS(SVG_NS, "path");
+  bubble.setAttribute(
+    "d",
+    "M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z",
+  );
+  bubble.setAttribute("fill", "none");
+  bubble.setAttribute("stroke", "currentColor");
+  bubble.setAttribute("stroke-width", "1.5");
+  bubble.setAttribute("stroke-linecap", "round");
+  bubble.setAttribute("stroke-linejoin", "round");
+  svg.appendChild(bubble);
+
+  const line1 = document.createElementNS(SVG_NS, "line");
+  line1.setAttribute("x1", "7.5");
+  line1.setAttribute("x2", "15.5");
+  line1.setAttribute("y1", "9");
+  line1.setAttribute("y2", "9");
+  line1.setAttribute("stroke", "currentColor");
+  line1.setAttribute("stroke-width", "1.5");
+  line1.setAttribute("stroke-linecap", "round");
+  svg.appendChild(line1);
+
+  const line2 = document.createElementNS(SVG_NS, "line");
+  line2.setAttribute("x1", "7.5");
+  line2.setAttribute("x2", "12.5");
+  line2.setAttribute("y1", "12.5");
+  line2.setAttribute("y2", "12.5");
+  line2.setAttribute("stroke", "currentColor");
+  line2.setAttribute("stroke-width", "1.5");
+  line2.setAttribute("stroke-linecap", "round");
+  svg.appendChild(line2);
   return svg;
 };
 
