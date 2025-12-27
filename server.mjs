@@ -13,8 +13,16 @@ const port = Number(process.env.PORT || 3000);
 const host = process.env.HOST || "127.0.0.1";
 const imageModel =
   (process.env.OPENAI_IMAGE_MODEL || "dall-e-3").trim() || "dall-e-3";
-const chatModel =
-  (process.env.OPENAI_CHAT_MODEL || "gpt-4.1").trim() || "gpt-4.1";
+const resolveChatModel = (value) => {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  const normalized = trimmed.toLowerCase();
+  if (["default", "auto", "openai-default"].includes(normalized)) {
+    return "";
+  }
+  return trimmed;
+};
+const chatModel = resolveChatModel(process.env.OPENAI_CHAT_MODEL);
 const chatReasoningEffort =
   (process.env.OPENAI_REASONING_EFFORT || "auto").trim().toLowerCase() ||
   "auto";
@@ -65,7 +73,7 @@ const readRequestBody = async (req) => {
 };
 
 const getChatConfig = () => ({
-  model: chatModel,
+  model: chatModel || "",
   reasoningEffort: chatReasoningEffort || "auto",
 });
 
@@ -133,9 +141,11 @@ const handleChatRequest = async (req, res) => {
   input.push(...messages);
 
   const payload = {
-    model: chatModel,
     input,
   };
+  if (chatModel) {
+    payload.model = chatModel;
+  }
   if (chatReasoningEffort && chatReasoningEffort !== "auto") {
     payload.reasoning = { effort: chatReasoningEffort };
   }

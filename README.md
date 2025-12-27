@@ -45,6 +45,7 @@ create policy "house_state update" on public.house_state
    - Publish directory: `.`
    - Functions directory: `netlify/functions`
    - Optional: `OPENAI_API_KEY` als Environment Variable setzen (für Bildgenerierung).
+   - Optional: `OPENAI_CHAT_MODEL` setzen, um ein Chat-Modell festzupinnen (ohne Wert oder mit `default`/`auto` nutzt die App den OpenAI-Standard).
    - Optional: `OPENAI_IMAGE_MODEL` setzen (Standard: `dall-e-3`, `gpt-image-1` nur mit verifizierter Organisation).
 
 ## E-Mail-Integration (Gmail + Outlook)

@@ -6,14 +6,22 @@ const jsonResponse = (statusCode, payload) => ({
   body: JSON.stringify(payload),
 });
 
-const chatModel =
-  (process.env.OPENAI_CHAT_MODEL || "gpt-4.1").trim() || "gpt-4.1";
+const resolveChatModel = (value) => {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  const normalized = trimmed.toLowerCase();
+  if (["default", "auto", "openai-default"].includes(normalized)) {
+    return "";
+  }
+  return trimmed;
+};
+const chatModel = resolveChatModel(process.env.OPENAI_CHAT_MODEL);
 const chatReasoningEffort =
   (process.env.OPENAI_REASONING_EFFORT || "auto").trim().toLowerCase() ||
   "auto";
 
 const getChatConfig = () => ({
-  model: chatModel,
+  model: chatModel || "",
   reasoningEffort: chatReasoningEffort || "auto",
 });
 
@@ -96,9 +104,11 @@ export const handler = async (event) => {
   input.push(...messages);
 
   const payload = {
-    model: chatModel,
     input,
   };
+  if (chatModel) {
+    payload.model = chatModel;
+  }
   if (chatReasoningEffort && chatReasoningEffort !== "auto") {
     payload.reasoning = { effort: chatReasoningEffort };
   }

@@ -134,7 +134,7 @@ const DEFAULT_TASK_FILTERS = {
   query: "",
 };
 const DEFAULT_CHAT_CONFIG = {
-  model: "gpt-4.1",
+  model: "",
   reasoningEffort: "auto",
 };
 const CHAT_MESSAGE_LIMIT = 20;
@@ -2542,7 +2542,13 @@ const updateAuthUI = () => {
 
 const readJson = async (response) => {
   try {
-    return await response.json();
+    const text = await response.text();
+    if (!text) return {};
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { _rawText: text };
+    }
   } catch {
     return {};
   }
@@ -2596,7 +2602,7 @@ const setSecurityStatus = (message, isError = false) => {
   );
 };
 
-const getSecurityErrorMessage = (data, fallback) => {
+const getSecurityErrorMessage = (response, data, fallback) => {
   const code = String(data?.code || "").trim();
   if (code === "missing_encryption_key") {
     return "Server-Konfiguration fehlt (EMAIL_TOKEN_ENCRYPTION_KEY).";
@@ -2615,6 +2621,44 @@ const getSecurityErrorMessage = (data, fallback) => {
   }
   if (code === "setup_failed") {
     return "Setup konnte nicht gestartet werden.";
+  }
+  const rawText = String(data?._rawText || "").trim();
+  if (rawText && !rawText.startsWith("<")) {
+    return `Fehler: ${rawText.slice(0, 160)}`;
+  }
+  if (data?.error) {
+    return `Fehler: ${String(data.error).slice(0, 160)}`;
+  }
+  if (response?.status) {
+    return `${fallback} (HTTP ${response.status})`;
+  }
+  return fallback;
+};
+
+const getSecurityFetchErrorMessage = (error, fallback) => {
+  const message = String(error?.message || "");
+  if (message.includes("Failed to fetch")) {
+    return "Server nicht erreichbar. Bitte neu laden.";
+  }
+  return fallback;
+};
+
+const getEmailOAuthErrorMessage = (response, data, fallback) => {
+  const code = String(data?.code || "").trim();
+  if (code === "missing_oauth_config") {
+    return "OAuth-Konfiguration fehlt. Bitte APP_BASE_URL und Client-ID/Secret prüfen.";
+  }
+  if (code === "missing_access_token" || code === "invalid_access_token") {
+    return "Sitzung abgelaufen. Bitte neu anmelden.";
+  }
+  if (code === "unknown_provider") {
+    return "Unbekannter E-Mail-Anbieter.";
+  }
+  if (code === "oauth_connect_failed") {
+    return "OAuth konnte nicht abgeschlossen werden.";
+  }
+  if (response?.status) {
+    return `${fallback} (HTTP ${response.status})`;
   }
   return fallback;
 };
@@ -2785,7 +2829,13 @@ const exchangeEmailCode = async (provider, code) => {
     );
     const data = await readJson(response);
     if (!response.ok) {
-      throw new Error("E-Mail-Verbindung fehlgeschlagen.");
+      throw new Error(
+        getEmailOAuthErrorMessage(
+          response,
+          data,
+          "E-Mail-Verbindung fehlgeschlagen.",
+        ),
+      );
     }
     emailState.error = "";
     sessionStorage.removeItem(emailOAuthCodeKey);
@@ -2838,7 +2888,13 @@ const startEmailConnect = async (provider) => {
     );
     const data = await readJson(response);
     if (!response.ok || !data?.url) {
-      throw new Error("OAuth konnte nicht gestartet werden.");
+      throw new Error(
+        getEmailOAuthErrorMessage(
+          response,
+          data,
+          "OAuth konnte nicht gestartet werden.",
+        ),
+      );
     }
     window.location.assign(data.url);
   } catch (error) {
@@ -3000,15 +3056,23 @@ const renderSecurityPanel = () => {
   }
 };
 
+const updateModalScrollLock = () => {
+  if (!document.body) return;
+  const hasOpenModal = Boolean(document.querySelector(".modal:not([hidden])"));
+  document.body.classList.toggle("modal-open", hasOpenModal);
+};
+
 const openSecurityModal = () => {
   if (!elements.securityModal) return;
   elements.securityModal.hidden = false;
+  updateModalScrollLock();
   void loadSecuritySettings();
 };
 
 const closeSecurityModal = () => {
   if (!elements.securityModal) return;
   elements.securityModal.hidden = true;
+  updateModalScrollLock();
 };
 
 const handleSecurityStart = async () => {
@@ -3024,7 +3088,11 @@ const handleSecurityStart = async () => {
     const data = await readJson(response);
     if (!response.ok) {
       throw new Error(
-        getSecurityErrorMessage(data, "Setup konnte nicht gestartet werden."),
+        getSecurityErrorMessage(
+          response,
+          data,
+          "Setup konnte nicht gestartet werden.",
+        ),
       );
     }
     securityState.setup = data;
@@ -3032,7 +3100,10 @@ const handleSecurityStart = async () => {
     renderSecurityPanel();
   } catch (error) {
     setSecurityStatus(
-      error?.message || "Setup konnte nicht gestartet werden.",
+      getSecurityFetchErrorMessage(
+        error,
+        error?.message || "Setup konnte nicht gestartet werden.",
+      ),
       true,
     );
   }
@@ -3058,7 +3129,11 @@ const handleSecurityConfirm = async () => {
     const data = await readJson(response);
     if (!response.ok) {
       throw new Error(
-        getSecurityErrorMessage(data, "Code konnte nicht bestätigt werden."),
+        getSecurityErrorMessage(
+          response,
+          data,
+          "Code konnte nicht bestätigt werden.",
+        ),
       );
     }
     securityState.totpEnabled = true;
@@ -3079,7 +3154,10 @@ const handleSecurityConfirm = async () => {
     renderSecurityPanel();
   } catch (error) {
     setSecurityStatus(
-      error?.message || "Code konnte nicht bestätigt werden.",
+      getSecurityFetchErrorMessage(
+        error,
+        error?.message || "Code konnte nicht bestätigt werden.",
+      ),
       true,
     );
   }
@@ -3132,6 +3210,7 @@ const openReauthModal = ({ context, method, onSuccess } = {}) => {
   if (elements.reauthPasswordInput) elements.reauthPasswordInput.value = "";
   setReauthStatus("", false);
   elements.reauthModal.hidden = false;
+  updateModalScrollLock();
   if (resolvedMethod === "password") {
     elements.reauthPasswordInput?.focus();
   } else {
@@ -3148,6 +3227,7 @@ const closeReauthModal = (force = false) => {
   reauthState.method = "";
   reauthState.onSuccess = null;
   setReauthStatus("", false);
+  updateModalScrollLock();
 };
 
 const handleReauthSubmit = async (event) => {
@@ -3175,7 +3255,11 @@ const handleReauthSubmit = async (event) => {
       const data = await readJson(response);
       if (!response.ok) {
         throw new Error(
-          getSecurityErrorMessage(data, "2FA konnte nicht deaktiviert werden."),
+          getSecurityErrorMessage(
+            response,
+            data,
+            "2FA konnte nicht deaktiviert werden.",
+          ),
         );
       }
       securityState.totpEnabled = false;
@@ -3187,7 +3271,10 @@ const handleReauthSubmit = async (event) => {
       closeReauthModal(true);
     } catch (error) {
       setReauthStatus(
-        error?.message || "2FA konnte nicht deaktiviert werden.",
+        getSecurityFetchErrorMessage(
+          error,
+          error?.message || "2FA konnte nicht deaktiviert werden.",
+        ),
         true,
       );
     }
@@ -4648,13 +4735,13 @@ const formatChatEffortLabel = (value) => {
 };
 
 const updateChatConfigDisplay = () => {
-  const model = chatConfigState.model || DEFAULT_CHAT_CONFIG.model || "";
+  const model = chatConfigState.model || "";
   const effort =
     chatConfigState.reasoningEffort || DEFAULT_CHAT_CONFIG.reasoningEffort;
   if (elements.chatConfigModel) {
     elements.chatConfigModel.textContent = model
       ? `Modell: ${model}`
-      : "Modell: Standard";
+      : "Modell: OpenAI-Standard";
   }
   if (elements.chatConfigEffort) {
     elements.chatConfigEffort.textContent = `Reasoning-Aufwand: ${formatChatEffortLabel(
@@ -4670,7 +4757,7 @@ const normalizeChatConfig = (payload) => {
       ? payload.reasoningEffort.trim()
       : "";
   return {
-    model: model || DEFAULT_CHAT_CONFIG.model,
+    model,
     reasoningEffort: reasoningEffort || DEFAULT_CHAT_CONFIG.reasoningEffort,
   };
 };
@@ -4797,6 +4884,7 @@ const openChatModal = ({ scope, roomId, taskId, commentId } = {}) => {
   setChatFormEnabled(true);
   renderChatThread(resolved.thread);
   elements.chatModal.hidden = false;
+  updateModalScrollLock();
   elements.chatInput?.focus();
 };
 
@@ -4815,6 +4903,7 @@ const closeChatModal = () => {
   if (elements.chatThread) {
     elements.chatThread.innerHTML = "";
   }
+  updateModalScrollLock();
 };
 
 const getActiveChatTarget = () => {
@@ -4862,7 +4951,7 @@ const handleChatSubmit = async (event) => {
       userName: "ChatGPT",
       userEmail: "",
     });
-    thread.model = response.model || config.model || thread.model;
+    thread.model = response.model || config.model || "";
     thread.effort =
       response.reasoningEffort || config.reasoningEffort || thread.effort;
     thread.updatedAt = new Date().toISOString();
@@ -7628,6 +7717,7 @@ const openTaskModal = (taskId) => {
   renderDependencyOptions(task);
   void refreshEmailPanel(task, { force: false });
   elements.taskModal.hidden = false;
+  updateModalScrollLock();
 };
 
 const closeTaskModal = () => {
@@ -7637,11 +7727,13 @@ const closeTaskModal = () => {
   setEmailPanelStatus("", false);
   setEmailReplyStatus("", false);
   clearEmailThreadView();
+  updateModalScrollLock();
 };
 
 const openHelpModal = () => {
   if (!elements.helpModal) return;
   elements.helpModal.hidden = false;
+  updateModalScrollLock();
   void fetchChatConfig({ force: true });
   elements.helpModalClose?.focus();
 };
@@ -7649,6 +7741,7 @@ const openHelpModal = () => {
 const closeHelpModal = () => {
   if (!elements.helpModal) return;
   elements.helpModal.hidden = true;
+  updateModalScrollLock();
 };
 
 const renderDependencyOptions = (task) => {
@@ -8745,15 +8838,35 @@ const requireActiveRoom = (message) => {
   return false;
 };
 
+const showTaskInputError = (input, message) => {
+  if (!input) return;
+  input.setCustomValidity(message);
+  if (typeof input.reportValidity === "function") {
+    input.reportValidity();
+  } else {
+    window.alert(message);
+  }
+  input.setCustomValidity("");
+  input.focus();
+};
+
 const handleTaskCreateSubmit = (event) => {
   event.preventDefault();
   if (!elements.taskCreateInput) return;
   const rawValue = elements.taskCreateInput.value.trim();
   if (!rawValue) {
+    showTaskInputError(
+      elements.taskCreateInput,
+      "Bitte eine Aufgabe eingeben.",
+    );
     return;
   }
   const parsed = parseTaskInput(rawValue);
   if (!parsed.title) {
+    showTaskInputError(
+      elements.taskCreateInput,
+      "Bitte einen Aufgabentitel eingeben.",
+    );
     return;
   }
   const roomValue = elements.taskCreateRoom?.value || "none";
@@ -9394,6 +9507,7 @@ const openImageModal = (imageId, roomId = state.activeRoomId) => {
 
   elements.imageModalTitle.textContent = file.label || file.name || "Bild";
   elements.imageModal.hidden = false;
+  updateModalScrollLock();
   if (elements.imageEditPrompt) {
     elements.imageEditPrompt.value = "";
   }
@@ -9424,6 +9538,7 @@ const closeImageModal = () => {
   imageModalState.imageId = null;
   imageModalState.baseVersionId = null;
   imageModalState.isOpen = false;
+  updateModalScrollLock();
   if (elements.imageModalPreview) {
     elements.imageModalPreview.src = "";
   }

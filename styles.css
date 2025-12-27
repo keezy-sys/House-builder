@@ -30,6 +30,10 @@ body.auth-locked {
   overflow: hidden;
 }
 
+body.modal-open {
+  overflow: hidden;
+}
+
 .auth-screen {
   position: fixed;
   inset: 0;
@@ -943,6 +947,7 @@ svg {
 
 .modal-surface {
   width: min(520px, 100%);
+  max-height: calc(100vh - 3rem);
   background: #fffaf4;
   border-radius: 1rem;
   padding: 1.5rem;
@@ -950,6 +955,8 @@ svg {
   border: 1px solid #eadfce;
   display: grid;
   gap: 1rem;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .help-surface {
