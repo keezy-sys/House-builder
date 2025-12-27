@@ -22,6 +22,7 @@ const EMAIL_MESSAGES_CACHE_TABLE = "email_messages_cache";
 const EMAIL_ACTIVITY_LOG_TABLE = "email_activity_log";
 const TASK_REGISTRY_TABLE = "task_registry";
 const SECURITY_TABLE = "user_security_settings";
+const REAUTH_MAX_AGE_MINUTES = 24 * 60;
 
 const PROVIDERS = {
   gmail: {
@@ -328,7 +329,10 @@ const generateRecoveryCodes = (count = 8) => {
   return codes;
 };
 
-const verifyRecentAuth = ({ settings, maxAgeMinutes = 30 }) => {
+const verifyRecentAuth = ({
+  settings,
+  maxAgeMinutes = REAUTH_MAX_AGE_MINUTES,
+}) => {
   const last = settings?.last_verified_at
     ? new Date(settings.last_verified_at).getTime()
     : 0;

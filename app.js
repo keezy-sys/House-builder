@@ -38,9 +38,25 @@ const OPENING_INSET_PX = 8;
 const WINDOW_GAP_PX = 4;
 const DEFAULT_DOOR_WIDTH_PX = 60;
 const DEFAULT_WINDOW_WIDTH_PX = 120;
+const DEFAULT_OBJECT_WIDTH_PX = 100;
+const DEFAULT_OBJECT_HEIGHT_PX = 60;
+const MIN_OBJECT_SIZE_PX = 24;
+const OBJECT_HANDLE_SIZE_PX = 8;
+const OBJECT_ROTATE_HANDLE_OFFSET_PX = 26;
+const OBJECT_ROTATE_HANDLE_RADIUS_PX = 6;
+const ROTATION_SNAP_DEG = 15;
 const SVG_NS = "http://www.w3.org/2000/svg";
 const DEFAULT_FLOORPLAN_HINT =
   "Bewegen Sie die Maus über einen Raum, um ihn hervorzuheben.";
+const ROOM_OBJECT_TYPES = ["rect", "circle"];
+const PLANNER_MODES = ["architect", "interior"];
+const DEFAULT_PLANNER_MODE = PLANNER_MODES[0];
+const OBJECT_HANDLES = [
+  { id: "nw", x: -1, y: -1 },
+  { id: "ne", x: 1, y: -1 },
+  { id: "se", x: 1, y: 1 },
+  { id: "sw", x: -1, y: 1 },
+];
 
 const THREE_D_DEFAULT_SCENE = {
   view: "walkthrough",
@@ -747,12 +763,13 @@ const isLocalHost = ["localhost", "127.0.0.1"].includes(
 
 const state = {
   activeRoomId: null,
-  activeFloorId: "ground",
+  activeFloorId: "upper",
   activeView: "room",
   activeRoomTab: "overview",
   isMobileView: false,
   isAddingComment: false,
   isArchitectMode: false,
+  plannerMode: DEFAULT_PLANNER_MODE,
   isExteriorMode: false,
   architectTool: "select",
   roomDraft: null,
@@ -763,6 +780,7 @@ const state = {
   selectedTaskIds: new Set(),
   activityEvents: [],
   selectedElement: null,
+  selectedObject: null,
   show3d: false,
   wallLinkLocked: true,
 };
@@ -815,6 +833,10 @@ const commentTooltipState = {
 const commentContextState = {
   commentId: null,
   roomId: null,
+  isOpen: false,
+};
+
+const userMenuState = {
   isOpen: false,
 };
 
@@ -914,6 +936,24 @@ const elements = {
     document.querySelectorAll("[data-architect-tool]"),
   ),
   architectToolHint: document.getElementById("architect-tool-hint"),
+  plannerModeButtons: Array.from(
+    document.querySelectorAll("[data-planner-mode]"),
+  ),
+  plannerModeHint: document.getElementById("planner-mode-hint"),
+  plannerPanels: Array.from(document.querySelectorAll("[data-planner-panel]")),
+  interiorInsertButtons: Array.from(
+    document.querySelectorAll("[data-interior-insert]"),
+  ),
+  interiorToolHint: document.getElementById("interior-tool-hint"),
+  interiorTitle: document.getElementById("interior-title"),
+  objectForm: document.getElementById("object-form"),
+  objectNameInput: document.getElementById("object-name"),
+  objectXInput: document.getElementById("object-x"),
+  objectYInput: document.getElementById("object-y"),
+  objectWidthInput: document.getElementById("object-width"),
+  objectHeightInput: document.getElementById("object-height"),
+  objectRotationInput: document.getElementById("object-rotation"),
+  interiorHelp: document.getElementById("interior-help"),
   exteriorToggle: document.getElementById("toggle-exterior"),
   architectHiddenPanels: Array.from(
     document.querySelectorAll("[data-architect-hidden]"),
@@ -995,6 +1035,7 @@ const elements = {
   taskModalChat: document.getElementById("task-modal-chat"),
   taskModalClose: document.getElementById("task-modal-close"),
   taskModalCancel: document.getElementById("task-modal-cancel"),
+  taskModalDelete: document.getElementById("task-modal-delete"),
   taskFileList: document.getElementById("task-file-list"),
   taskFileEmpty: document.getElementById("task-file-empty"),
   taskFileUpload: document.getElementById("task-file-upload"),
@@ -1054,6 +1095,8 @@ const elements = {
   authError: document.getElementById("auth-error"),
   authInfo: document.getElementById("auth-info"),
   authUserName: document.getElementById("auth-user-name"),
+  userMenuTrigger: document.getElementById("user-menu-trigger"),
+  userMenu: document.getElementById("user-menu"),
   emailAccountsButton: document.getElementById("email-accounts-button"),
   emailAccountsModal: document.getElementById("email-accounts-modal"),
   emailAccountsClose: document.getElementById("email-accounts-close"),
@@ -1102,6 +1145,7 @@ const defaultRoomData = () => ({
   images: [],
   comments: [],
   decisions: [],
+  objects: [],
   chat: null,
   scene: null,
 });
@@ -1132,6 +1176,8 @@ const createRoomId = (floorId) =>
   `room-${floorId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const createOpeningId = () =>
   `opening-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const createObjectId = () =>
+  `object-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 const isValidDateInput = (value) =>
   typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
@@ -1589,6 +1635,58 @@ const normalizeComments = (comments) => {
     .filter(Boolean);
 };
 
+const normalizeRoomObject = (object, index) => {
+  if (!object || typeof object !== "object") return null;
+  const width = Number(object.width);
+  const height = Number(object.height);
+  const cx = Number(object.cx);
+  const cy = Number(object.cy);
+  const rotation = Number(object.rotation);
+  return {
+    id:
+      typeof object.id === "string" && object.id.trim()
+        ? object.id.trim()
+        : `object-${Date.now()}-${index}`,
+    roomId:
+      typeof object.roomId === "string" && object.roomId.trim()
+        ? object.roomId.trim()
+        : null,
+    type: ROOM_OBJECT_TYPES.includes(object.type)
+      ? object.type
+      : ROOM_OBJECT_TYPES[0],
+    name:
+      typeof object.name === "string" && object.name.trim()
+        ? object.name.trim()
+        : `Objekt ${index + 1}`,
+    cx: Number.isFinite(cx) ? cx : 0,
+    cy: Number.isFinite(cy) ? cy : 0,
+    width: Math.max(
+      MIN_OBJECT_SIZE_PX,
+      Number.isFinite(width) ? width : DEFAULT_OBJECT_WIDTH_PX,
+    ),
+    height: Math.max(
+      MIN_OBJECT_SIZE_PX,
+      Number.isFinite(height) ? height : DEFAULT_OBJECT_HEIGHT_PX,
+    ),
+    rotation: normalizeRotation(Number.isFinite(rotation) ? rotation : 0),
+    createdAt:
+      typeof object.createdAt === "string" && object.createdAt.trim()
+        ? object.createdAt.trim()
+        : new Date().toISOString(),
+    updatedAt:
+      typeof object.updatedAt === "string" && object.updatedAt.trim()
+        ? object.updatedAt.trim()
+        : new Date().toISOString(),
+  };
+};
+
+const normalizeRoomObjects = (objects) => {
+  if (!Array.isArray(objects)) return [];
+  return objects
+    .map((item, index) => normalizeRoomObject(item, index))
+    .filter(Boolean);
+};
+
 const normalizeActivityEvents = (events) => {
   if (!Array.isArray(events)) return [];
   return events
@@ -1769,8 +1867,10 @@ const ensureRoomData = (roomId) => {
   if (!Array.isArray(roomData.images)) roomData.images = [];
   if (!Array.isArray(roomData.comments)) roomData.comments = [];
   if (!Array.isArray(roomData.decisions)) roomData.decisions = [];
+  if (!Array.isArray(roomData.objects)) roomData.objects = [];
   roomData.comments = normalizeComments(roomData.comments);
   roomData.decisions = normalizeDecisions(roomData.decisions);
+  roomData.objects = normalizeRoomObjects(roomData.objects);
   roomData.chat = normalizeChatThread(roomData.chat);
   if (roomData.scene === undefined) roomData.scene = null;
   return roomData;
@@ -1924,9 +2024,99 @@ const getNextRoomName = (floor) => {
   return `${base} ${index}`;
 };
 
+const getNextObjectName = (roomData) => {
+  const base = "Objekt";
+  if (!roomData || !Array.isArray(roomData.objects)) {
+    return `${base} 1`;
+  }
+  let maxIndex = 0;
+  roomData.objects.forEach((item) => {
+    if (!item?.name) return;
+    const match = item.name.match(/^Objekt\s+(\d+)$/i);
+    if (!match) return;
+    const value = Number(match[1]);
+    if (Number.isFinite(value)) {
+      maxIndex = Math.max(maxIndex, value);
+    }
+  });
+  return `${base} ${maxIndex + 1}`;
+};
+
+const getRoomCenter = (room) => ({
+  x: room.x + room.width / 2,
+  y: room.y + room.height / 2,
+});
+
+const getRoomAtPoint = (rooms, point) =>
+  rooms.find(
+    (room) =>
+      point.x >= room.x &&
+      point.x <= room.x + room.width &&
+      point.y >= room.y &&
+      point.y <= room.y + room.height,
+  ) || null;
+
+const getRoomOnActiveFloor = (roomId) => {
+  const floor = getActiveFloor();
+  if (!floor || !roomId) return null;
+  return floor.rooms.find((room) => room.id === roomId) || null;
+};
+
+const createRoomObject = ({
+  roomId,
+  type,
+  name,
+  cx,
+  cy,
+  width,
+  height,
+  rotation,
+}) => {
+  const timestamp = new Date().toISOString();
+  return {
+    id: createObjectId(),
+    roomId,
+    type: ROOM_OBJECT_TYPES.includes(type) ? type : ROOM_OBJECT_TYPES[0],
+    name: name || "Objekt",
+    cx: Number.isFinite(cx) ? cx : 0,
+    cy: Number.isFinite(cy) ? cy : 0,
+    width: Math.max(
+      MIN_OBJECT_SIZE_PX,
+      Number(width) || DEFAULT_OBJECT_WIDTH_PX,
+    ),
+    height: Math.max(
+      MIN_OBJECT_SIZE_PX,
+      Number(height) || DEFAULT_OBJECT_HEIGHT_PX,
+    ),
+    rotation: normalizeRotation(Number(rotation) || 0),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+};
+
 const toMm = (px) => Math.round(px * MM_PER_PX);
 const toPx = (mm) => Number(mm) / MM_PER_PX;
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+const toRadians = (deg) => (deg * Math.PI) / 180;
+const toDegrees = (rad) => (rad * 180) / Math.PI;
+const normalizeRotation = (value) => {
+  if (!Number.isFinite(value)) return 0;
+  const normalized = ((value % 360) + 360) % 360;
+  return normalized;
+};
+const formatNumber = (value, precision = 0) => {
+  if (!Number.isFinite(value)) return "0";
+  const fixed = value.toFixed(precision);
+  return fixed.endsWith(".0") ? String(Math.round(value)) : fixed;
+};
+const rotatePoint = (point, angleRad) => {
+  const cos = Math.cos(angleRad);
+  const sin = Math.sin(angleRad);
+  return {
+    x: point.x * cos - point.y * sin,
+    y: point.x * sin + point.y * cos,
+  };
+};
 const getFloorplanViewBox = () => {
   const base = elements.floorplan?.viewBox?.baseVal;
   if (base && Number.isFinite(base.width) && Number.isFinite(base.height)) {
@@ -1959,6 +2149,13 @@ const updateFloorplanViewBox = () => {
     state.isExteriorMode ? EXTERIOR_VIEWBOX : DEFAULT_VIEWBOX,
   );
 };
+const getViewBoxCenter = () => {
+  const viewBox = getFloorplanViewBox();
+  return {
+    x: viewBox.x + viewBox.width / 2,
+    y: viewBox.y + viewBox.height / 2,
+  };
+};
 const getInputNumber = (primary, fallback) => {
   const raw = primary?.value;
   if (raw === "" || raw === null || raw === undefined) {
@@ -1966,6 +2163,14 @@ const getInputNumber = (primary, fallback) => {
   }
   const value = Number(raw);
   return Number.isNaN(value) ? Number(fallback?.value) : value;
+};
+
+const isEditableTarget = (target) => {
+  if (!target || typeof target.closest !== "function") return false;
+  if (target.isContentEditable) return true;
+  return Boolean(
+    target.closest("input, textarea, select, [contenteditable='true']"),
+  );
 };
 
 const rangesOverlap = (startA, endA, startB, endB) =>
@@ -2565,6 +2770,9 @@ const updateAuthUI = () => {
   if (elements.authInfo) {
     elements.authInfo.hidden = !isAuthed || isRecovery;
   }
+  if (!isAuthed || isRecovery) {
+    closeUserMenu();
+  }
   if (elements.emailAccountsButton) {
     elements.emailAccountsButton.hidden = !isAuthed || isRecovery;
   }
@@ -2818,13 +3026,18 @@ const getEmailFetchErrorMessage = (error, fallback) => {
   return fallback;
 };
 
+const LOCAL_REAUTH_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
 const isLocalReauthFresh = () => {
   const userId = sessionStorage.getItem("2fa_user_id");
   if (!authState.user || userId !== authState.user.id) return false;
   const stamp = sessionStorage.getItem("2fa_verified_at");
   if (!stamp) return false;
   const timestamp = new Date(stamp).getTime();
-  return Number.isFinite(timestamp) && timestamp > Date.now() - 30 * 60 * 1000;
+  return (
+    Number.isFinite(timestamp) &&
+    timestamp > Date.now() - LOCAL_REAUTH_MAX_AGE_MS
+  );
 };
 
 const getProviderLabel = (provider) =>
@@ -3228,12 +3441,35 @@ const updateModalScrollLock = () => {
   document.body.classList.toggle("modal-open", hasOpenModal);
 };
 
+const openUserMenu = () => {
+  if (!elements.userMenu || !elements.userMenuTrigger) return;
+  elements.userMenu.hidden = false;
+  elements.userMenuTrigger.setAttribute("aria-expanded", "true");
+  userMenuState.isOpen = true;
+};
+
+const closeUserMenu = () => {
+  if (!elements.userMenu || !elements.userMenuTrigger) return;
+  elements.userMenu.hidden = true;
+  elements.userMenuTrigger.setAttribute("aria-expanded", "false");
+  userMenuState.isOpen = false;
+};
+
+const toggleUserMenu = () => {
+  if (userMenuState.isOpen) {
+    closeUserMenu();
+  } else {
+    openUserMenu();
+  }
+};
+
 const openEmailAccountsModal = () => {
   if (!elements.emailAccountsModal) return;
   if (!authState.user || authState.isRecovery) {
     window.alert("Bitte zuerst anmelden.");
     return;
   }
+  closeUserMenu();
   elements.emailAccountsModal.hidden = false;
   updateModalScrollLock();
   void loadEmailAccounts();
@@ -3251,6 +3487,7 @@ const handleEmailAccountsRefresh = () => {
 
 const openSecurityModal = () => {
   if (!elements.securityModal) return;
+  closeUserMenu();
   elements.securityModal.hidden = false;
   updateModalScrollLock();
   void loadSecuritySettings();
@@ -3525,6 +3762,8 @@ const refreshUI = () => {
   updateFloorplanHint();
   updateInteriorControls();
   updateArchitectToolUI();
+  updatePlannerModeUI();
+  updateInteriorToolUI();
   renderMobileRoomSelect();
 };
 
@@ -4192,6 +4431,125 @@ const createOpeningGroup = (opening, room, floorId, isSelected) => {
   return group;
 };
 
+const getObjectLocalPoint = (point, object) => {
+  const delta = { x: point.x - object.cx, y: point.y - object.cy };
+  return rotatePoint(delta, toRadians(-object.rotation));
+};
+
+const isPointInsideObject = (point, object) => {
+  const local = getObjectLocalPoint(point, object);
+  const halfWidth = object.width / 2;
+  const halfHeight = object.height / 2;
+  if (object.type === "circle") {
+    const nx = local.x / Math.max(halfWidth, 1);
+    const ny = local.y / Math.max(halfHeight, 1);
+    return nx * nx + ny * ny <= 1;
+  }
+  return Math.abs(local.x) <= halfWidth && Math.abs(local.y) <= halfHeight;
+};
+
+const getRoomObjectsForFloor = (floor) => {
+  if (!floor) return [];
+  const objects = [];
+  getInteriorRooms(floor).forEach((room) => {
+    const roomData = ensureRoomData(room.id);
+    roomData.objects.forEach((object) => {
+      objects.push({ room, object });
+    });
+  });
+  return objects;
+};
+
+const getObjectHitTest = (point, floor) => {
+  const objects = getRoomObjectsForFloor(floor);
+  for (let index = objects.length - 1; index >= 0; index -= 1) {
+    const entry = objects[index];
+    if (isPointInsideObject(point, entry.object)) {
+      return entry;
+    }
+  }
+  return null;
+};
+
+const createObjectShape = (object, className) => {
+  if (object.type === "circle") {
+    const ellipse = createSvgElement("ellipse");
+    ellipse.setAttribute("cx", 0);
+    ellipse.setAttribute("cy", 0);
+    ellipse.setAttribute("rx", object.width / 2);
+    ellipse.setAttribute("ry", object.height / 2);
+    if (className) {
+      ellipse.setAttribute("class", className);
+    }
+    return ellipse;
+  }
+  const rect = createSvgElement("rect");
+  rect.setAttribute("x", -object.width / 2);
+  rect.setAttribute("y", -object.height / 2);
+  rect.setAttribute("width", object.width);
+  rect.setAttribute("height", object.height);
+  if (className) {
+    rect.setAttribute("class", className);
+  }
+  return rect;
+};
+
+const createRoomObjectGroup = (object, roomId, isSelected, showHandles) => {
+  const group = createSvgElement("g");
+  group.setAttribute(
+    "class",
+    `room-object room-object-${object.type}${isSelected ? " selected" : ""}`,
+  );
+  group.dataset.roomId = roomId;
+  group.dataset.objectId = object.id;
+  group.dataset.elementType = "object";
+  group.setAttribute(
+    "transform",
+    `translate(${object.cx} ${object.cy}) rotate(${object.rotation})`,
+  );
+
+  group.appendChild(createObjectShape(object, "room-object-shape"));
+
+  if (isSelected) {
+    group.appendChild(createObjectShape(object, "room-object-outline"));
+    if (showHandles) {
+      OBJECT_HANDLES.forEach((handle) => {
+        const handleRect = createSvgElement("rect");
+        const cx = (object.width / 2) * handle.x;
+        const cy = (object.height / 2) * handle.y;
+        handleRect.setAttribute("x", cx - OBJECT_HANDLE_SIZE_PX / 2);
+        handleRect.setAttribute("y", cy - OBJECT_HANDLE_SIZE_PX / 2);
+        handleRect.setAttribute("width", OBJECT_HANDLE_SIZE_PX);
+        handleRect.setAttribute("height", OBJECT_HANDLE_SIZE_PX);
+        handleRect.setAttribute("class", "room-object-handle");
+        handleRect.dataset.objectHandle = handle.id;
+        group.appendChild(handleRect);
+      });
+
+      const topY = -object.height / 2;
+      const rotateY = topY - OBJECT_ROTATE_HANDLE_OFFSET_PX;
+      const rotateLine = createSvgElement("line");
+      rotateLine.setAttribute("x1", 0);
+      rotateLine.setAttribute("y1", topY);
+      rotateLine.setAttribute("x2", 0);
+      rotateLine.setAttribute("y2", rotateY);
+      rotateLine.setAttribute("class", "room-object-rotate-line");
+      group.appendChild(rotateLine);
+
+      const rotateHandle = createSvgCircle(
+        0,
+        rotateY,
+        OBJECT_ROTATE_HANDLE_RADIUS_PX,
+        "room-object-rotate-handle",
+      );
+      rotateHandle.dataset.objectHandle = "rotate";
+      group.appendChild(rotateHandle);
+    }
+  }
+
+  return group;
+};
+
 const renderFloorplan = () => {
   elements.floorplan.innerHTML = "";
   hideCommentTooltip();
@@ -4240,6 +4598,7 @@ const renderFloorplan = () => {
     elements.floorplan.appendChild(line);
   });
 
+  const roomLabels = [];
   interiorRooms.forEach((room) => {
     const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
     rect.setAttribute("x", room.x);
@@ -4272,9 +4631,10 @@ const renderFloorplan = () => {
     label.textContent = room.name;
 
     elements.floorplan.appendChild(rect);
-    elements.floorplan.appendChild(label);
+    roomLabels.push(label);
   });
 
+  const exteriorLabels = [];
   visibleExteriorRooms.forEach((room) => {
     const label = document.createElementNS(
       "http://www.w3.org/2000/svg",
@@ -4284,7 +4644,7 @@ const renderFloorplan = () => {
     label.setAttribute("y", room.y + 28);
     label.setAttribute("class", "room-label");
     label.textContent = room.name;
-    elements.floorplan.appendChild(label);
+    exteriorLabels.push(label);
   });
 
   interiorRooms.forEach((room) => {
@@ -4350,6 +4710,19 @@ const renderFloorplan = () => {
     });
   });
 
+  const showObjectHandles =
+    state.isArchitectMode &&
+    state.plannerMode === "interior" &&
+    !state.isExteriorMode;
+  getRoomObjectsForFloor(floor).forEach(({ room, object }) => {
+    const isSelected =
+      state.selectedObject?.objectId === object.id &&
+      state.selectedObject?.roomId === room.id;
+    elements.floorplan.appendChild(
+      createRoomObjectGroup(object, room.id, isSelected, showObjectHandles),
+    );
+  });
+
   floor.openings.forEach((opening) => {
     const isSelected =
       state.selectedElement?.openingId === opening.id &&
@@ -4359,6 +4732,14 @@ const renderFloorplan = () => {
     elements.floorplan.appendChild(
       createOpeningGroup(opening, room, floor.id, isSelected),
     );
+  });
+
+  roomLabels.forEach((label) => {
+    elements.floorplan.appendChild(label);
+  });
+
+  exteriorLabels.forEach((label) => {
+    elements.floorplan.appendChild(label);
   });
 
   if (state.roomDraft) {
@@ -6060,9 +6441,17 @@ const syncActivityNotifications = () => {
   return activityNotificationState.newEventIds;
 };
 
+const setActivityPanelOpen = (isOpen) => {
+  if (!elements.activityPage) return;
+  if (elements.activityPage.tagName === "DETAILS") {
+    elements.activityPage.open = Boolean(isOpen);
+  }
+};
+
 const scrollToActivityFeed = () => {
   const target = elements.activityPage || elements.activityFeed;
   if (!target) return;
+  setActivityPanelOpen(true);
   target.scrollIntoView({ behavior: "smooth", block: "start" });
 };
 
@@ -7569,10 +7958,25 @@ const buildTaskItem = (
     showCosts = false,
     showFields = false,
     enableDrag = false,
+    showTags = true,
+    showMeta = true,
+    showControls = true,
+    showBlocking = true,
   } = {},
 ) => {
   const item = document.createElement("li");
   item.className = "task-item";
+  if (
+    !showControls &&
+    !showMeta &&
+    !showTags &&
+    !showFields &&
+    !showMaterials &&
+    !showCosts &&
+    !showBlocking
+  ) {
+    item.classList.add("is-compact");
+  }
   item.dataset.taskId = task.id;
   if (showSelection) {
     item.dataset.taskTitle = task.title;
@@ -7643,7 +8047,7 @@ const buildTaskItem = (
 
   item.appendChild(header);
 
-  if (task.tags?.length) {
+  if (showTags && task.tags?.length) {
     const tags = document.createElement("div");
     tags.className = "task-tags";
     task.tags.forEach((tag) => {
@@ -7655,56 +8059,62 @@ const buildTaskItem = (
     item.appendChild(tags);
   }
 
-  const statusTags = taskMap ? buildTaskTags(task, taskMap) : null;
-  if (statusTags) {
-    item.appendChild(statusTags);
+  if (showTags) {
+    const statusTags = taskMap ? buildTaskTags(task, taskMap) : null;
+    if (statusTags) {
+      item.appendChild(statusTags);
+    }
   }
 
-  const meta = document.createElement("div");
-  meta.className = "task-meta";
-  if (task.priority) {
-    const priority = document.createElement("span");
-    priority.textContent = `Priorität: ${
-      TASK_PRIORITY_LABELS[task.priority] || task.priority
-    }`;
-    meta.appendChild(priority);
-  }
-  if (task.startDate) {
-    const start = document.createElement("span");
-    start.textContent = `Start: ${formatShortDate(task.startDate)}`;
-    meta.appendChild(start);
-  }
-  if (task.endDate) {
-    const end = document.createElement("span");
-    end.textContent = `Ende: ${formatShortDate(task.endDate)}`;
-    meta.appendChild(end);
-  }
-  if (task.dueDate) {
-    const due = document.createElement("span");
-    due.textContent = `Fällig: ${formatShortDate(task.dueDate) || task.dueDate}`;
-    meta.appendChild(due);
-  }
-  if (task.link) {
-    const link = document.createElement("a");
-    link.className = "task-external-link";
-    link.href = task.link;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    link.textContent = "Link öffnen";
-    meta.appendChild(link);
-  }
-  if (Array.isArray(task.dependencyIds) && task.dependencyIds.length) {
-    const deps = document.createElement("span");
-    deps.textContent = `Abhängigkeiten: ${task.dependencyIds.length}`;
-    meta.appendChild(deps);
-  }
-  if (meta.childNodes.length) {
-    item.appendChild(meta);
+  if (showMeta) {
+    const meta = document.createElement("div");
+    meta.className = "task-meta";
+    if (task.priority) {
+      const priority = document.createElement("span");
+      priority.textContent = `Priorität: ${
+        TASK_PRIORITY_LABELS[task.priority] || task.priority
+      }`;
+      meta.appendChild(priority);
+    }
+    if (task.startDate) {
+      const start = document.createElement("span");
+      start.textContent = `Start: ${formatShortDate(task.startDate)}`;
+      meta.appendChild(start);
+    }
+    if (task.endDate) {
+      const end = document.createElement("span");
+      end.textContent = `Ende: ${formatShortDate(task.endDate)}`;
+      meta.appendChild(end);
+    }
+    if (task.dueDate) {
+      const due = document.createElement("span");
+      due.textContent = `Fällig: ${formatShortDate(task.dueDate) || task.dueDate}`;
+      meta.appendChild(due);
+    }
+    if (task.link) {
+      const link = document.createElement("a");
+      link.className = "task-external-link";
+      link.href = task.link;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = "Link öffnen";
+      meta.appendChild(link);
+    }
+    if (Array.isArray(task.dependencyIds) && task.dependencyIds.length) {
+      const deps = document.createElement("span");
+      deps.textContent = `Abhängigkeiten: ${task.dependencyIds.length}`;
+      meta.appendChild(deps);
+    }
+    if (meta.childNodes.length) {
+      item.appendChild(meta);
+    }
   }
 
-  const blockingRow = taskMap ? buildBlockingRow(task, taskMap) : null;
-  if (blockingRow) {
-    item.appendChild(blockingRow);
+  if (showBlocking) {
+    const blockingRow = taskMap ? buildBlockingRow(task, taskMap) : null;
+    if (blockingRow) {
+      item.appendChild(blockingRow);
+    }
   }
 
   if (showFields) {
@@ -7727,18 +8137,20 @@ const buildTaskItem = (
     }
   }
 
-  const controls = document.createElement("div");
-  controls.className = "task-controls";
-  controls.appendChild(buildStatusSelect(task));
-  controls.appendChild(buildAssigneeSelect(task));
+  if (showControls) {
+    const controls = document.createElement("div");
+    controls.className = "task-controls";
+    controls.appendChild(buildStatusSelect(task));
+    controls.appendChild(buildAssigneeSelect(task));
 
-  const removeButton = document.createElement("button");
-  removeButton.type = "button";
-  removeButton.textContent = "Entfernen";
-  removeButton.addEventListener("click", () => removeTask(task.id));
-  controls.appendChild(removeButton);
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.textContent = "Entfernen";
+    removeButton.addEventListener("click", () => removeTask(task.id));
+    controls.appendChild(removeButton);
 
-  item.appendChild(controls);
+    item.appendChild(controls);
+  }
   return item;
 };
 
@@ -7833,9 +8245,10 @@ const buildKanbanColumn = (status, tasks, taskMap) => {
         buildTaskItem(task, {
           showRoom: true,
           showSelection: true,
-          showFields: true,
-          showMaterials: true,
-          showCosts: true,
+          showTags: false,
+          showMeta: false,
+          showControls: false,
+          showBlocking: false,
           taskMap,
           enableDrag: true,
         }),
@@ -9276,8 +9689,124 @@ const handleTaskModalSubmit = (event) => {
   closeTaskModal();
 };
 
+const handleTaskModalDelete = () => {
+  const taskId = taskModalState.taskId;
+  if (!taskId) return;
+  removeTask(taskId);
+  const stillExists = state.tasks.some((task) => task.id === taskId);
+  if (!stillExists) {
+    closeTaskModal();
+  }
+};
+
+const updatePlannerModeUI = () => {
+  if (elements.plannerModeButtons?.length) {
+    elements.plannerModeButtons.forEach((button) => {
+      const mode = button.dataset.plannerMode;
+      const isActive = mode === state.plannerMode;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-selected", String(isActive));
+    });
+  }
+  if (elements.plannerPanels?.length) {
+    elements.plannerPanels.forEach((panel) => {
+      const panelMode = panel.dataset.plannerPanel;
+      const isActive = panelMode === state.plannerMode;
+      panel.hidden = !isActive;
+      panel.setAttribute("aria-hidden", String(!isActive));
+    });
+  }
+  if (elements.plannerModeHint) {
+    if (state.isExteriorMode) {
+      elements.plannerModeHint.textContent =
+        "Außenbereiche aktiv. Innenbereich ist gesperrt.";
+    } else {
+      elements.plannerModeHint.textContent =
+        state.plannerMode === "interior"
+          ? "Objekte platzieren, auswählen und drehen."
+          : "Räume, Wände, Türen und Fenster bearbeiten.";
+    }
+  }
+};
+
+const renderInteriorPanel = () => {
+  if (!state.isArchitectMode || state.plannerMode !== "interior") {
+    return;
+  }
+  updateInteriorToolUI();
+  if (state.isExteriorMode) {
+    if (elements.interiorTitle) {
+      elements.interiorTitle.textContent = "Außenbereiche aktiv";
+    }
+    if (elements.interiorHelp) {
+      elements.interiorHelp.textContent =
+        "Innenbereich ist gesperrt. Schalten Sie auf Innenansicht, um zu bearbeiten.";
+    }
+    if (elements.objectForm) {
+      elements.objectForm.hidden = true;
+    }
+    return;
+  }
+
+  const selection = state.selectedObject;
+  const object = getSelectedRoomObject();
+  if (!selection || !object) {
+    if (selection && !object) {
+      state.selectedObject = null;
+    }
+    if (elements.interiorTitle) {
+      elements.interiorTitle.textContent = "Objekt wählen";
+    }
+    if (elements.interiorHelp) {
+      elements.interiorHelp.textContent =
+        "Rechteck oder Kreis einfügen, dann anklicken zum Bearbeiten.";
+    }
+    if (elements.objectForm) {
+      elements.objectForm.hidden = true;
+    }
+    return;
+  }
+
+  if (elements.interiorTitle) {
+    elements.interiorTitle.textContent = object.name || "Objekt";
+  }
+  if (elements.interiorHelp) {
+    elements.interiorHelp.textContent =
+      "Ziehen zum Verschieben, Ecken zum Skalieren, Griff zum Drehen.";
+  }
+  if (elements.objectNameInput) {
+    elements.objectNameInput.value = object.name || "";
+  }
+  if (elements.objectXInput) {
+    elements.objectXInput.value = formatNumber(object.cx, 0);
+  }
+  if (elements.objectYInput) {
+    elements.objectYInput.value = formatNumber(object.cy, 0);
+  }
+  if (elements.objectWidthInput) {
+    elements.objectWidthInput.value = formatNumber(object.width, 0);
+  }
+  if (elements.objectHeightInput) {
+    elements.objectHeightInput.value = formatNumber(object.height, 0);
+  }
+  if (elements.objectRotationInput) {
+    elements.objectRotationInput.value = formatNumber(
+      normalizeRotation(object.rotation),
+      1,
+    );
+  }
+  if (elements.objectForm) {
+    elements.objectForm.hidden = false;
+  }
+};
+
 const renderArchitectPanel = () => {
   if (!state.isArchitectMode) {
+    return;
+  }
+  updatePlannerModeUI();
+  if (state.plannerMode === "interior") {
+    renderInteriorPanel();
     return;
   }
   if (state.isExteriorMode) {
@@ -9592,6 +10121,21 @@ const renderArchitectPanel = () => {
   elements.measurementForm.hidden = false;
 };
 
+const updateInteriorToolUI = () => {
+  const isLocked = state.isExteriorMode;
+  if (elements.interiorInsertButtons?.length) {
+    elements.interiorInsertButtons.forEach((button) => {
+      button.disabled = isLocked;
+      button.setAttribute("aria-disabled", String(isLocked));
+    });
+  }
+  if (elements.interiorToolHint) {
+    elements.interiorToolHint.textContent = isLocked
+      ? "Außenansicht aktiv. Innenbereich ist gesperrt."
+      : "Objekte einfügen und im Grundriss anpassen.";
+  }
+};
+
 const updateArchitectToolUI = () => {
   if (elements.architectToolButtons?.length) {
     elements.architectToolButtons.forEach((button) => {
@@ -9599,8 +10143,10 @@ const updateArchitectToolUI = () => {
       const isActive = tool === state.architectTool;
       button.classList.toggle("is-active", isActive);
       button.setAttribute("aria-selected", String(isActive));
-      button.disabled = state.isExteriorMode;
-      button.setAttribute("aria-disabled", String(state.isExteriorMode));
+      const isDisabled =
+        state.isExteriorMode || state.plannerMode !== "architect";
+      button.disabled = isDisabled;
+      button.setAttribute("aria-disabled", String(isDisabled));
     });
   }
   if (elements.architectToolHint) {
@@ -9623,6 +10169,7 @@ const updateArchitectToolUI = () => {
 };
 
 const setArchitectTool = (tool) => {
+  if (state.plannerMode !== "architect") return;
   const normalized = ["select", "door", "window", "room"].includes(tool)
     ? tool
     : "select";
@@ -9640,6 +10187,25 @@ const setArchitectTool = (tool) => {
   renderFloorplan();
   renderArchitectPanel();
   updateArchitectToolUI();
+};
+
+const setPlannerMode = (mode) => {
+  const normalized = PLANNER_MODES.includes(mode) ? mode : DEFAULT_PLANNER_MODE;
+  if (state.plannerMode === normalized) return;
+  state.plannerMode = normalized;
+  state.selectedElement = null;
+  state.selectedObject = null;
+  state.isAddingComment = false;
+  state.roomDraft = null;
+  resetDragState();
+  clearHoverState();
+  updatePlannerModeClasses();
+  updateFloorplanHint();
+  updatePlannerModeUI();
+  updateArchitectToolUI();
+  updateInteriorToolUI();
+  renderFloorplan();
+  renderArchitectPanel();
 };
 
 const getRoomCategory = (room) => {
@@ -10009,8 +10575,18 @@ const clearHoverState = () => {
     .forEach((el) => el.classList.remove("hovered"));
 };
 
-const setArchitectDragging = (isDragging) => {
-  document.body.classList.toggle("architect-dragging", isDragging);
+const setPlannerDragging = (isDragging) => {
+  const isArchitect =
+    state.isArchitectMode && state.plannerMode === "architect";
+  const isInterior = state.isArchitectMode && state.plannerMode === "interior";
+  document.body.classList.toggle(
+    "architect-dragging",
+    isDragging && isArchitect,
+  );
+  document.body.classList.toggle("interior-dragging", isDragging && isInterior);
+  if (!isDragging) {
+    document.body.classList.remove("architect-dragging", "interior-dragging");
+  }
 };
 
 const updateFloorplanHint = () => {
@@ -10020,9 +10596,14 @@ const updateFloorplanHint = () => {
       "Außenbereiche aktiv: Innenbereich ist gesperrt.";
     return;
   }
-  elements.floorplanHint.textContent = state.isArchitectMode
-    ? "Architekt-Ansicht: Räume, Wände, Türen und Fenster im Grundriss ziehen."
-    : DEFAULT_FLOORPLAN_HINT;
+  if (!state.isArchitectMode) {
+    elements.floorplanHint.textContent = DEFAULT_FLOORPLAN_HINT;
+    return;
+  }
+  elements.floorplanHint.textContent =
+    state.plannerMode === "interior"
+      ? "Innenarchitekt: Objekte platzieren, auswählen und drehen."
+      : "Architektenmodus: Räume, Wände, Türen und Fenster im Grundriss ziehen.";
 };
 
 const updateInteriorControls = () => {
@@ -10064,25 +10645,44 @@ const resetDragState = ({ keepSuppressClick = false } = {}) => {
   dragState.context = null;
   dragState.startClientX = 0;
   dragState.startClientY = 0;
-  setArchitectDragging(false);
+  setPlannerDragging(false);
+};
+
+const updatePlannerModeClasses = () => {
+  const isPlannerActive = state.isArchitectMode;
+  document.body.classList.toggle("planner-mode", isPlannerActive);
+  document.body.classList.toggle(
+    "architect-mode",
+    isPlannerActive && state.plannerMode === "architect",
+  );
+  document.body.classList.toggle(
+    "interior-mode",
+    isPlannerActive && state.plannerMode === "interior",
+  );
 };
 
 const setArchitectMode = (isOn) => {
   state.isArchitectMode = isOn;
+  if (!PLANNER_MODES.includes(state.plannerMode)) {
+    state.plannerMode = DEFAULT_PLANNER_MODE;
+  }
   if (elements.toggleArchitect) {
     elements.toggleArchitect.checked = isOn;
   }
   state.selectedElement = null;
+  state.selectedObject = null;
   state.isAddingComment = false;
   state.roomDraft = null;
   state.architectTool = "select";
   updateViewUI();
-  document.body.classList.toggle("architect-mode", isOn);
+  updatePlannerModeClasses();
   resetDragState();
   clearHoverState();
   renderFloorplan();
   updateFloorplanHint();
   updateArchitectToolUI();
+  updatePlannerModeUI();
+  updateInteriorToolUI();
   updateInteriorControls();
   renderArchitectPanel();
 };
@@ -10096,6 +10696,7 @@ const setExteriorMode = (isOn) => {
   if (state.isExteriorMode) {
     state.isAddingComment = false;
     state.selectedElement = null;
+    state.selectedObject = null;
     state.roomDraft = null;
     state.show3d = false;
     const activeRoom = state.activeRoomId
@@ -10111,6 +10712,8 @@ const setExteriorMode = (isOn) => {
   updateFloorplanViewBox();
   updateFloorplanHint();
   updateArchitectToolUI();
+  updateInteriorToolUI();
+  updatePlannerModeUI();
   updateInteriorControls();
   renderFloorplan();
   renderArchitectPanel();
@@ -10135,6 +10738,7 @@ const setActiveFloor = (floorId) => {
   state.activeFloorId = floorId;
   state.activeRoomId = null;
   state.selectedElement = null;
+  state.selectedObject = null;
   state.isAddingComment = false;
   state.roomDraft = null;
   renderFloorplan();
@@ -10155,6 +10759,7 @@ const selectRoom = (roomId) => {
   state.activeRoomId = roomId;
   state.isAddingComment = false;
   state.show3d = false;
+  state.selectedObject = null;
   if (!roomId) {
     state.selectedElement = null;
   }
@@ -10166,8 +10771,60 @@ const selectRoom = (roomId) => {
   updateInteriorControls();
 };
 
+const getRoomObjectById = (roomId, objectId) => {
+  if (!roomId || !objectId) return null;
+  const roomData = ensureRoomData(roomId);
+  return roomData.objects.find((object) => object.id === objectId) || null;
+};
+
+const getSelectedRoomObject = () => {
+  const selection = state.selectedObject;
+  if (!selection) return null;
+  return getRoomObjectById(selection.roomId, selection.objectId);
+};
+
+const clearSelectedObject = () => {
+  if (!state.selectedObject) return;
+  state.selectedObject = null;
+  renderFloorplan();
+  renderArchitectPanel();
+};
+
+const selectInteriorObject = (roomId, objectId) => {
+  if (!roomId || !objectId) {
+    clearSelectedObject();
+    return;
+  }
+  state.selectedElement = null;
+  state.selectedObject = { roomId, objectId };
+  if (state.activeRoomId !== roomId) {
+    state.activeRoomId = roomId;
+    renderRoomPanel();
+  }
+  renderFloorplan();
+  renderArchitectPanel();
+};
+
+const updateSelectedObject = (
+  updater,
+  { commit = false, refreshPanel = false } = {},
+) => {
+  const object = getSelectedRoomObject();
+  if (!object) return;
+  const didUpdate = updater(object);
+  if (!didUpdate) return;
+  renderFloorplan();
+  if (refreshPanel) {
+    renderArchitectPanel();
+  }
+  if (commit) {
+    touchRoomObject(object);
+    saveState();
+  }
+};
+
 const selectArchitectElement = (target) => {
-  if (state.isExteriorMode) return;
+  if (state.isExteriorMode || state.plannerMode !== "architect") return;
   const hitTarget = target?.closest?.(".architect-hit") || target;
   if (!hitTarget) return;
   const roomId = hitTarget.dataset.roomId;
@@ -10187,6 +10844,7 @@ const selectArchitectElement = (target) => {
     renderRoomPanel();
     renderFloorplan();
   }
+  state.selectedObject = null;
   state.selectedElement = {
     roomId,
     label,
@@ -10197,6 +10855,71 @@ const selectArchitectElement = (target) => {
   };
   renderArchitectPanel();
   return state.selectedElement;
+};
+
+const resolveCommentTargetFromEvent = (event) => {
+  const floor = getActiveFloor();
+  if (!floor) return null;
+  const point = getFloorplanPoint(event);
+  const rooms = state.isExteriorMode
+    ? getExteriorRooms(floor)
+    : getInteriorRooms(floor);
+  const roomId = event.target?.closest?.(".room-hit")?.dataset?.roomId;
+  const room = roomId ? findRoomById(roomId) : getRoomAtPoint(rooms, point);
+  if (!room) return null;
+  if (state.isExteriorMode && !isExteriorRoom(room)) return null;
+  if (!state.isExteriorMode && isExteriorRoom(room)) return null;
+  return { room, point };
+};
+
+const addCommentAtPoint = (room, point) => {
+  if (!room || !point) return false;
+  if (state.isExteriorMode !== isExteriorRoom(room)) return false;
+  const withinRoom =
+    point.x >= room.x &&
+    point.x <= room.x + room.width &&
+    point.y >= room.y &&
+    point.y <= room.y + room.height;
+
+  if (!withinRoom) {
+    return false;
+  }
+
+  const commentText = window.prompt("Wie lautet der Kommentar?");
+  if (!commentText) {
+    return false;
+  }
+
+  if (!authState.user) {
+    window.alert("Bitte anmelden, um Kommentare zu speichern.");
+    return false;
+  }
+
+  const userName = getDisplayName(authState.user);
+  const roomData = ensureRoomData(room.id);
+  roomData.comments.unshift({
+    id: createCommentId(),
+    userId: authState.user.id,
+    userName,
+    userEmail: authState.user.email || "",
+    text: commentText,
+    x: point.x,
+    y: point.y,
+    resolved: false,
+    chat: null,
+  });
+
+  state.isAddingComment = false;
+  logActivityEvent("comment_added", {
+    roomId: room.id,
+    metadata: { text: commentText },
+  });
+  saveState();
+  renderFloorplan();
+  if (state.activeRoomId === room.id) {
+    renderComments(roomData);
+  }
+  return true;
 };
 
 const handleAddComment = (event) => {
@@ -10212,49 +10935,7 @@ const handleAddComment = (event) => {
     return;
   }
 
-  const { x, y } = getFloorplanPoint(event);
-  const withinRoom =
-    x >= room.x &&
-    x <= room.x + room.width &&
-    y >= room.y &&
-    y <= room.y + room.height;
-
-  if (!withinRoom) {
-    return;
-  }
-
-  const commentText = window.prompt("Wie lautet der Kommentar?");
-  if (!commentText) {
-    return;
-  }
-
-  if (!authState.user) {
-    window.alert("Bitte anmelden, um Kommentare zu speichern.");
-    return;
-  }
-
-  const userName = getDisplayName(authState.user);
-  const roomData = ensureRoomData(state.activeRoomId);
-  roomData.comments.unshift({
-    id: createCommentId(),
-    userId: authState.user.id,
-    userName,
-    userEmail: authState.user.email || "",
-    text: commentText,
-    x,
-    y,
-    resolved: false,
-    chat: null,
-  });
-
-  state.isAddingComment = false;
-  logActivityEvent("comment_added", {
-    roomId: state.activeRoomId,
-    metadata: { text: commentText },
-  });
-  saveState();
-  renderFloorplan();
-  renderComments(roomData);
+  addCommentAtPoint(room, getFloorplanPoint(event));
 };
 
 const requireActiveRoom = (message) => {
@@ -11581,7 +12262,12 @@ const applyArchitectAdjustments = ({
   commit = false,
   refreshPanel = false,
 } = {}) => {
-  if (!state.selectedElement || state.isExteriorMode) return;
+  if (
+    !state.selectedElement ||
+    state.isExteriorMode ||
+    state.plannerMode !== "architect"
+  )
+    return;
 
   if (state.selectedElement.elementType === "wall") {
     const wallData = getWallSelectionData(state.selectedElement);
@@ -11825,6 +12511,97 @@ const addOpeningAtPoint = (type, point) => {
   saveState();
 };
 
+const resolveObjectInsertContext = () => {
+  const floor = getActiveFloor();
+  if (!floor) return null;
+  const interiorRooms = getInteriorRooms(floor);
+  if (!interiorRooms.length) return null;
+  const activeRoom = getRoomOnActiveFloor(state.activeRoomId);
+  if (activeRoom && !isExteriorRoom(activeRoom)) {
+    return { room: activeRoom, point: getRoomCenter(activeRoom) };
+  }
+  const viewCenter = getViewBoxCenter();
+  const roomAtCenter = getRoomAtPoint(interiorRooms, viewCenter);
+  if (roomAtCenter) {
+    return { room: roomAtCenter, point: viewCenter };
+  }
+  return { room: interiorRooms[0], point: getRoomCenter(interiorRooms[0]) };
+};
+
+const addRoomObject = (type) => {
+  if (state.isExteriorMode) {
+    return;
+  }
+  const context = resolveObjectInsertContext();
+  if (!context) {
+    window.alert("Bitte zuerst einen Innenraum auswählen.");
+    return;
+  }
+  const roomData = ensureRoomData(context.room.id);
+  const object = createRoomObject({
+    roomId: context.room.id,
+    type,
+    name: getNextObjectName(roomData),
+    cx: context.point.x,
+    cy: context.point.y,
+    width: DEFAULT_OBJECT_WIDTH_PX,
+    height: DEFAULT_OBJECT_HEIGHT_PX,
+    rotation: 0,
+  });
+  roomData.objects.push(object);
+  state.selectedElement = null;
+  state.selectedObject = { roomId: context.room.id, objectId: object.id };
+  state.activeRoomId = context.room.id;
+  renderFloorplan();
+  renderArchitectPanel();
+  renderRoomPanel();
+  saveState();
+};
+
+const touchRoomObject = (object) => {
+  if (!object) return;
+  object.updatedAt = new Date().toISOString();
+};
+
+const deleteSelectedObject = () => {
+  const selection = state.selectedObject;
+  if (!selection) return;
+  const roomData = ensureRoomData(selection.roomId);
+  const index = roomData.objects.findIndex(
+    (object) => object.id === selection.objectId,
+  );
+  if (index === -1) return;
+  roomData.objects.splice(index, 1);
+  state.selectedObject = null;
+  renderFloorplan();
+  renderArchitectPanel();
+  saveState();
+};
+
+const duplicateSelectedObject = () => {
+  const selection = state.selectedObject;
+  if (!selection) return;
+  const source = getSelectedRoomObject();
+  if (!source) return;
+  const roomData = ensureRoomData(selection.roomId);
+  const timestamp = new Date().toISOString();
+  const copy = {
+    ...source,
+    id: createObjectId(),
+    name: getNextObjectName(roomData),
+    cx: source.cx + 12,
+    cy: source.cy + 12,
+    rotation: normalizeRotation(source.rotation),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  roomData.objects.push(copy);
+  state.selectedObject = { roomId: selection.roomId, objectId: copy.id };
+  renderFloorplan();
+  renderArchitectPanel();
+  saveState();
+};
+
 const beginRoomDraft = (point) => {
   state.roomDraft = {
     startX: point.x,
@@ -11884,6 +12661,7 @@ const startArchitectDrag = (event, target) => {
   const hitTarget = target?.closest?.(".architect-hit") || target;
   if (
     !state.isArchitectMode ||
+    state.plannerMode !== "architect" ||
     state.isExteriorMode ||
     state.architectTool !== "select" ||
     !hitTarget?.classList?.contains("architect-hit")
@@ -11948,11 +12726,11 @@ const startArchitectDrag = (event, target) => {
   dragState.pointerId = event.pointerId;
   dragState.suppressClick = false;
   elements.floorplan.setPointerCapture(event.pointerId);
-  setArchitectDragging(true);
+  setPlannerDragging(true);
 };
 
 const startCommentDrag = (event, marker) => {
-  if (!state.isArchitectMode) return;
+  if (!state.isArchitectMode || state.plannerMode !== "architect") return;
   const data = getCommentDragData(marker);
   if (!data) return;
   const pointer = getFloorplanPoint(event);
@@ -11973,10 +12751,185 @@ const startCommentDrag = (event, marker) => {
   dragState.suppressClick = false;
   elements.floorplan.setPointerCapture(event.pointerId);
   hideCommentTooltip();
-  setArchitectDragging(true);
+  setPlannerDragging(true);
+};
+
+const isInteriorDragType = (type) =>
+  ["object-move", "object-resize", "object-rotate"].includes(type);
+
+const startInteriorDrag = (event, target, handle) => {
+  if (
+    !state.isArchitectMode ||
+    state.plannerMode !== "interior" ||
+    state.isExteriorMode
+  ) {
+    return;
+  }
+  const objectTarget = target?.closest?.("[data-object-id]") || target;
+  const roomId = objectTarget?.dataset?.roomId;
+  const objectId = objectTarget?.dataset?.objectId;
+  if (!roomId || !objectId) return;
+  const object = getRoomObjectById(roomId, objectId);
+  if (!object) return;
+  selectInteriorObject(roomId, objectId);
+
+  const pointer = getFloorplanPoint(event);
+  const handleId = handle?.dataset?.objectHandle || null;
+
+  dragState.active = true;
+  dragState.didMove = false;
+  dragState.pointerId = event.pointerId;
+  dragState.suppressClick = false;
+  dragState.startClientX = event.clientX;
+  dragState.startClientY = event.clientY;
+
+  if (handleId === "rotate") {
+    dragState.type = "object-rotate";
+    dragState.context = {
+      object,
+      startRotation: object.rotation,
+      startAngle: Math.atan2(pointer.y - object.cy, pointer.x - object.cx),
+    };
+  } else if (handleId) {
+    const handleDef = OBJECT_HANDLES.find((item) => item.id === handleId);
+    if (!handleDef) {
+      resetDragState();
+      return;
+    }
+    const fixedLocal = {
+      x: (-handleDef.x * object.width) / 2,
+      y: (-handleDef.y * object.height) / 2,
+    };
+    const fixedOffset = rotatePoint(fixedLocal, toRadians(object.rotation));
+    dragState.type = "object-resize";
+    dragState.context = {
+      object,
+      handle: handleDef,
+      fixedWorld: {
+        x: object.cx + fixedOffset.x,
+        y: object.cy + fixedOffset.y,
+      },
+    };
+  } else {
+    dragState.type = "object-move";
+    dragState.startPointerX = pointer.x;
+    dragState.startPointerY = pointer.y;
+    dragState.context = {
+      object,
+      startX: object.cx,
+      startY: object.cy,
+    };
+  }
+
+  elements.floorplan.setPointerCapture(event.pointerId);
+  setPlannerDragging(true);
+};
+
+const handleInteriorPointerMove = (event) => {
+  if (!state.isArchitectMode || state.plannerMode !== "interior") return;
+  if (!dragState.active || event.pointerId !== dragState.pointerId) return;
+  if (!isInteriorDragType(dragState.type)) return;
+
+  const pointer = getFloorplanPoint(event);
+  const movedDistance = Math.hypot(
+    event.clientX - dragState.startClientX,
+    event.clientY - dragState.startClientY,
+  );
+  if (!dragState.didMove) {
+    if (movedDistance < DRAG_THRESHOLD_PX) {
+      return;
+    }
+    dragState.didMove = true;
+  }
+
+  if (dragState.type === "object-move") {
+    const { object, startX, startY } = dragState.context;
+    const newX = startX + (pointer.x - dragState.startPointerX);
+    const newY = startY + (pointer.y - dragState.startPointerY);
+    if (Math.abs(newX - object.cx) < 0.1 && Math.abs(newY - object.cy) < 0.1)
+      return;
+    object.cx = newX;
+    object.cy = newY;
+  } else if (dragState.type === "object-rotate") {
+    const { object, startRotation, startAngle } = dragState.context;
+    const angle = Math.atan2(pointer.y - object.cy, pointer.x - object.cx);
+    let nextRotation = startRotation + toDegrees(angle - startAngle);
+    if (event.shiftKey) {
+      nextRotation =
+        Math.round(nextRotation / ROTATION_SNAP_DEG) * ROTATION_SNAP_DEG;
+    }
+    object.rotation = normalizeRotation(nextRotation);
+  } else if (dragState.type === "object-resize") {
+    const { object, handle, fixedWorld } = dragState.context;
+    const delta = {
+      x: pointer.x - fixedWorld.x,
+      y: pointer.y - fixedWorld.y,
+    };
+    const local = rotatePoint(delta, toRadians(-object.rotation));
+    const nextWidth = handle.x * local.x;
+    const nextHeight = handle.y * local.y;
+    const width = Math.max(MIN_OBJECT_SIZE_PX, nextWidth);
+    const height = Math.max(MIN_OBJECT_SIZE_PX, nextHeight);
+    if (!Number.isFinite(width) || !Number.isFinite(height)) return;
+    const centerLocal = {
+      x: (handle.x * width) / 2,
+      y: (handle.y * height) / 2,
+    };
+    const centerOffset = rotatePoint(centerLocal, toRadians(object.rotation));
+    object.cx = fixedWorld.x + centerOffset.x;
+    object.cy = fixedWorld.y + centerOffset.y;
+    object.width = width;
+    object.height = height;
+  }
+
+  renderFloorplan();
+  renderArchitectPanel();
+};
+
+const finishInteriorDrag = () => {
+  if (!dragState.active || !isInteriorDragType(dragState.type)) return;
+  if (dragState.pointerId !== null) {
+    try {
+      elements.floorplan.releasePointerCapture(dragState.pointerId);
+    } catch {
+      // Ignore release failures when pointer capture is already cleared.
+    }
+  }
+
+  if (dragState.didMove) {
+    touchRoomObject(dragState.context?.object);
+    saveState();
+    renderFloorplan();
+    renderArchitectPanel();
+  }
+
+  dragState.suppressClick = dragState.didMove;
+  resetDragState({ keepSuppressClick: true });
+  if (dragState.suppressClick) {
+    window.setTimeout(() => {
+      dragState.suppressClick = false;
+    }, 0);
+  }
+};
+
+const handlePlannerPointerMove = (event) => {
+  if (state.isArchitectMode && state.plannerMode === "interior") {
+    handleInteriorPointerMove(event);
+    return;
+  }
+  handleArchitectPointerMove(event);
+};
+
+const finishPlannerDrag = () => {
+  if (isInteriorDragType(dragState.type)) {
+    finishInteriorDrag();
+    return;
+  }
+  finishArchitectDrag();
 };
 
 const handleArchitectPointerMove = (event) => {
+  if (!state.isArchitectMode || state.plannerMode !== "architect") return;
   if (state.isExteriorMode) return;
   if (
     state.isArchitectMode &&
@@ -12189,7 +13142,7 @@ const bindEvents = () => {
       }
       return;
     }
-    if (state.isArchitectMode) {
+    if (state.isArchitectMode && state.plannerMode === "architect") {
       const hitTarget = target?.closest?.(".architect-hit");
       const point = getFloorplanPoint(event);
       if (state.architectTool === "door") {
@@ -12214,6 +13167,33 @@ const bindEvents = () => {
         selectArchitectElement(hitTarget);
         return;
       }
+    }
+
+    if (state.isArchitectMode && state.plannerMode === "interior") {
+      if (state.isAddingComment) {
+        handleAddComment(event);
+        return;
+      }
+      const objectTarget = target?.closest?.("[data-object-id]");
+      if (objectTarget?.dataset?.roomId && objectTarget?.dataset?.objectId) {
+        selectInteriorObject(
+          objectTarget.dataset.roomId,
+          objectTarget.dataset.objectId,
+        );
+        return;
+      }
+      const hit = getObjectHitTest(getFloorplanPoint(event), getActiveFloor());
+      if (hit) {
+        selectInteriorObject(hit.room.id, hit.object.id);
+        return;
+      }
+      const roomTarget = target?.closest?.(".room-hit");
+      if (roomTarget?.dataset?.roomId) {
+        selectRoom(roomTarget.dataset.roomId);
+        return;
+      }
+      clearSelectedObject();
+      return;
     }
 
     if (state.isAddingComment) {
@@ -12241,7 +13221,7 @@ const bindEvents = () => {
           return;
         }
       }
-      if (!state.isArchitectMode) {
+      if (!state.isArchitectMode || state.plannerMode !== "architect") {
         return;
       }
       event.preventDefault();
@@ -12249,19 +13229,29 @@ const bindEvents = () => {
       return;
     }
     if (state.isExteriorMode) return;
-    if (!state.isArchitectMode || state.architectTool !== "select") return;
+    if (state.isArchitectMode && state.plannerMode === "interior") {
+      const handle = target?.closest?.("[data-object-handle]");
+      const objectTarget = target?.closest?.("[data-object-id]");
+      if (!objectTarget) return;
+      event.preventDefault();
+      startInteriorDrag(event, objectTarget, handle);
+      return;
+    }
+    if (
+      !state.isArchitectMode ||
+      state.plannerMode !== "architect" ||
+      state.architectTool !== "select"
+    )
+      return;
     const hitTarget = target?.closest?.(".architect-hit");
     if (!hitTarget) return;
     event.preventDefault();
     startArchitectDrag(event, hitTarget);
   });
 
-  elements.floorplan.addEventListener(
-    "pointermove",
-    handleArchitectPointerMove,
-  );
-  elements.floorplan.addEventListener("pointerup", finishArchitectDrag);
-  elements.floorplan.addEventListener("pointercancel", finishArchitectDrag);
+  elements.floorplan.addEventListener("pointermove", handlePlannerPointerMove);
+  elements.floorplan.addEventListener("pointerup", finishPlannerDrag);
+  elements.floorplan.addEventListener("pointercancel", finishPlannerDrag);
   elements.floorplan.addEventListener("pointermove", (event) => {
     const target = event.target;
     const marker = target?.closest?.(".comment-marker");
@@ -12284,26 +13274,38 @@ const bindEvents = () => {
   elements.floorplan.addEventListener("contextmenu", (event) => {
     const target = event.target;
     const marker = target?.closest?.(".comment-marker");
-    if (!marker) return;
-    const roomId = marker.dataset.roomId;
-    const commentId = marker.dataset.commentId;
-    if (!roomId || !commentId) return;
-    if (state.isExteriorMode) {
-      const room = findRoomById(roomId);
-      if (!room || !isExteriorRoom(room)) {
-        return;
+    if (marker) {
+      const roomId = marker.dataset.roomId;
+      const commentId = marker.dataset.commentId;
+      if (!roomId || !commentId) return;
+      if (state.isExteriorMode) {
+        const room = findRoomById(roomId);
+        if (!room || !isExteriorRoom(room)) {
+          return;
+        }
       }
+      const comment = getCommentById(roomId, commentId);
+      if (!comment) return;
+      event.preventDefault();
+      hideCommentTooltip();
+      openCommentContextMenu(event, comment, roomId);
+      return;
     }
-    const comment = getCommentById(roomId, commentId);
-    if (!comment) return;
+
+    if (state.activeView !== "room") return;
+    const resolved = resolveCommentTargetFromEvent(event);
+    if (!resolved) return;
     event.preventDefault();
-    hideCommentTooltip();
-    openCommentContextMenu(event, comment, roomId);
+    if (state.activeRoomId !== resolved.room.id) {
+      selectRoom(resolved.room.id);
+    }
+    addCommentAtPoint(resolved.room, resolved.point);
   });
 
   elements.floorplan.addEventListener("mouseover", (event) => {
     if (
       !state.isArchitectMode ||
+      state.plannerMode !== "architect" ||
       state.isExteriorMode ||
       state.architectTool !== "select"
     )
@@ -12319,6 +13321,7 @@ const bindEvents = () => {
   elements.floorplan.addEventListener("mouseout", (event) => {
     if (
       !state.isArchitectMode ||
+      state.plannerMode !== "architect" ||
       state.isExteriorMode ||
       state.architectTool !== "select"
     )
@@ -12330,7 +13333,7 @@ const bindEvents = () => {
     }
   });
 
-  elements.addCommentBtn.addEventListener("click", () => {
+  elements.addCommentBtn?.addEventListener("click", () => {
     const activeRoom = state.activeRoomId
       ? findRoomById(state.activeRoomId)
       : null;
@@ -12381,6 +13384,10 @@ const bindEvents = () => {
   });
 
   elements.clearSelectionBtn.addEventListener("click", () => {
+    if (state.isArchitectMode && state.plannerMode === "interior") {
+      clearSelectedObject();
+      return;
+    }
     selectRoom(null);
   });
 
@@ -12491,9 +13498,19 @@ const bindEvents = () => {
   );
   elements.taskModalClose?.addEventListener("click", closeTaskModal);
   elements.taskModalCancel?.addEventListener("click", closeTaskModal);
+  elements.taskModalDelete?.addEventListener("click", handleTaskModalDelete);
   elements.taskModal?.addEventListener("click", (event) => {
     if (event.target === elements.taskModal) {
       closeTaskModal();
+    }
+  });
+  elements.userMenuTrigger?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleUserMenu();
+  });
+  elements.userMenu?.addEventListener("click", (event) => {
+    if (event.target && event.target.matches("button")) {
+      closeUserMenu();
     }
   });
   elements.taskModalChat?.addEventListener("click", () => {
@@ -12633,11 +13650,92 @@ const bindEvents = () => {
     if (taskModalState.dependencyPickerOpen) {
       closeDependencyPicker();
     }
+    if (userMenuState.isOpen) {
+      closeUserMenu();
+    }
     if (imageModalState.isOpen) {
       closeImageModal();
     }
     if (chatModalState.isOpen) {
       closeChatModal();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (
+      !state.isArchitectMode ||
+      state.plannerMode !== "interior" ||
+      !state.selectedObject
+    ) {
+      return;
+    }
+    if (isEditableTarget(event.target)) return;
+    const key = event.key;
+    if (key === "Delete" || key === "Backspace") {
+      event.preventDefault();
+      deleteSelectedObject();
+      return;
+    }
+    if ((event.metaKey || event.ctrlKey) && key.toLowerCase() === "d") {
+      event.preventDefault();
+      duplicateSelectedObject();
+      return;
+    }
+    const step = event.shiftKey ? 10 : 1;
+    if (key === "ArrowUp") {
+      event.preventDefault();
+      updateSelectedObject(
+        (object) => {
+          object.cy -= step;
+          return true;
+        },
+        { commit: true, refreshPanel: true },
+      );
+      return;
+    }
+    if (key === "ArrowDown") {
+      event.preventDefault();
+      updateSelectedObject(
+        (object) => {
+          object.cy += step;
+          return true;
+        },
+        { commit: true, refreshPanel: true },
+      );
+      return;
+    }
+    if (key === "ArrowLeft") {
+      event.preventDefault();
+      updateSelectedObject(
+        (object) => {
+          object.cx -= step;
+          return true;
+        },
+        { commit: true, refreshPanel: true },
+      );
+      return;
+    }
+    if (key === "ArrowRight") {
+      event.preventDefault();
+      updateSelectedObject(
+        (object) => {
+          object.cx += step;
+          return true;
+        },
+        { commit: true, refreshPanel: true },
+      );
+      return;
+    }
+    if (key === "[" || key === "]") {
+      event.preventDefault();
+      const delta = event.shiftKey ? ROTATION_SNAP_DEG : 1;
+      updateSelectedObject(
+        (object) => {
+          const next = object.rotation + (key === "[" ? -delta : delta);
+          object.rotation = normalizeRotation(next);
+          return true;
+        },
+        { commit: true, refreshPanel: true },
+      );
     }
   });
   document.addEventListener("click", (event) => {
@@ -12659,6 +13757,13 @@ const bindEvents = () => {
       !elements.taskDependencyToggle?.contains(event.target)
     ) {
       closeDependencyPicker();
+    }
+    if (
+      userMenuState.isOpen &&
+      !elements.userMenu?.contains(event.target) &&
+      !elements.userMenuTrigger?.contains(event.target)
+    ) {
+      closeUserMenu();
     }
   });
   window.addEventListener("resize", closeCommentContextMenu);
@@ -12713,9 +13818,29 @@ const bindEvents = () => {
     setArchitectMode(event.target.checked);
   });
 
+  if (elements.plannerModeButtons?.length) {
+    elements.plannerModeButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const mode = button.dataset.plannerMode;
+        if (!mode) return;
+        setPlannerMode(mode);
+      });
+    });
+  }
+
   if (elements.exteriorToggle) {
     elements.exteriorToggle.addEventListener("change", (event) => {
       setExteriorMode(event.target.checked);
+    });
+  }
+
+  if (elements.interiorInsertButtons?.length) {
+    elements.interiorInsertButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const type = button.dataset.interiorInsert;
+        if (!type) return;
+        addRoomObject(type);
+      });
     });
   }
 
@@ -12815,6 +13940,79 @@ const bindEvents = () => {
   elements.measurementForm.addEventListener("submit", (event) => {
     event.preventDefault();
     applyArchitectAdjustments({ commit: true, refreshPanel: true });
+  });
+
+  if (elements.objectForm) {
+    elements.objectForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      renderArchitectPanel();
+    });
+  }
+
+  const bindObjectNumberInput = (input, applyValue) => {
+    if (!input) return;
+    const apply = (commit) => {
+      const raw = input.value;
+      if (raw === "" || raw === null || raw === undefined) return;
+      const value = Number(raw);
+      if (!Number.isFinite(value)) return;
+      updateSelectedObject((object) => applyValue(object, value), {
+        commit,
+        refreshPanel: commit,
+      });
+    };
+    input.addEventListener("input", () => apply(false));
+    input.addEventListener("change", () => apply(true));
+  };
+
+  if (elements.objectNameInput) {
+    const applyName = (commit) => {
+      const value = elements.objectNameInput.value.trim();
+      updateSelectedObject(
+        (object) => {
+          const next = value || "Objekt";
+          if (next === object.name) return false;
+          object.name = next;
+          return true;
+        },
+        { commit, refreshPanel: commit },
+      );
+    };
+    elements.objectNameInput.addEventListener("input", () => applyName(false));
+    elements.objectNameInput.addEventListener("change", () => applyName(true));
+  }
+
+  bindObjectNumberInput(elements.objectXInput, (object, value) => {
+    if (object.cx === value) return false;
+    object.cx = value;
+    return true;
+  });
+
+  bindObjectNumberInput(elements.objectYInput, (object, value) => {
+    if (object.cy === value) return false;
+    object.cy = value;
+    return true;
+  });
+
+  bindObjectNumberInput(elements.objectWidthInput, (object, value) => {
+    const next = Math.max(MIN_OBJECT_SIZE_PX, value);
+    if (object.width === next) return false;
+    object.width = next;
+    return true;
+  });
+
+  bindObjectNumberInput(elements.objectHeightInput, (object, value) => {
+    const next = Math.max(MIN_OBJECT_SIZE_PX, value);
+    if (object.height === next) return false;
+    object.height = next;
+    return true;
+  });
+
+  bindObjectNumberInput(elements.objectRotationInput, (object, value) => {
+    const next = normalizeRotation(value);
+    if (object.rotation === next) return false;
+    object.rotation = next;
+    return true;
   });
 
   MOBILE_MEDIA_QUERY.addEventListener("change", () => {

@@ -79,6 +79,14 @@ const openTaskAdvanced = async (page) => {
   }
 };
 
+const switchToGroundFloor = async (page) => {
+  await page.locator("#floor-toggle").evaluate((input) => {
+    input.value = "0";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+};
+
 test("app loads ohne Absturz", async ({ page }) => {
   await preparePage(page);
   await expect(page.locator("body")).toBeVisible();
@@ -107,6 +115,7 @@ test("Pinned images erscheinen auf Waenden, Boden und Decke in 3D", async ({
 }) => {
   const roomId = "ground-bedroom-left";
   await preparePage(page, { state: buildPinnedRoomState(roomId) });
+  await switchToGroundFloor(page);
   await page.locator(`.room-hit[data-room-id='${roomId}']`).click();
   await page.locator("[data-room-tab='inspiration']").click();
   await page.locator("#toggle-3d").click();
@@ -154,8 +163,12 @@ test("Aufgaben erstellen, filtern und erledigen", async ({ page }) => {
   await expect(taskList).not.toContainText("Aufgabe Bad");
 
   const taskItem = page.locator("#task-list .task-item").first();
-  await taskItem.locator("select[data-field='status']").selectOption("Done");
-  await expect(taskItem).toHaveClass(/is-done/);
+  const doneColumn = page.locator(".kanban-column[data-status='Done']");
+  await taskItem.locator("input[data-task-select]").check();
+  await page.locator("#task-bulk-done").click();
+  await expect(
+    doneColumn.locator("[data-task-title='Aufgabe Küche']"),
+  ).toHaveCount(1);
 });
 
 test("Aufgabenuebersicht erstellt neue Aufgabe trotz Filter", async ({
@@ -192,8 +205,12 @@ test("saved views filtern Tasks nach Tags und Status", async ({ page }) => {
   const taskList = page.locator("#task-list");
   const paintTask = taskList.locator("[data-task-title='Order paint']");
   const deviceTask = taskList.locator("[data-task-title='Device delivery']");
-  await paintTask.locator("select[data-field='status']").selectOption("Done");
-  await expect(paintTask).toHaveClass(/is-done/);
+  const doneColumn = page.locator(".kanban-column[data-status='Done']");
+  await paintTask.locator("input[data-task-select]").check();
+  await page.locator("#task-bulk-done").click();
+  await expect(
+    doneColumn.locator("[data-task-title='Order paint']"),
+  ).toHaveCount(1);
 
   await page.locator("button[data-task-view='materials']").click();
   await expect(page.locator("button[data-task-view='materials']")).toHaveClass(
@@ -251,17 +268,18 @@ test("bulk actions setzen Status, Zuweisung und Faelligkeit", async ({
   const taskList = page.locator("#task-list");
   const taskA = taskList.locator("[data-task-title='Bulk task A']");
   const taskB = taskList.locator("[data-task-title='Bulk task B']");
+  const doneColumn = page.locator(".kanban-column[data-status='Done']");
 
   await taskA.locator("input[data-task-select]").check();
   await taskB.locator("input[data-task-select]").check();
   await page.locator("#task-bulk-done").click();
 
-  await expect(taskA.locator("select[data-field='status']")).toHaveValue(
-    "Done",
-  );
-  await expect(taskB.locator("select[data-field='status']")).toHaveValue(
-    "Done",
-  );
+  await expect(
+    doneColumn.locator("[data-task-title='Bulk task A']"),
+  ).toHaveCount(1);
+  await expect(
+    doneColumn.locator("[data-task-title='Bulk task B']"),
+  ).toHaveCount(1);
 
   await taskA.locator("input[data-task-select]").check();
   await taskB.locator("input[data-task-select]").check();
@@ -273,20 +291,38 @@ test("bulk actions setzen Status, Zuweisung und Faelligkeit", async ({
   await page.locator("#task-bulk-assignee").selectOption(bulkAssignee);
   await page.locator("#task-bulk-assign").click();
 
-  await expect(taskA.locator("select[data-field='assignee']")).toHaveValue(
-    bulkAssignee,
-  );
-  await expect(taskB.locator("select[data-field='assignee']")).toHaveValue(
-    bulkAssignee,
-  );
+  const assigneeValues = await page.evaluate(() => {
+    const payload = JSON.parse(localStorage.getItem("house-builder-state"));
+    const tasks = payload?.tasks || [];
+    const result = {};
+    tasks.forEach((task) => {
+      if (task.title === "Bulk task A" || task.title === "Bulk task B") {
+        result[task.title] = task.assignee || "";
+      }
+    });
+    return result;
+  });
+  expect(assigneeValues["Bulk task A"]).toBe(bulkAssignee);
+  expect(assigneeValues["Bulk task B"]).toBe(bulkAssignee);
 
   await taskA.locator("input[data-task-select]").check();
   await taskB.locator("input[data-task-select]").check();
   await page.locator("#task-bulk-due").fill("2024-10-01");
   await page.locator("#task-bulk-due-apply").click();
 
-  await expect(taskA.locator("input[data-task-due]")).toHaveValue("2024-10-01");
-  await expect(taskB.locator("input[data-task-due]")).toHaveValue("2024-10-01");
+  const dueValues = await page.evaluate(() => {
+    const payload = JSON.parse(localStorage.getItem("house-builder-state"));
+    const tasks = payload?.tasks || [];
+    const result = {};
+    tasks.forEach((task) => {
+      if (task.title === "Bulk task A" || task.title === "Bulk task B") {
+        result[task.title] = task.dueDate || "";
+      }
+    });
+    return result;
+  });
+  expect(dueValues["Bulk task A"]).toBe("2024-10-01");
+  expect(dueValues["Bulk task B"]).toBe("2024-10-01");
 });
 
 test.describe("mobile view", () => {

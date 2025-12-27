@@ -98,7 +98,7 @@
       <div class="header-actions">
         <label class="toggle" id="architect-toggle-label">
           <input type="checkbox" id="toggle-architect" />
-          <span>Architekt-Ansicht</span>
+          <span>Planungsmodus</span>
         </label>
         <button
           type="button"
@@ -122,16 +122,29 @@
         >
           ?
         </button>
-        <button id="security-settings" class="secondary" type="button" hidden>
-          Sicherheit
-        </button>
         <div class="auth-info" id="auth-info" hidden>
-          <div class="auth-user">
-            <span class="auth-label">Angemeldet als</span>
+          <button
+            id="user-menu-trigger"
+            class="user-menu-trigger"
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded="false"
+            aria-controls="user-menu"
+          >
             <span id="auth-user-name" class="user-name"></span>
+            <span class="user-menu-caret">▾</span>
+          </button>
+          <div id="user-menu" class="user-menu" role="menu" hidden>
+            <button id="email-accounts-button" type="button" role="menuitem">
+              E-Mail
+            </button>
+            <button id="security-settings" type="button" role="menuitem">
+              Sicherheit
+            </button>
+            <button id="sign-out" type="button" role="menuitem">
+              Abmelden
+            </button>
           </div>
-          <button id="email-accounts-button" type="button">E-Mail</button>
-          <button id="sign-out" type="button">Abmelden</button>
         </div>
       </div>
     </header>
@@ -216,34 +229,7 @@
             <div id="comment-tooltip-text" class="comment-tooltip-text"></div>
           </div>
         </div>
-        <div class="legend">
-          <span class="legend-item">
-            <svg class="legend-icon" viewBox="0 0 36 12" aria-hidden="true">
-              <line class="legend-wall" x1="4" y1="6" x2="32" y2="6" />
-            </svg>
-            Wand
-          </span>
-          <span class="legend-item">
-            <svg class="legend-icon" viewBox="0 0 36 24" aria-hidden="true">
-              <line class="legend-door-frame" x1="6" y1="6" x2="20" y2="6" />
-              <line class="legend-door-leaf" x1="6" y1="6" x2="6" y2="20" />
-              <path class="legend-door-arc" d="M 20 6 A 14 14 0 0 1 6 20" />
-            </svg>
-            Tür
-          </span>
-          <span class="legend-item">
-            <svg class="legend-icon" viewBox="0 0 36 12" aria-hidden="true">
-              <line class="legend-window-line" x1="4" y1="4" x2="32" y2="4" />
-              <line class="legend-window-line" x1="4" y1="8" x2="32" y2="8" />
-              <line class="legend-window-cross" x1="18" y1="4" x2="18" y2="8" />
-            </svg>
-            Fenster
-          </span>
-        </div>
         <div class="floorplan-actions">
-          <button id="add-comment" class="primary" type="button">
-            Kommentar hinzufügen
-          </button>
           <button id="clear-selection" type="button">Auswahl löschen</button>
         </div>
       </section>
@@ -673,15 +659,41 @@
         <section id="architect-view" class="architect-view" hidden>
           <section class="panel architect-panel">
             <div class="panel-header">
-              <h3>Architekt-Ansicht</h3>
+              <h3>Modus</h3>
             </div>
-            <p class="helper">
-              Elemente platzieren oder auswählen, um Maße präzise zu steuern.
-            </p>
+            <div
+              class="segmented-control"
+              role="tablist"
+              aria-label="Modus wählen"
+            >
+              <button
+                class="segmented-option is-active"
+                type="button"
+                data-planner-mode="architect"
+                aria-selected="true"
+              >
+                Architekten
+              </button>
+              <button
+                class="segmented-option"
+                type="button"
+                data-planner-mode="interior"
+                aria-selected="false"
+              >
+                Innenarchitekt
+              </button>
+            </div>
+            <p id="planner-mode-hint" class="helper"></p>
             <label class="toggle architect-toggle">
               <input type="checkbox" id="toggle-exterior" />
               <span>Außenbereiche anzeigen</span>
             </label>
+          </section>
+
+          <section class="panel architect-panel" data-planner-panel="architect">
+            <div class="panel-header">
+              <h3>Architektur</h3>
+            </div>
             <div class="architect-tools">
               <span class="architect-tools-label">Werkzeuge</span>
               <div
@@ -726,7 +738,7 @@
             </div>
           </section>
 
-          <section class="panel architect-panel">
+          <section class="panel architect-panel" data-planner-panel="architect">
             <h3 id="architect-title">Element wählen</h3>
             <form id="measurement-form" class="measurement-form" hidden>
               <div
@@ -826,27 +838,124 @@
             </form>
             <p id="architect-help" class="helper"></p>
           </section>
+
+          <section class="panel architect-panel" data-planner-panel="interior">
+            <div class="panel-header">
+              <h3>Innenobjekte</h3>
+            </div>
+            <div class="architect-tools interior-tools">
+              <span class="architect-tools-label">Einfügen</span>
+              <div
+                class="segmented-control"
+                role="group"
+                aria-label="Objekt einfügen"
+              >
+                <button
+                  class="segmented-option"
+                  type="button"
+                  data-interior-insert="rect"
+                >
+                  Rechteck
+                </button>
+                <button
+                  class="segmented-option"
+                  type="button"
+                  data-interior-insert="circle"
+                >
+                  Kreis
+                </button>
+              </div>
+              <p id="interior-tool-hint" class="helper"></p>
+            </div>
+          </section>
+
+          <section class="panel architect-panel" data-planner-panel="interior">
+            <h3 id="interior-title">Objekt wählen</h3>
+            <form id="object-form" class="object-form" hidden>
+              <label class="object-group">
+                <span class="object-label">Name</span>
+                <input type="text" id="object-name" />
+              </label>
+              <div class="object-grid">
+                <label class="object-group">
+                  <span class="object-label">X (Mitte)</span>
+                  <input
+                    type="number"
+                    id="object-x"
+                    inputmode="decimal"
+                    step="1"
+                  />
+                </label>
+                <label class="object-group">
+                  <span class="object-label">Y (Mitte)</span>
+                  <input
+                    type="number"
+                    id="object-y"
+                    inputmode="decimal"
+                    step="1"
+                  />
+                </label>
+                <label class="object-group">
+                  <span class="object-label">Breite</span>
+                  <input
+                    type="number"
+                    id="object-width"
+                    inputmode="decimal"
+                    step="1"
+                    min="24"
+                  />
+                </label>
+                <label class="object-group">
+                  <span class="object-label">Höhe</span>
+                  <input
+                    type="number"
+                    id="object-height"
+                    inputmode="decimal"
+                    step="1"
+                    min="24"
+                  />
+                </label>
+                <label class="object-group">
+                  <span class="object-label">Rotation (Grad)</span>
+                  <input
+                    type="number"
+                    id="object-rotation"
+                    inputmode="decimal"
+                    step="0.1"
+                  />
+                </label>
+              </div>
+              <button type="submit" class="visually-hidden">
+                Werte übernehmen
+              </button>
+            </form>
+            <p id="interior-help" class="helper"></p>
+          </section>
         </section>
       </aside>
     </main>
 
-    <section
+    <details
       id="activity-page"
       class="activity-page"
       aria-label="Aktivitätsfeed"
     >
-      <div class="activity-header">
-        <div>
-          <h2>Aktivitätsfeed</h2>
-          <p class="helper">
+      <summary class="activity-toggle">
+        <span class="activity-header">
+          <span class="activity-title">Aktivitätsfeed</span>
+          <span class="helper">
             Letzte Ereignisse aus Aufgaben, Kommentaren, Dateien und
             Entscheidungen.
-          </p>
-        </div>
+          </span>
+        </span>
+      </summary>
+      <div class="activity-body">
+        <ul id="activity-feed" class="activity-list"></ul>
+        <p id="activity-empty" class="helper">
+          Noch keine Aktivität vorhanden.
+        </p>
       </div>
-      <ul id="activity-feed" class="activity-list"></ul>
-      <p id="activity-empty" class="helper">Noch keine Aktivität vorhanden.</p>
-    </section>
+    </details>
 
     <div id="task-modal" class="modal" hidden>
       <div
@@ -1023,6 +1132,13 @@
             </div>
           </div>
           <div class="modal-actions">
+            <button
+              type="button"
+              id="task-modal-delete"
+              class="image-delete task-modal-delete"
+            >
+              Aufgabe löschen
+            </button>
             <button type="button" id="task-modal-cancel">Abbrechen</button>
             <button type="submit" class="primary">Speichern</button>
           </div>
