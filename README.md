@@ -47,61 +47,48 @@ create policy "house_state update" on public.house_state
    - Optional: `OPENAI_API_KEY` als Environment Variable setzen (für Bildgenerierung).
    - Optional: `OPENAI_IMAGE_MODEL` setzen (Standard: `dall-e-3`, `gpt-image-1` nur mit verifizierter Organisation).
 
-## Gmail Integration (optional)
+## E-Mail-Integration (Gmail + Outlook)
 
-1. **Tabelle anlegen (SQL Editor)**
+1. **Migrationen ausführen (SQL Editor)**
+   - Datei: `supabase/migrations/20241227_email_integration.sql`
 
-```sql
-create table if not exists public.gmail_accounts (
-  user_id uuid primary key references auth.users(id),
-  email text,
-  access_token text,
-  refresh_token text,
-  token_type text,
-  scope text,
-  expires_at timestamp with time zone,
-  updated_at timestamp with time zone default now()
-);
-
-alter table public.gmail_accounts enable row level security;
-
-create policy "gmail_accounts read" on public.gmail_accounts
-  for select
-  to authenticated
-  using (user_id = auth.uid());
-
-create policy "gmail_accounts insert" on public.gmail_accounts
-  for insert
-  to authenticated
-  with check (user_id = auth.uid());
-
-create policy "gmail_accounts update" on public.gmail_accounts
-  for update
-  to authenticated
-  using (user_id = auth.uid());
-
-create policy "gmail_accounts delete" on public.gmail_accounts
-  for delete
-  to authenticated
-  using (user_id = auth.uid());
-```
-
-2. **Google OAuth Client erstellen**
-   - OAuth Client Typ: Web Application.
-   - Authorized redirect URIs:
-     - Lokal: `http://127.0.0.1:3000/`
-     - Netlify: `https://<dein-netlify-domain>/`
+2. **OAuth Apps konfigurieren**
+   - Redirect URIs (lokal + Netlify):
+     - `APP_BASE_URL` (z.B. `http://localhost:3000/` und `https://<dein-netlify-domain>/`)
+   - Google OAuth Client (Web Application).
+   - Microsoft Entra App Registration (Web).
 
 3. **Environment Variablen setzen (Netlify + lokal)**
-   - `GOOGLE_CLIENT_ID`
-   - `GOOGLE_CLIENT_SECRET`
-   - `GOOGLE_REDIRECT_URI` (muss exakt zu den Redirect URIs passen)
-   - `SUPABASE_URL` und `SUPABASE_ANON_KEY` als Netlify Env (Functions nutzen diese).
+   - `APP_BASE_URL`
+   - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+   - `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`
+   - `EMAIL_TOKEN_ENCRYPTION_KEY` (32 Bytes, z.B. 64 Hex oder Base64)
+   - `SUPABASE_URL`, `SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY` (nur für Cron-Refresh)
+   - `CRON_SECRET` (für den Refresh-Endpunkt)
 
 4. **App nutzen**
-   - In der App auf "Gmail verbinden" klicken.
-   - In einer Aufgabe den Thread-Link oder die Thread-ID eintragen und anheften.
-   - Es werden nur angeheftete Threads geladen; es gibt keinen Inbox-Listing-Endpunkt.
+   - In einer Aufgabe den Bereich „E-Mail-Integration“ öffnen.
+   - Gmail/Outlook verbinden.
+   - E-Mails in das Label/den Ordner „Lugano“ verschieben.
+   - Unverknüpfte Threads erscheinen automatisch und lassen sich mit einem Klick verknüpfen.
+
+5. **2FA aktivieren**
+   - Über „Sicherheit“ die Zwei-Faktor-Authentifizierung einrichten.
+   - QR-Code scannen, Code bestätigen, Recovery-Codes sichern.
+
+6. **Datenschutz/Boundary**
+   - Es werden nur E-Mails im Label/Ordner „Lugano“ abgefragt.
+   - Tokens werden nur verschlüsselt gespeichert.
+
+7. **Zugriff entziehen**
+   - Google/Microsoft: App-Zugriff in den Account-Einstellungen entfernen.
+
+8. **Cron Refresh (optional)**
+   - Nur nötig, wenn Threads automatisch aktualisiert werden sollen.
+   - Standardmäßig lädt die App E-Mails beim Öffnen/Reload und per manuellem Refresh.
+   - Netlify Scheduled Function auf `/api/email/cron/refresh-lugano` einrichten.
+   - Header: `Authorization: Bearer <CRON_SECRET>`.
 
 ## Benutzer
 
@@ -122,3 +109,14 @@ App läuft dann unter `http://127.0.0.1:3000`.
 
 - Der gespeicherte Zustand ist für alle angemeldeten Nutzer gemeinsam.
 - Gleichzeitige Änderungen folgen dem „last write wins“-Prinzip.
+
+## QA Checkliste (E-Mail)
+
+- Gmail verbinden -> Label „Lugano“ wird erstellt.
+- Outlook verbinden -> Ordner „Lugano“ wird erstellt.
+- E-Mail in „Lugano“ verschieben -> erscheint unter „Unverknüpfte Lugano-Threads“.
+- Thread verknüpfen -> erscheint unter „Mit dieser Aufgabe verknüpft“.
+- Thread öffnen -> Nachrichten werden angezeigt.
+- Antworten senden -> bei abgelaufener Reauth erscheint 2FA/Passwort-Dialog.
+- Audit-Log-Einträge existieren (CONNECT, LINK, VIEW_THREAD, REPLY_SENT, PAUSE).
+- Pause -> keine Abfragen mehr, Unlinked-Liste bleibt leer.

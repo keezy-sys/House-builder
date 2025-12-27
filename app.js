@@ -708,14 +708,32 @@ const activityNotificationState = {
   userKey: "",
 };
 
-const gmailState = {
-  connected: false,
-  email: "",
-  threadId: null,
-  thread: null,
-  loading: false,
-  threadLoading: false,
+const emailState = {
+  accounts: [],
+  unlinkedThreads: [],
+  linkedThreads: [],
+  activeThread: null,
+  threadMessages: [],
+  loadingAccounts: false,
+  loadingThreads: false,
+  loadingMessages: false,
   error: "",
+};
+
+const securityState = {
+  totpEnabled: false,
+  recoveryCodesRemaining: 0,
+  lastVerifiedAt: null,
+  loading: false,
+  setup: null,
+  recoveryCodes: [],
+};
+
+const reauthState = {
+  isOpen: false,
+  context: "",
+  method: "",
+  onSuccess: null,
 };
 
 const isLocalHost = ["localhost", "127.0.0.1"].includes(
@@ -962,18 +980,20 @@ const elements = {
   taskStartDate: document.getElementById("task-start-date"),
   taskEndDate: document.getElementById("task-end-date"),
   taskDependencyList: document.getElementById("task-dependency-list"),
-  gmailThreadStatus: document.getElementById("gmail-thread-status"),
-  gmailThreadConnectHint: document.getElementById("gmail-thread-connect"),
-  gmailThreadInput: document.getElementById("gmail-thread-input"),
-  gmailThreadPinBtn: document.getElementById("gmail-thread-pin"),
-  gmailThreadClearBtn: document.getElementById("gmail-thread-clear"),
-  gmailThreadRefreshBtn: document.getElementById("gmail-thread-refresh"),
-  gmailThreadView: document.getElementById("gmail-thread-view"),
-  gmailThreadMeta: document.getElementById("gmail-thread-meta"),
-  gmailThreadMessages: document.getElementById("gmail-thread-messages"),
-  gmailReplyText: document.getElementById("gmail-reply-text"),
-  gmailReplySend: document.getElementById("gmail-reply-send"),
-  gmailReplyStatus: document.getElementById("gmail-reply-status"),
+  emailPanelStatus: document.getElementById("email-panel-status"),
+  emailPanelRefresh: document.getElementById("email-panel-refresh"),
+  emailAccounts: document.getElementById("email-accounts"),
+  emailConnectActions: document.getElementById("email-connect-actions"),
+  emailConnectGmail: document.getElementById("email-connect-gmail"),
+  emailConnectMicrosoft: document.getElementById("email-connect-microsoft"),
+  emailUnlinkedThreads: document.getElementById("email-unlinked-threads"),
+  emailLinkedThreads: document.getElementById("email-linked-threads"),
+  emailThreadView: document.getElementById("email-thread-view"),
+  emailThreadMeta: document.getElementById("email-thread-meta"),
+  emailThreadMessages: document.getElementById("email-thread-messages"),
+  emailReplyText: document.getElementById("email-reply-text"),
+  emailReplySend: document.getElementById("email-reply-send"),
+  emailReplyStatus: document.getElementById("email-reply-status"),
   chatModal: document.getElementById("chat-modal"),
   chatModalClose: document.getElementById("chat-modal-close"),
   chatModalTitle: document.getElementById("chat-modal-title"),
@@ -998,21 +1018,43 @@ const elements = {
   authError: document.getElementById("auth-error"),
   authInfo: document.getElementById("auth-info"),
   authUserName: document.getElementById("auth-user-name"),
-  gmailStatus: document.getElementById("gmail-status"),
-  gmailStatusText: document.getElementById("gmail-status-text"),
-  gmailConnectBtn: document.getElementById("gmail-connect"),
-  gmailDisconnectBtn: document.getElementById("gmail-disconnect"),
+  securitySettingsBtn: document.getElementById("security-settings"),
   magicLinkBtn: document.getElementById("magic-link-btn"),
   resetPasswordBtn: document.getElementById("reset-password-btn"),
   passwordResetPanel: document.getElementById("password-reset-panel"),
   passwordResetForm: document.getElementById("password-reset-form"),
   signOutBtn: document.getElementById("sign-out"),
+  securityModal: document.getElementById("security-modal"),
+  securityModalClose: document.getElementById("security-modal-close"),
+  security2faStatus: document.getElementById("security-2fa-status"),
+  security2faStart: document.getElementById("security-2fa-start"),
+  security2faDisable: document.getElementById("security-2fa-disable"),
+  security2faSetup: document.getElementById("security-2fa-setup"),
+  securityQrImage: document.getElementById("security-qr-image"),
+  securitySecret: document.getElementById("security-secret"),
+  security2faCode: document.getElementById("security-2fa-code"),
+  security2faConfirm: document.getElementById("security-2fa-confirm"),
+  securityRecovery: document.getElementById("security-recovery-codes"),
+  securityRecoveryList: document.getElementById("security-recovery-list"),
+  reauthModal: document.getElementById("reauth-modal"),
+  reauthModalClose: document.getElementById("reauth-modal-close"),
+  reauthModalTitle: document.getElementById("reauth-modal-title"),
+  reauthHelper: document.getElementById("reauth-helper"),
+  reauthForm: document.getElementById("reauth-form"),
+  reauthCodeRow: document.getElementById("reauth-code-row"),
+  reauthCodeInput: document.getElementById("reauth-code"),
+  reauthRecoveryRow: document.getElementById("reauth-recovery-row"),
+  reauthRecoveryInput: document.getElementById("reauth-recovery"),
+  reauthPasswordRow: document.getElementById("reauth-password-row"),
+  reauthPasswordInput: document.getElementById("reauth-password"),
+  reauthStatus: document.getElementById("reauth-status"),
 };
 
 const storageKey = "house-builder-state";
 const apiKeyStorageKey = "house-builder-image-api-key";
-const gmailOAuthStateKey = "house-builder-gmail-oauth-state";
-const gmailOAuthCodeKey = "house-builder-gmail-oauth-code";
+const emailOAuthStateKey = "house-builder-email-oauth-state";
+const emailOAuthCodeKey = "house-builder-email-oauth-code";
+const emailOAuthProviderKey = "house-builder-email-oauth-provider";
 
 const defaultRoomData = () => ({
   checklist: [],
@@ -1023,8 +1065,12 @@ const defaultRoomData = () => ({
   scene: null,
 });
 
-const createTaskId = () =>
-  `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const createTaskId = () => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `task-${crypto.randomUUID()}`;
+  }
+  return `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+};
 
 const createActivityId = () =>
   `activity-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -1125,41 +1171,6 @@ const normalizeTaskCosts = (costs) => {
   }, {});
 };
 
-const normalizeGmailThread = (thread) => {
-  if (!thread || typeof thread !== "object") return null;
-  const id =
-    typeof thread.id === "string"
-      ? thread.id.trim()
-      : typeof thread.threadId === "string"
-        ? thread.threadId.trim()
-        : "";
-  if (!id) return null;
-  const subject =
-    typeof thread.subject === "string" ? thread.subject.trim() : "";
-  const snippet =
-    typeof thread.snippet === "string" ? thread.snippet.trim() : "";
-  const lastMessageAt =
-    typeof thread.lastMessageAt === "string" && thread.lastMessageAt.trim()
-      ? thread.lastMessageAt.trim()
-      : null;
-  const ownerId =
-    typeof thread.ownerId === "string" && thread.ownerId.trim()
-      ? thread.ownerId.trim()
-      : null;
-  const ownerEmail =
-    typeof thread.ownerEmail === "string" && thread.ownerEmail.trim()
-      ? thread.ownerEmail.trim()
-      : null;
-  return {
-    id,
-    subject,
-    snippet,
-    lastMessageAt,
-    ownerId,
-    ownerEmail,
-  };
-};
-
 const normalizeChatRole = (value) =>
   value === "assistant" || value === "user" ? value : "user";
 
@@ -1246,7 +1257,6 @@ const buildTaskSearchIndex = (task) => {
     task.assignee,
     Array.isArray(task.tags) ? task.tags.join(" ") : "",
     task.materials?.vendor,
-    task.gmailThread?.subject,
   ];
   return parts
     .map((part) => String(part || "").trim())
@@ -1339,7 +1349,6 @@ const normalizeTask = (task, fallbackTitle) => {
     priority: normalizeTaskPriority(task.priority),
     link: normalizeTaskLink(task.link),
     notes: typeof task.notes === "string" ? task.notes : "",
-    gmailThread: normalizeGmailThread(task.gmailThread),
     chat: normalizeChatThread(task.chat),
     createdAt,
     updatedAt,
@@ -1392,7 +1401,6 @@ const createTask = ({
   priority = DEFAULT_TASK_PRIORITY,
   link = "",
   notes = "",
-  gmailThread = null,
 } = {}) => {
   const timestamp = new Date().toISOString();
   const task = {
@@ -1415,7 +1423,6 @@ const createTask = ({
       : DEFAULT_TASK_PRIORITY,
     link: normalizeTaskLink(link),
     notes: notes || "",
-    gmailThread: normalizeGmailThread(gmailThread),
     chat: null,
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -2514,6 +2521,9 @@ const updateAuthUI = () => {
   if (elements.authInfo) {
     elements.authInfo.hidden = !isAuthed || isRecovery;
   }
+  if (elements.securitySettingsBtn) {
+    elements.securitySettingsBtn.hidden = !isAuthed || isRecovery;
+  }
   if (elements.authUserName) {
     elements.authUserName.textContent =
       isAuthed && !isRecovery ? authState.displayName : "";
@@ -2538,7 +2548,7 @@ const readJson = async (response) => {
   }
 };
 
-const createGmailOAuthState = () => {
+const createEmailOAuthState = () => {
   if (window.crypto?.getRandomValues) {
     const bytes = new Uint8Array(16);
     window.crypto.getRandomValues(bytes);
@@ -2547,49 +2557,165 @@ const createGmailOAuthState = () => {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 };
 
-const setGmailThreadStatus = (message, isError = false) => {
-  if (!elements.gmailThreadStatus) return;
-  elements.gmailThreadStatus.textContent = message || "";
-  elements.gmailThreadStatus.classList.toggle(
+const setEmailPanelStatus = (message, isError = false) => {
+  if (!elements.emailPanelStatus) return;
+  elements.emailPanelStatus.textContent = message || "";
+  elements.emailPanelStatus.classList.toggle(
     "error",
     Boolean(message && isError),
   );
-  elements.gmailThreadStatus.hidden = !message;
+  elements.emailPanelStatus.hidden = !message;
 };
 
-const setGmailReplyStatus = (message, isError = false) => {
-  if (!elements.gmailReplyStatus) return;
-  elements.gmailReplyStatus.textContent = message || "";
-  elements.gmailReplyStatus.classList.toggle(
+const setEmailReplyStatus = (message, isError = false) => {
+  if (!elements.emailReplyStatus) return;
+  elements.emailReplyStatus.textContent = message || "";
+  elements.emailReplyStatus.classList.toggle(
     "error",
     Boolean(message && isError),
   );
-  elements.gmailReplyStatus.hidden = !message;
+  elements.emailReplyStatus.hidden = !message;
 };
 
-const updateGmailHeaderUI = () => {
-  if (!elements.gmailStatus) return;
+const setReauthStatus = (message, isError = false) => {
+  if (!elements.reauthStatus) return;
+  elements.reauthStatus.textContent = message || "";
+  elements.reauthStatus.classList.toggle(
+    "error",
+    Boolean(message && isError),
+  );
+  elements.reauthStatus.hidden = !message;
+};
+
+const setSecurityStatus = (message, isError = false) => {
+  if (!elements.security2faStatus) return;
+  elements.security2faStatus.textContent = message || "";
+  elements.security2faStatus.classList.toggle(
+    "error",
+    Boolean(message && isError),
+  );
+};
+
+const isLocalReauthFresh = () => {
+  const userId = sessionStorage.getItem("2fa_user_id");
+  if (!authState.user || userId !== authState.user.id) return false;
+  const stamp = sessionStorage.getItem("2fa_verified_at");
+  if (!stamp) return false;
+  const timestamp = new Date(stamp).getTime();
+  return (
+    Number.isFinite(timestamp) &&
+    timestamp > Date.now() - 30 * 60 * 1000
+  );
+};
+
+const getProviderLabel = (provider) =>
+  provider === "gmail" ? "Gmail" : "Outlook";
+
+const requestEmailReauth = (method) => {
+  if (reauthState.isOpen) return;
+  openReauthModal({
+    context: "email",
+    method: method || "totp",
+    onSuccess: async () => {
+      const task = getTaskFromModal();
+      if (task) {
+        await refreshEmailPanel(task, { force: true });
+      } else {
+        await loadEmailAccounts();
+      }
+    },
+  });
+};
+
+const handleEmailReauthRequired = (response, data) => {
+  if (response.status === 401 && data?.requiresReauth) {
+    requestEmailReauth(data?.method || "totp");
+    return true;
+  }
+  return false;
+};
+
+const updateEmailConnectActions = () => {
+  if (!elements.emailConnectActions) return;
+  const hasGmail = emailState.accounts.some(
+    (account) => account.provider === "gmail",
+  );
+  const hasMicrosoft = emailState.accounts.some(
+    (account) => account.provider === "microsoft",
+  );
+  if (elements.emailConnectGmail) {
+    elements.emailConnectGmail.hidden = hasGmail;
+  }
+  if (elements.emailConnectMicrosoft) {
+    elements.emailConnectMicrosoft.hidden = hasMicrosoft;
+  }
   const isAuthed = Boolean(authState.user) && !authState.isRecovery;
-  elements.gmailStatus.hidden = !isAuthed;
-  if (!isAuthed) return;
-  const connected = gmailState.connected;
-  const errorMessage = gmailState.error;
-  if (elements.gmailStatusText) {
-    const statusText = connected
-      ? `Verbunden: ${gmailState.email || "Gmail"}`
-      : "Nicht verbunden";
-    elements.gmailStatusText.textContent = errorMessage || statusText;
-    elements.gmailStatusText.classList.toggle("error", Boolean(errorMessage));
-  }
-  if (elements.gmailConnectBtn) {
-    elements.gmailConnectBtn.hidden = connected;
-  }
-  if (elements.gmailDisconnectBtn) {
-    elements.gmailDisconnectBtn.hidden = !connected;
-  }
+  elements.emailConnectActions.hidden = !isAuthed;
 };
 
-const captureGmailOAuthParams = () => {
+const renderEmailAccounts = () => {
+  if (!elements.emailAccounts) return;
+  elements.emailAccounts.innerHTML = "";
+  if (!authState.user) return;
+  if (!emailState.accounts.length) {
+    const note = document.createElement("p");
+    note.className = "helper";
+    note.textContent = "Noch keine E-Mail-Konten verbunden.";
+    elements.emailAccounts.appendChild(note);
+    return;
+  }
+  emailState.accounts.forEach((account) => {
+    const row = document.createElement("div");
+    row.className = "email-account-row";
+    const meta = document.createElement("div");
+    meta.className = "email-account-meta";
+    const provider = document.createElement("div");
+    provider.className = "email-account-provider";
+    provider.textContent = getProviderLabel(account.provider);
+    const status = document.createElement("div");
+    status.className = "email-account-status";
+    const address = account.emailAddress || "Verbunden";
+    status.textContent = account.isPaused
+      ? `Pausiert · ${address}`
+      : account.emailAddress
+        ? `Verbunden als ${account.emailAddress}`
+        : address;
+    meta.appendChild(provider);
+    meta.appendChild(status);
+    row.appendChild(meta);
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.textContent = account.isPaused ? "Fortsetzen" : "Pausieren";
+    toggle.addEventListener("click", () => void toggleEmailPause(account));
+    row.appendChild(toggle);
+    elements.emailAccounts.appendChild(row);
+  });
+};
+
+const resetEmailState = () => {
+  emailState.accounts = [];
+  emailState.unlinkedThreads = [];
+  emailState.linkedThreads = [];
+  emailState.activeThread = null;
+  emailState.threadMessages = [];
+  emailState.loadingAccounts = false;
+  emailState.loadingThreads = false;
+  emailState.loadingMessages = false;
+  emailState.error = "";
+  setEmailPanelStatus("", false);
+  setEmailReplyStatus("", false);
+  if (elements.emailUnlinkedThreads) {
+    elements.emailUnlinkedThreads.innerHTML = "";
+  }
+  if (elements.emailLinkedThreads) {
+    elements.emailLinkedThreads.innerHTML = "";
+  }
+  clearEmailThreadView();
+  updateEmailConnectActions();
+  renderEmailAccounts();
+};
+
+const captureEmailOAuthParams = () => {
   const params = new URLSearchParams(window.location.search);
   const code = params.get("code");
   const stateParam = params.get("state");
@@ -2597,16 +2723,19 @@ const captureGmailOAuthParams = () => {
   if (!code && !error) return;
 
   if (error) {
-    gmailState.error = "Gmail-Verbindung abgebrochen.";
-    sessionStorage.removeItem(gmailOAuthCodeKey);
+    emailState.error = "E-Mail-Verbindung abgebrochen.";
+    sessionStorage.removeItem(emailOAuthCodeKey);
+    sessionStorage.removeItem(emailOAuthProviderKey);
   } else if (code) {
-    const storedState = sessionStorage.getItem(gmailOAuthStateKey);
+    const storedState = sessionStorage.getItem(emailOAuthStateKey);
+    const storedProvider = sessionStorage.getItem(emailOAuthProviderKey);
     if (storedState && stateParam && storedState !== stateParam) {
-      gmailState.error =
-        "Gmail-Verbindung fehlgeschlagen. Bitte erneut verbinden.";
-      sessionStorage.removeItem(gmailOAuthCodeKey);
-    } else {
-      sessionStorage.setItem(gmailOAuthCodeKey, code);
+      emailState.error =
+        "E-Mail-Verbindung fehlgeschlagen. Bitte erneut verbinden.";
+      sessionStorage.removeItem(emailOAuthCodeKey);
+      sessionStorage.removeItem(emailOAuthProviderKey);
+    } else if (storedProvider) {
+      sessionStorage.setItem(emailOAuthCodeKey, code);
     }
   }
 
@@ -2614,53 +2743,286 @@ const captureGmailOAuthParams = () => {
   const url = new URL(window.location.href);
   url.search = params.toString();
   window.history.replaceState({}, "", url.toString());
+  if (emailState.error) {
+    setEmailPanelStatus(emailState.error, true);
+  }
 };
 
-const loadGmailStatus = async () => {
+const exchangeEmailCode = async (provider, code) => {
+  const token = getAuthToken();
+  if (!token) return;
+  try {
+    const response = await fetch(
+      `/api/email/oauth/${provider}/callback?code=${encodeURIComponent(code)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+    const data = await readJson(response);
+    if (!response.ok) {
+      throw new Error("E-Mail-Verbindung fehlgeschlagen.");
+    }
+    emailState.error = "";
+    sessionStorage.removeItem(emailOAuthCodeKey);
+    sessionStorage.removeItem(emailOAuthProviderKey);
+    sessionStorage.removeItem(emailOAuthStateKey);
+    await loadEmailAccounts();
+    const activeTask = getTaskFromModal();
+    if (activeTask) {
+      await refreshEmailPanel(activeTask, { force: true });
+    }
+  } catch (error) {
+    emailState.error = error?.message || "E-Mail-Verbindung fehlgeschlagen.";
+    setEmailPanelStatus(emailState.error, true);
+  }
+};
+
+const completePendingEmailOAuth = async () => {
+  const code = sessionStorage.getItem(emailOAuthCodeKey);
+  const provider = sessionStorage.getItem(emailOAuthProviderKey);
+  if (!code || !provider) return;
+  await exchangeEmailCode(provider, code);
+};
+
+const startEmailConnect = async (provider) => {
   if (!authState.user) {
-    gmailState.connected = false;
-    gmailState.email = "";
-    updateGmailHeaderUI();
+    window.alert("Bitte zuerst anmelden.");
+    return;
+  }
+  const token = getAuthToken();
+  if (!token) {
+    setEmailPanelStatus(
+      "Anmeldung abgelaufen. Bitte erneut anmelden.",
+      true,
+    );
+    return;
+  }
+  const stateToken = createEmailOAuthState();
+  sessionStorage.setItem(emailOAuthStateKey, stateToken);
+  sessionStorage.setItem(emailOAuthProviderKey, provider);
+  try {
+    const response = await fetch(
+      `/api/email/oauth/${provider}/start?state=${encodeURIComponent(
+        stateToken,
+      )}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+    const data = await readJson(response);
+    if (!response.ok || !data?.url) {
+      throw new Error("OAuth konnte nicht gestartet werden.");
+    }
+    window.location.assign(data.url);
+  } catch (error) {
+    setEmailPanelStatus(
+      error?.message || "OAuth konnte nicht gestartet werden.",
+      true,
+    );
+  }
+};
+
+const loadEmailAccounts = async () => {
+  if (!authState.user) {
+    resetEmailState();
     return;
   }
   const token = getAuthToken();
   if (!token) return;
-  gmailState.loading = true;
+  emailState.loadingAccounts = true;
   try {
-    const response = await fetch("/api/gmail/status", {
+    const response = await fetch("/api/email/accounts", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const data = await readJson(response);
+    if (handleEmailReauthRequired(response, data)) {
+      return;
+    }
+    if (!response.ok) {
+      throw new Error("Konten konnten nicht geladen werden.");
+    }
+    emailState.accounts = Array.isArray(data?.accounts) ? data.accounts : [];
+    emailState.error = "";
+  } catch (error) {
+    emailState.accounts = [];
+    emailState.error =
+      error?.message || "Konten konnten nicht geladen werden.";
+    setEmailPanelStatus(emailState.error, true);
+  } finally {
+    emailState.loadingAccounts = false;
+    renderEmailAccounts();
+    updateEmailConnectActions();
+  }
+};
+
+const toggleEmailPause = async (account) => {
+  const token = getAuthToken();
+  if (!token) return;
+  const action = account.isPaused ? "unpause" : "pause";
+  try {
+    const response = await fetch(
+      `/api/email/accounts/${encodeURIComponent(account.id)}/${action}`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+    const data = await readJson(response);
+    if (handleEmailReauthRequired(response, data)) {
+      return;
+    }
+    if (!response.ok) {
+      throw new Error("Status konnte nicht geändert werden.");
+    }
+    await loadEmailAccounts();
+    const activeTask = getTaskFromModal();
+    if (activeTask) {
+      await refreshEmailPanel(activeTask, { force: true });
+    }
+  } catch (error) {
+    setEmailPanelStatus(
+      error?.message || "Status konnte nicht geändert werden.",
+      true,
+    );
+  }
+};
+
+const loadSecuritySettings = async () => {
+  if (!authState.user) {
+    securityState.totpEnabled = false;
+    securityState.recoveryCodesRemaining = 0;
+    securityState.lastVerifiedAt = null;
+    securityState.setup = null;
+    securityState.recoveryCodes = [];
+    renderSecurityPanel();
+    return;
+  }
+  const token = getAuthToken();
+  if (!token) return;
+  securityState.loading = true;
+  try {
+    const response = await fetch("/api/security/settings", {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     });
     const data = await readJson(response);
     if (!response.ok) {
-      throw new Error(
-        data?.error || "Gmail-Status konnte nicht geladen werden.",
-      );
+      throw new Error("Sicherheitsstatus konnte nicht geladen werden.");
     }
-    gmailState.connected = Boolean(data?.connected);
-    gmailState.email = data?.email || "";
-    gmailState.error = "";
+    securityState.totpEnabled = Boolean(data?.totpEnabled);
+    securityState.recoveryCodesRemaining = Number(
+      data?.recoveryCodesRemaining || 0,
+    );
+    securityState.lastVerifiedAt = data?.lastVerifiedAt || null;
+    securityState.setup = null;
+    securityState.recoveryCodes = [];
   } catch (error) {
-    gmailState.connected = false;
-    gmailState.email = "";
-    gmailState.error =
-      error?.message || "Gmail-Status konnte nicht geladen werden.";
+    securityState.totpEnabled = false;
+    securityState.recoveryCodesRemaining = 0;
+    securityState.lastVerifiedAt = null;
+    securityState.setup = null;
+    securityState.recoveryCodes = [];
   } finally {
-    gmailState.loading = false;
-    updateGmailHeaderUI();
-    const activeTask = getTaskFromModal();
-    if (activeTask) {
-      void renderGmailThreadPanel(activeTask, { forceRefresh: false });
-    }
+    securityState.loading = false;
+    renderSecurityPanel();
   }
 };
 
-const exchangeGmailCode = async (code) => {
+const renderSecurityPanel = () => {
+  const enabled = securityState.totpEnabled;
+  setSecurityStatus(
+    enabled
+      ? `2FA ist aktiv. ${securityState.recoveryCodesRemaining} Recovery-Codes verfügbar.`
+      : "2FA ist nicht aktiviert.",
+    false,
+  );
+  if (elements.security2faStart) {
+    elements.security2faStart.hidden = enabled;
+  }
+  if (elements.security2faDisable) {
+    elements.security2faDisable.hidden = !enabled;
+  }
+  if (elements.security2faSetup) {
+    elements.security2faSetup.hidden = !securityState.setup;
+  }
+  if (elements.securityQrImage) {
+    if (securityState.setup?.qrDataUrl) {
+      elements.securityQrImage.src = securityState.setup.qrDataUrl;
+    } else {
+      elements.securityQrImage.removeAttribute("src");
+    }
+  }
+  if (elements.securitySecret) {
+    elements.securitySecret.textContent = securityState.setup?.secret || "";
+  }
+  if (elements.securityRecovery) {
+    elements.securityRecovery.hidden = !securityState.recoveryCodes.length;
+  }
+  if (elements.securityRecoveryList) {
+    elements.securityRecoveryList.innerHTML = "";
+    securityState.recoveryCodes.forEach((code) => {
+      const item = document.createElement("li");
+      item.textContent = code;
+      elements.securityRecoveryList.appendChild(item);
+    });
+  }
+};
+
+const openSecurityModal = () => {
+  if (!elements.securityModal) return;
+  elements.securityModal.hidden = false;
+  void loadSecuritySettings();
+};
+
+const closeSecurityModal = () => {
+  if (!elements.securityModal) return;
+  elements.securityModal.hidden = true;
+};
+
+const handleSecurityStart = async () => {
   const token = getAuthToken();
   if (!token) return;
   try {
-    const response = await fetch("/api/gmail/token", {
+    const response = await fetch("/api/security/totp/setup", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const data = await readJson(response);
+    if (!response.ok) {
+      throw new Error("Setup konnte nicht gestartet werden.");
+    }
+    securityState.setup = data;
+    securityState.recoveryCodes = [];
+    renderSecurityPanel();
+  } catch (error) {
+    setSecurityStatus(
+      error?.message || "Setup konnte nicht gestartet werden.",
+      true,
+    );
+  }
+};
+
+const handleSecurityConfirm = async () => {
+  const token = getAuthToken();
+  if (!token || !elements.security2faCode) return;
+  const code = elements.security2faCode.value.trim();
+  if (!code) {
+    setSecurityStatus("Bitte Code eingeben.", true);
+    return;
+  }
+  try {
+    const response = await fetch("/api/security/totp/confirm", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -2670,102 +3032,186 @@ const exchangeGmailCode = async (code) => {
     });
     const data = await readJson(response);
     if (!response.ok) {
-      throw new Error(data?.error || "Gmail-Verbindung fehlgeschlagen.");
+      throw new Error("Code konnte nicht bestätigt werden.");
     }
-    gmailState.connected = Boolean(data?.connected);
-    gmailState.email = data?.email || "";
-    gmailState.error = "";
-    sessionStorage.removeItem(gmailOAuthCodeKey);
+    securityState.totpEnabled = true;
+    securityState.setup = null;
+    securityState.recoveryCodes = Array.isArray(data?.recoveryCodes)
+      ? data.recoveryCodes
+      : [];
+    securityState.recoveryCodesRemaining = securityState.recoveryCodes.length;
+    const verifiedAt = new Date().toISOString();
+    securityState.lastVerifiedAt = verifiedAt;
+    sessionStorage.setItem("2fa_verified_at", verifiedAt);
+    if (authState.user?.id) {
+      sessionStorage.setItem("2fa_user_id", authState.user.id);
+    }
+    if (elements.security2faCode) {
+      elements.security2faCode.value = "";
+    }
+    renderSecurityPanel();
   } catch (error) {
-    gmailState.error = error?.message || "Gmail-Verbindung fehlgeschlagen.";
-  } finally {
-    updateGmailHeaderUI();
-    const activeTask = getTaskFromModal();
-    if (activeTask) {
-      void renderGmailThreadPanel(activeTask, { forceRefresh: false });
-    }
-  }
-};
-
-const completePendingGmailOAuth = async () => {
-  const code = sessionStorage.getItem(gmailOAuthCodeKey);
-  if (!code) return;
-  await exchangeGmailCode(code);
-};
-
-const startGmailConnect = async () => {
-  if (!authState.user) {
-    window.alert("Bitte zuerst anmelden.");
-    return;
-  }
-  gmailState.error = "";
-  updateGmailHeaderUI();
-  const token = getAuthToken();
-  if (!token) {
-    gmailState.error = "Anmeldung abgelaufen. Bitte erneut anmelden.";
-    updateGmailHeaderUI();
-    setGmailThreadStatus(gmailState.error, true);
-    return;
-  }
-  const stateToken = createGmailOAuthState();
-  sessionStorage.setItem(gmailOAuthStateKey, stateToken);
-  try {
-    const response = await fetch(
-      `/api/gmail/auth?state=${encodeURIComponent(stateToken)}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
+    setSecurityStatus(
+      error?.message || "Code konnte nicht bestätigt werden.",
+      true,
     );
-    const data = await readJson(response);
-    if (!response.ok || !data?.url) {
-      throw new Error(
-        data?.error || "Gmail-Auth konnte nicht gestartet werden.",
-      );
-    }
-    window.location.assign(data.url);
-  } catch (error) {
-    gmailState.error =
-      error?.message || "Gmail-Auth konnte nicht gestartet werden.";
-    setGmailThreadStatus(gmailState.error, true);
-  } finally {
-    updateGmailHeaderUI();
   }
 };
 
-const disconnectGmail = async () => {
-  if (!authState.user) return;
+const handleSecurityDisable = () => {
+  openReauthModal({
+    context: "disable-2fa",
+    method: "totp",
+  });
+};
+
+const openReauthModal = ({ context, method, onSuccess } = {}) => {
+  if (!elements.reauthModal) return;
+  const resolvedMethod = method || "totp";
+  reauthState.isOpen = true;
+  reauthState.context = context || "";
+  reauthState.method = resolvedMethod;
+  reauthState.onSuccess = onSuccess || null;
+  if (elements.reauthModalTitle) {
+    elements.reauthModalTitle.textContent =
+      context === "reply"
+        ? "Antwort bestätigen"
+        : context === "disable-2fa"
+          ? "2FA deaktivieren"
+          : "Zwei-Faktor-Bestätigung";
+  }
+  if (elements.reauthHelper) {
+    elements.reauthHelper.textContent =
+      context === "reply"
+        ? "Bitte bestätigen, um die Antwort zu senden."
+        : context === "disable-2fa"
+          ? "Bitte TOTP-Code eingeben, um 2FA zu deaktivieren."
+          : resolvedMethod === "password"
+            ? "Bitte Passwort eingeben, um fortzufahren."
+            : "Bitte 2FA-Code eingeben, um fortzufahren.";
+  }
+  if (elements.reauthCodeRow) {
+    elements.reauthCodeRow.hidden = resolvedMethod !== "totp";
+  }
+  if (elements.reauthRecoveryRow) {
+    elements.reauthRecoveryRow.hidden =
+      resolvedMethod !== "totp" || context === "disable-2fa";
+  }
+  if (elements.reauthPasswordRow) {
+    elements.reauthPasswordRow.hidden = resolvedMethod !== "password";
+  }
+  if (elements.reauthCodeInput) elements.reauthCodeInput.value = "";
+  if (elements.reauthRecoveryInput) elements.reauthRecoveryInput.value = "";
+  if (elements.reauthPasswordInput) elements.reauthPasswordInput.value = "";
+  setReauthStatus("", false);
+  elements.reauthModal.hidden = false;
+  if (resolvedMethod === "password") {
+    elements.reauthPasswordInput?.focus();
+  } else {
+    elements.reauthCodeInput?.focus();
+  }
+};
+
+const closeReauthModal = (force = false) => {
+  if (!elements.reauthModal) return;
+  if (!force && reauthState.context === "login") return;
+  elements.reauthModal.hidden = true;
+  reauthState.isOpen = false;
+  reauthState.context = "";
+  reauthState.method = "";
+  reauthState.onSuccess = null;
+  setReauthStatus("", false);
+};
+
+const handleReauthSubmit = async (event) => {
+  event.preventDefault();
   const token = getAuthToken();
   if (!token) return;
-  const confirmDisconnect = window.confirm(
-    "Gmail-Verbindung wirklich trennen?",
-  );
-  if (!confirmDisconnect) return;
+  const code = String(elements.reauthCodeInput?.value || "").trim();
+  const recovery = String(elements.reauthRecoveryInput?.value || "").trim();
+  const password = String(elements.reauthPasswordInput?.value || "").trim();
+
+  if (reauthState.context === "disable-2fa") {
+    if (!code) {
+      setReauthStatus("Bitte TOTP-Code eingeben.", true);
+      return;
+    }
+    try {
+      const response = await fetch("/api/security/totp/disable", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ code }),
+      });
+      const data = await readJson(response);
+      if (!response.ok) {
+        throw new Error("2FA konnte nicht deaktiviert werden.");
+      }
+      securityState.totpEnabled = false;
+      securityState.recoveryCodesRemaining = 0;
+      securityState.recoveryCodes = [];
+      securityState.lastVerifiedAt = null;
+      securityState.setup = null;
+      renderSecurityPanel();
+      closeReauthModal(true);
+    } catch (error) {
+      setReauthStatus(
+        error?.message || "2FA konnte nicht deaktiviert werden.",
+        true,
+      );
+    }
+    return;
+  }
+
   try {
-    const response = await fetch("/api/gmail/account", {
-      method: "DELETE",
+    if (reauthState.method === "password" && !password) {
+      setReauthStatus("Bitte Passwort eingeben.", true);
+      return;
+    }
+    if (reauthState.method !== "password" && !code && !recovery) {
+      setReauthStatus("Bitte Code eingeben.", true);
+      return;
+    }
+    const payload =
+      reauthState.method === "password"
+        ? { password }
+        : code
+          ? { code }
+          : { recoveryCode: recovery };
+    const response = await fetch("/api/security/reauth", {
+      method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
+      body: JSON.stringify(payload),
     });
     const data = await readJson(response);
     if (!response.ok) {
-      throw new Error(data?.error || "Gmail konnte nicht getrennt werden.");
+      throw new Error("Bestätigung fehlgeschlagen.");
     }
-    gmailState.connected = false;
-    gmailState.email = "";
-    gmailState.thread = null;
-    gmailState.threadId = null;
-    gmailState.error = "";
+    const verifiedAt = data?.verifiedAt || new Date().toISOString();
+    sessionStorage.setItem("2fa_verified_at", verifiedAt);
+    if (authState.user?.id) {
+      sessionStorage.setItem("2fa_user_id", authState.user.id);
+    }
+    securityState.lastVerifiedAt = verifiedAt;
+    if (Number.isFinite(data?.recoveryCodesRemaining)) {
+      securityState.recoveryCodesRemaining = data.recoveryCodesRemaining;
+    }
+    closeReauthModal(true);
+    if (typeof reauthState.onSuccess === "function") {
+      const handler = reauthState.onSuccess;
+      reauthState.onSuccess = null;
+      await handler();
+    }
   } catch (error) {
-    gmailState.error = error?.message || "Gmail konnte nicht getrennt werden.";
-  } finally {
-    updateGmailHeaderUI();
-    const activeTask = getTaskFromModal();
-    if (activeTask) {
-      void renderGmailThreadPanel(activeTask, { forceRefresh: false });
-    }
+    setReauthStatus(
+      error?.message || "Bestätigung fehlgeschlagen.",
+      true,
+    );
   }
 };
 
@@ -3039,30 +3485,34 @@ const handleSessionChange = async (session) => {
   authState.user = session?.user ?? null;
   authState.displayName = authState.user ? getDisplayName(authState.user) : "";
   updateAuthUI();
-  updateGmailHeaderUI();
   if (authState.user) {
     setAuthMessage("", false);
   }
 
   if (!authState.user) {
     resetActivityNotificationState();
-    gmailState.connected = false;
-    gmailState.email = "";
-    gmailState.thread = null;
-    gmailState.threadId = null;
-    gmailState.error = "";
-    updateGmailHeaderUI();
+    resetEmailState();
+    securityState.totpEnabled = false;
+    securityState.recoveryCodesRemaining = 0;
+    securityState.lastVerifiedAt = null;
+    securityState.setup = null;
+    securityState.recoveryCodes = [];
+    sessionStorage.removeItem("2fa_verified_at");
+    sessionStorage.removeItem("2fa_user_id");
+    closeReauthModal(true);
     clearStateSubscription();
     return;
   }
 
-  await completePendingGmailOAuth();
-  await loadGmailStatus();
+  await completePendingEmailOAuth();
+  await loadEmailAccounts();
+  await loadSecuritySettings();
+  if (!authState.isRecovery && securityState.totpEnabled && !isLocalReauthFresh()) {
+    openReauthModal({ context: "login", method: "totp" });
+  }
 
   if (authState.user.id !== previousUserId) {
     resetActivityNotificationState();
-    gmailState.thread = null;
-    gmailState.threadId = null;
     await loadRemoteState();
     subscribeToStateChanges();
   }
@@ -6551,131 +7001,254 @@ const getTaskFromModal = () => {
   return state.tasks.find((item) => item.id === taskId) || null;
 };
 
-const parseGmailThreadId = (value) => {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  if (!raw.includes("mail.google.com")) {
-    return raw;
-  }
-  try {
-    const url = new URL(raw);
-    const hash = url.hash.replace(/^#/, "");
-    if (hash) {
-      const parts = hash.split("/").filter(Boolean);
-      return parts[parts.length - 1] || "";
-    }
-    const threadParam = url.searchParams.get("th");
-    return threadParam ? threadParam.trim() : raw;
-  } catch {
-    return raw;
-  }
+const setEmailThreadViewVisible = (isVisible) => {
+  if (!elements.emailThreadView) return;
+  elements.emailThreadView.hidden = !isVisible;
 };
 
-const isGmailThreadOwner = (thread) => {
-  if (!thread?.ownerId) return true;
-  return thread.ownerId === authState.user?.id;
-};
-
-const setGmailThreadViewVisible = (isVisible) => {
-  if (!elements.gmailThreadView) return;
-  elements.gmailThreadView.hidden = !isVisible;
-};
-
-const clearGmailThreadView = () => {
-  if (elements.gmailThreadMeta) {
-    elements.gmailThreadMeta.innerHTML = "";
+const clearEmailThreadView = () => {
+  if (elements.emailThreadMeta) {
+    elements.emailThreadMeta.innerHTML = "";
   }
-  if (elements.gmailThreadMessages) {
-    elements.gmailThreadMessages.innerHTML = "";
+  if (elements.emailThreadMessages) {
+    elements.emailThreadMessages.innerHTML = "";
   }
-  setGmailThreadViewVisible(false);
+  if (elements.emailReplyText) {
+    elements.emailReplyText.disabled = true;
+  }
+  if (elements.emailReplySend) {
+    elements.emailReplySend.disabled = true;
+  }
+  setEmailReplyStatus("", false);
+  setEmailThreadViewVisible(false);
 };
 
-const renderGmailThreadMeta = (task, thread) => {
-  if (!elements.gmailThreadMeta) return;
-  elements.gmailThreadMeta.innerHTML = "";
-  if (!thread && !task?.gmailThread) return;
+const renderEmailThreadMeta = (link) => {
+  if (!elements.emailThreadMeta) return;
+  elements.emailThreadMeta.innerHTML = "";
+  if (!link) return;
 
-  const subject =
-    thread?.subject || task?.gmailThread?.subject || "Gmail-Thread";
+  const subject = link.subject || "E-Mail-Thread";
   const subjectEl = document.createElement("div");
   subjectEl.textContent = subject;
-  elements.gmailThreadMeta.appendChild(subjectEl);
+  elements.emailThreadMeta.appendChild(subjectEl);
 
-  const snippet = thread?.snippet || task?.gmailThread?.snippet;
-  if (snippet) {
+  if (link.last_snippet) {
     const snippetEl = document.createElement("div");
-    snippetEl.textContent = snippet;
-    elements.gmailThreadMeta.appendChild(snippetEl);
+    snippetEl.textContent = link.last_snippet;
+    elements.emailThreadMeta.appendChild(snippetEl);
   }
 
-  const lastMessageAt =
-    thread?.lastMessageAt || task?.gmailThread?.lastMessageAt || "";
-  if (lastMessageAt) {
-    const time = document.createElement("div");
-    time.textContent = `Letzte Mail: ${formatActivityTimestamp(lastMessageAt)}`;
-    elements.gmailThreadMeta.appendChild(time);
+  const metaLine = [];
+  if (link.provider) {
+    metaLine.push(getProviderLabel(link.provider));
   }
-
-  const ownerEmail = task?.gmailThread?.ownerEmail;
-  if (ownerEmail) {
-    const owner = document.createElement("div");
-    owner.textContent = `Angeheftet von ${ownerEmail}`;
-    elements.gmailThreadMeta.appendChild(owner);
+  if (link.last_message_at) {
+    metaLine.push(formatActivityTimestamp(link.last_message_at));
+  }
+  if (metaLine.length) {
+    const metaEl = document.createElement("div");
+    metaEl.textContent = metaLine.join(" · ");
+    elements.emailThreadMeta.appendChild(metaEl);
   }
 };
 
-const renderGmailThreadMessages = (thread) => {
-  if (!elements.gmailThreadMessages) return;
-  elements.gmailThreadMessages.innerHTML = "";
-  const messages = Array.isArray(thread?.messages) ? thread.messages : [];
-  if (!messages.length) {
+const renderEmailThreadMessages = () => {
+  if (!elements.emailThreadMessages) return;
+  elements.emailThreadMessages.innerHTML = "";
+  if (!emailState.threadMessages.length) {
     const empty = document.createElement("li");
     empty.className = "helper";
     empty.textContent = "Keine Nachrichten gefunden.";
-    elements.gmailThreadMessages.appendChild(empty);
+    elements.emailThreadMessages.appendChild(empty);
     return;
   }
-
-  messages.forEach((message) => {
+  emailState.threadMessages.forEach((message) => {
     const item = document.createElement("li");
-    item.className = "gmail-message";
+    item.className = "email-message";
 
     const header = document.createElement("div");
-    header.className = "gmail-message-header";
+    header.className = "email-message-header";
     const from = document.createElement("span");
-    from.textContent = message?.headers?.from || "Unbekannt";
+    const fromText =
+      message?.from?.email || message?.from?.name || "Unbekannt";
+    from.textContent = fromText;
     const date = document.createElement("span");
-    date.textContent = message?.internalDate
-      ? formatActivityTimestamp(message.internalDate)
-      : message?.headers?.date || "";
+    date.textContent = message?.sentAt
+      ? formatActivityTimestamp(message.sentAt)
+      : "";
     header.appendChild(from);
     header.appendChild(date);
     item.appendChild(header);
 
-    const subject = message?.headers?.subject;
-    if (subject) {
+    if (message.subject) {
       const subjectEl = document.createElement("div");
-      subjectEl.className = "gmail-message-subject";
-      subjectEl.textContent = subject;
+      subjectEl.className = "email-message-subject";
+      subjectEl.textContent = message.subject;
       item.appendChild(subjectEl);
     }
 
-    const snippet = document.createElement("div");
-    snippet.textContent = message?.snippet || "";
-    item.appendChild(snippet);
+    const body = document.createElement("div");
+    body.textContent = message.bodyText || message.snippet || "";
+    item.appendChild(body);
 
-    elements.gmailThreadMessages.appendChild(item);
+    elements.emailThreadMessages.appendChild(item);
   });
 };
 
-const requestGmailThread = async (threadId) => {
-  const token = getAuthToken();
-  if (!token) {
-    throw new Error("Nicht angemeldet.");
+const renderEmailThreadView = () => {
+  if (!emailState.activeThread) {
+    clearEmailThreadView();
+    return;
   }
+  renderEmailThreadMeta(emailState.activeThread);
+  renderEmailThreadMessages();
+  if (elements.emailReplyText) {
+    elements.emailReplyText.disabled = false;
+  }
+  if (elements.emailReplySend) {
+    elements.emailReplySend.disabled = false;
+  }
+  setEmailThreadViewVisible(true);
+};
+
+const renderUnlinkedThreads = (task) => {
+  if (!elements.emailUnlinkedThreads) return;
+  elements.emailUnlinkedThreads.innerHTML = "";
+  if (!authState.user) {
+    const note = document.createElement("li");
+    note.className = "helper";
+    note.textContent = "Bitte anmelden, um E-Mails zu sehen.";
+    elements.emailUnlinkedThreads.appendChild(note);
+    return;
+  }
+  if (!emailState.unlinkedThreads.length) {
+    const empty = document.createElement("li");
+    empty.className = "helper";
+    empty.textContent = "Keine unverknüpften Threads gefunden.";
+    elements.emailUnlinkedThreads.appendChild(empty);
+    return;
+  }
+
+  emailState.unlinkedThreads.forEach((thread) => {
+    const item = document.createElement("li");
+    item.className = "email-thread-item";
+
+    const body = document.createElement("div");
+    body.className = "email-thread-body";
+    const subject = document.createElement("div");
+    subject.className = "email-thread-subject";
+    subject.textContent = thread.subject || "E-Mail-Thread";
+    body.appendChild(subject);
+    if (thread.snippet) {
+      const snippet = document.createElement("div");
+      snippet.className = "email-thread-snippet";
+      snippet.textContent = thread.snippet;
+      body.appendChild(snippet);
+    }
+    const metaLine = [];
+    if (thread.provider) {
+      metaLine.push(getProviderLabel(thread.provider));
+    }
+    if (thread.lastMessageAt) {
+      metaLine.push(formatActivityTimestamp(thread.lastMessageAt));
+    }
+    if (metaLine.length) {
+      const meta = document.createElement("div");
+      meta.className = "email-thread-meta-line";
+      meta.textContent = metaLine.join(" · ");
+      body.appendChild(meta);
+    }
+    item.appendChild(body);
+
+    const actions = document.createElement("div");
+    actions.className = "email-thread-actions";
+    const linkButton = document.createElement("button");
+    linkButton.type = "button";
+    linkButton.textContent = "Mit dieser Aufgabe verknüpfen";
+    linkButton.addEventListener("click", () => {
+      if (!task) return;
+      void handleEmailLink(task.id, thread.provider, thread.id);
+    });
+    actions.appendChild(linkButton);
+    item.appendChild(actions);
+
+    elements.emailUnlinkedThreads.appendChild(item);
+  });
+};
+
+const renderLinkedThreads = () => {
+  if (!elements.emailLinkedThreads) return;
+  elements.emailLinkedThreads.innerHTML = "";
+  if (!authState.user) return;
+  if (!emailState.linkedThreads.length) {
+    const empty = document.createElement("li");
+    empty.className = "helper";
+    empty.textContent = "Noch keine Threads verknüpft.";
+    elements.emailLinkedThreads.appendChild(empty);
+    return;
+  }
+  emailState.linkedThreads.forEach((link) => {
+    const item = document.createElement("li");
+    item.className = "email-thread-item";
+    if (emailState.activeThread?.id === link.id) {
+      item.classList.add("is-active");
+    }
+
+    const body = document.createElement("div");
+    body.className = "email-thread-body";
+    const subject = document.createElement("div");
+    subject.className = "email-thread-subject";
+    subject.textContent = link.subject || "E-Mail-Thread";
+    body.appendChild(subject);
+    if (link.last_snippet) {
+      const snippet = document.createElement("div");
+      snippet.className = "email-thread-snippet";
+      snippet.textContent = link.last_snippet;
+      body.appendChild(snippet);
+    }
+    const metaLine = [];
+    if (link.provider) {
+      metaLine.push(getProviderLabel(link.provider));
+    }
+    if (link.last_message_at) {
+      metaLine.push(formatActivityTimestamp(link.last_message_at));
+    }
+    if (metaLine.length) {
+      const meta = document.createElement("div");
+      meta.className = "email-thread-meta-line";
+      meta.textContent = metaLine.join(" · ");
+      body.appendChild(meta);
+    }
+    item.appendChild(body);
+
+    const actions = document.createElement("div");
+    actions.className = "email-thread-actions";
+    const openButton = document.createElement("button");
+    openButton.type = "button";
+    openButton.textContent = "Öffnen";
+    openButton.addEventListener("click", () => {
+      void openEmailThread(link);
+    });
+    const unlinkButton = document.createElement("button");
+    unlinkButton.type = "button";
+    unlinkButton.textContent = "Lösen";
+    unlinkButton.addEventListener("click", () => {
+      void handleEmailUnlink(link.id);
+    });
+    actions.appendChild(openButton);
+    actions.appendChild(unlinkButton);
+    item.appendChild(actions);
+
+    elements.emailLinkedThreads.appendChild(item);
+  });
+};
+
+const loadLinkedThreads = async (taskId) => {
+  const token = getAuthToken();
+  if (!token) return;
   const response = await fetch(
-    `/api/gmail/thread/${encodeURIComponent(threadId)}`,
+    `/api/tasks/${encodeURIComponent(taskId)}/email-links`,
     {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -6683,234 +7256,305 @@ const requestGmailThread = async (threadId) => {
     },
   );
   const data = await readJson(response);
+  if (handleEmailReauthRequired(response, data)) {
+    return;
+  }
   if (!response.ok) {
-    throw new Error(data?.error || "Gmail-Thread konnte nicht geladen werden.");
+    throw new Error("Verknüpfungen konnten nicht geladen werden.");
   }
-  return data?.thread || null;
-};
-
-const syncTaskGmailMeta = (task, thread) => {
-  if (!task?.gmailThread || !thread) return;
-  const updates = {};
-  if (thread.subject && thread.subject !== task.gmailThread.subject) {
-    updates.subject = thread.subject;
-  }
-  if (thread.snippet && thread.snippet !== task.gmailThread.snippet) {
-    updates.snippet = thread.snippet;
+  emailState.linkedThreads = Array.isArray(data?.links) ? data.links : [];
+  emailState.linkedThreads.sort((a, b) => {
+    const aTime = a?.last_message_at ? new Date(a.last_message_at).getTime() : 0;
+    const bTime = b?.last_message_at ? new Date(b.last_message_at).getTime() : 0;
+    return bTime - aTime;
+  });
+  if (emailState.activeThread) {
+    const updated = emailState.linkedThreads.find(
+      (link) => link.id === emailState.activeThread.id,
+    );
+    if (updated) {
+      emailState.activeThread = updated;
+    }
   }
   if (
-    thread.lastMessageAt &&
-    thread.lastMessageAt !== task.gmailThread.lastMessageAt
+    emailState.activeThread &&
+    !emailState.linkedThreads.some((link) => link.id === emailState.activeThread.id)
   ) {
-    updates.lastMessageAt = thread.lastMessageAt;
+    emailState.activeThread = null;
+    emailState.threadMessages = [];
   }
-  if (!Object.keys(updates).length) return;
-  task.gmailThread = {
-    ...task.gmailThread,
-    ...updates,
-  };
-  task.updatedAt = new Date().toISOString();
-  updateTaskSearchIndex(task);
-  saveState();
-  renderTasksPanel();
+  renderLinkedThreads();
+  renderEmailThreadView();
 };
 
-const renderGmailThreadPanel = async (task, { forceRefresh = false } = {}) => {
-  if (!elements.gmailThreadInput) return;
-  if (!task) {
-    clearGmailThreadView();
-    return;
-  }
-  const thread = task.gmailThread;
-  const connected = gmailState.connected;
-  const isOwner = isGmailThreadOwner(thread);
-
-  if (gmailState.error) {
-    setGmailThreadStatus(gmailState.error, true);
-    gmailState.error = "";
-  }
-
-  if (elements.gmailThreadConnectHint) {
-    elements.gmailThreadConnectHint.hidden = connected;
-  }
-  if (elements.gmailThreadInput) {
-    elements.gmailThreadInput.value = thread?.id || "";
-    elements.gmailThreadInput.disabled = !connected || !isOwner;
-  }
-  if (elements.gmailThreadPinBtn) {
-    elements.gmailThreadPinBtn.disabled = !connected || !isOwner;
-  }
-  if (elements.gmailThreadClearBtn) {
-    elements.gmailThreadClearBtn.disabled = !thread;
-  }
-  if (elements.gmailThreadRefreshBtn) {
-    elements.gmailThreadRefreshBtn.disabled = !thread || !connected || !isOwner;
-  }
-  if (elements.gmailReplyText) {
-    elements.gmailReplyText.disabled = !thread || !connected || !isOwner;
-  }
-  if (elements.gmailReplySend) {
-    elements.gmailReplySend.disabled = !thread || !connected || !isOwner;
-  }
-
-  if (!thread) {
-    setGmailThreadStatus("", false);
-    setGmailReplyStatus("", false);
-    clearGmailThreadView();
-    return;
-  }
-
-  if (!isOwner) {
-    const ownerLabel = thread?.ownerEmail
-      ? `Thread wurde von ${thread.ownerEmail} angeheftet.`
-      : "Thread wurde von einem anderen Nutzer angeheftet.";
-    setGmailThreadStatus(ownerLabel, false);
-    clearGmailThreadView();
-    return;
-  }
-
-  if (!connected) {
-    setGmailThreadStatus("Gmail ist nicht verbunden.", true);
-    clearGmailThreadView();
-    return;
-  }
-
-  if (!forceRefresh && gmailState.threadId === thread.id && gmailState.thread) {
-    setGmailThreadStatus("", false);
-    renderGmailThreadMeta(task, gmailState.thread);
-    renderGmailThreadMessages(gmailState.thread);
-    setGmailThreadViewVisible(true);
-    return;
-  }
-
-  gmailState.threadLoading = true;
-  setGmailThreadStatus("Gmail-Thread wird geladen ...");
-  try {
-    const loaded = await requestGmailThread(thread.id);
-    gmailState.threadId = thread.id;
-    gmailState.thread = loaded;
-    setGmailThreadStatus("", false);
-    renderGmailThreadMeta(task, loaded);
-    renderGmailThreadMessages(loaded);
-    setGmailThreadViewVisible(true);
-    syncTaskGmailMeta(task, loaded);
-  } catch (error) {
-    setGmailThreadStatus(
-      error?.message || "Gmail-Thread konnte nicht geladen werden.",
-      true,
-    );
-    clearGmailThreadView();
-  } finally {
-    gmailState.threadLoading = false;
-  }
-};
-
-const handleGmailThreadPin = async () => {
-  const task = getTaskFromModal();
-  if (!task) return;
-  if (!gmailState.connected) {
-    setGmailThreadStatus("Bitte zuerst Gmail verbinden.", true);
-    return;
-  }
-  const input = elements.gmailThreadInput?.value || "";
-  const threadId = parseGmailThreadId(input);
-  if (!threadId) {
-    setGmailThreadStatus("Bitte Thread-URL oder ID eingeben.", true);
-    return;
-  }
-
-  task.gmailThread = {
-    id: threadId,
-    subject: task.gmailThread?.subject || "",
-    snippet: task.gmailThread?.snippet || "",
-    lastMessageAt: task.gmailThread?.lastMessageAt || null,
-    ownerId: authState.user?.id || null,
-    ownerEmail: authState.user?.email || "",
-  };
-  task.updatedAt = new Date().toISOString();
-  updateTaskSearchIndex(task);
-  logTaskUpdate(task, { gmailThreadId: threadId });
-  saveState();
-  if (supabase && authState.user) {
-    await pushStateToSupabase();
-  }
-  await renderGmailThreadPanel(task, { forceRefresh: true });
-};
-
-const handleGmailThreadClear = async () => {
-  const task = getTaskFromModal();
-  if (!task || !task.gmailThread) return;
-  const confirmRemove = window.confirm(
-    "Gmail-Thread wirklich von der Aufgabe loesen?",
-  );
-  if (!confirmRemove) return;
-  task.gmailThread = null;
-  task.updatedAt = new Date().toISOString();
-  updateTaskSearchIndex(task);
-  logTaskUpdate(task, { gmailThreadId: null });
-  saveState();
-  if (supabase && authState.user) {
-    await pushStateToSupabase();
-  }
-  gmailState.thread = null;
-  gmailState.threadId = null;
-  if (elements.gmailThreadInput) {
-    elements.gmailThreadInput.value = "";
-  }
-  setGmailThreadStatus("", false);
-  setGmailReplyStatus("", false);
-  clearGmailThreadView();
-};
-
-const handleGmailReplySend = async () => {
-  const task = getTaskFromModal();
-  const threadId = task?.gmailThread?.id;
-  if (!task || !threadId) return;
-  const replyText = elements.gmailReplyText?.value?.trim() || "";
-  if (!replyText) {
-    setGmailReplyStatus("Bitte eine Antwort eingeben.", true);
-    return;
-  }
+const loadUnlinkedThreads = async (task) => {
   const token = getAuthToken();
   if (!token) return;
-  setGmailReplyStatus("Antwort wird gesendet ...");
+  const threads = [];
+  for (const account of emailState.accounts) {
+    if (account.isPaused) continue;
+    const response = await fetch(
+      `/api/email/${account.provider}/lugano/unlinked?limit=30`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+    const data = await readJson(response);
+    if (handleEmailReauthRequired(response, data)) {
+      return;
+    }
+    if (!response.ok) {
+      throw new Error("Threads konnten nicht geladen werden.");
+    }
+    (data?.threads || []).forEach((thread) => {
+      threads.push({ ...thread, provider: account.provider });
+    });
+  }
+  threads.sort((a, b) => {
+    const aTime = a?.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
+    const bTime = b?.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
+    return bTime - aTime;
+  });
+  emailState.unlinkedThreads = threads;
+  renderUnlinkedThreads(task);
+};
+
+const refreshEmailPanel = async (task, { force = false } = {}) => {
+  if (!task) {
+    clearEmailThreadView();
+    return;
+  }
+  if (!authState.user) {
+    setEmailPanelStatus("Bitte anmelden, um E-Mails zu sehen.", true);
+    renderEmailAccounts();
+    renderUnlinkedThreads(task);
+    renderLinkedThreads();
+    return;
+  }
+  if (force) {
+    emailState.activeThread = null;
+    emailState.threadMessages = [];
+  }
+  setEmailPanelStatus("", false);
+  try {
+    await loadEmailAccounts();
+    await loadLinkedThreads(task.id);
+    await loadUnlinkedThreads(task);
+  } catch (error) {
+    setEmailPanelStatus(
+      error?.message || "E-Mail-Daten konnten nicht geladen werden.",
+      true,
+    );
+  }
+};
+
+const openEmailThread = async (link) => {
+  if (!link) return;
+  emailState.activeThread = link;
+  emailState.threadMessages = [];
+  renderLinkedThreads();
+  setEmailReplyStatus("", false);
+  await loadEmailThreadMessages(link.id);
+};
+
+const loadEmailThreadMessages = async (linkId) => {
+  const token = getAuthToken();
+  if (!token) return;
+  emailState.loadingMessages = true;
+  setEmailPanelStatus("Thread wird geladen ...");
   try {
     const response = await fetch(
-      `/api/gmail/thread/${encodeURIComponent(threadId)}/reply`,
+      `/api/email-links/${encodeURIComponent(linkId)}/messages`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+    const data = await readJson(response);
+    if (handleEmailReauthRequired(response, data)) {
+      return;
+    }
+    if (!response.ok) {
+      throw new Error("Thread konnte nicht geladen werden.");
+    }
+    emailState.threadMessages = Array.isArray(data?.messages)
+      ? data.messages
+      : [];
+    setEmailPanelStatus("", false);
+    renderEmailThreadView();
+  } catch (error) {
+    setEmailPanelStatus(
+      error?.message || "Thread konnte nicht geladen werden.",
+      true,
+    );
+    clearEmailThreadView();
+  } finally {
+    emailState.loadingMessages = false;
+  }
+};
+
+const handleEmailLink = async (taskId, provider, threadId) => {
+  const token = getAuthToken();
+  if (!token) return;
+  setEmailPanelStatus("Thread wird verknüpft ...");
+  try {
+    const response = await fetch(
+      `/api/tasks/${encodeURIComponent(taskId)}/email-links`,
       {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ message: replyText }),
+        body: JSON.stringify({
+          provider,
+          providerThreadId: threadId,
+        }),
       },
     );
     const data = await readJson(response);
+    if (handleEmailReauthRequired(response, data)) {
+      return;
+    }
     if (!response.ok) {
-      throw new Error(data?.error || "Antwort konnte nicht gesendet werden.");
+      throw new Error("Thread konnte nicht verknüpft werden.");
     }
-    if (elements.gmailReplyText) {
-      elements.gmailReplyText.value = "";
+    const task = getTaskFromModal();
+    if (task) {
+      await refreshEmailPanel(task, { force: true });
     }
-    setGmailReplyStatus("Antwort gesendet.", false);
-    logActivityEvent("gmail_reply_sent", {
-      taskId: task.id,
-      metadata: { threadId },
-    });
-    await renderGmailThreadPanel(task, { forceRefresh: true });
   } catch (error) {
-    setGmailReplyStatus(
+    setEmailPanelStatus(
+      error?.message || "Thread konnte nicht verknüpft werden.",
+      true,
+    );
+  }
+};
+
+const handleEmailUnlink = async (linkId) => {
+  const token = getAuthToken();
+  if (!token) return;
+  const confirmRemove = window.confirm(
+    "Thread wirklich von der Aufgabe lösen?",
+  );
+  if (!confirmRemove) return;
+  try {
+    const response = await fetch(
+      `/api/email-links/${encodeURIComponent(linkId)}`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+    const data = await readJson(response);
+    if (handleEmailReauthRequired(response, data)) {
+      return;
+    }
+    if (!response.ok) {
+      throw new Error("Verknüpfung konnte nicht gelöst werden.");
+    }
+    const task = getTaskFromModal();
+    if (task) {
+      await refreshEmailPanel(task, { force: true });
+    }
+  } catch (error) {
+    setEmailPanelStatus(
+      error?.message || "Verknüpfung konnte nicht gelöst werden.",
+      true,
+    );
+  }
+};
+
+const handleEmailReplySend = async () => {
+  const link = emailState.activeThread;
+  if (!link) return;
+  const replyText = elements.emailReplyText?.value?.trim() || "";
+  if (!replyText) {
+    setEmailReplyStatus("Bitte eine Antwort eingeben.", true);
+    return;
+  }
+  const token = getAuthToken();
+  if (!token) return;
+  setEmailReplyStatus("Antwort wird gesendet ...");
+  try {
+    const response = await fetch(
+      `/api/email-links/${encodeURIComponent(link.id)}/reply`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ bodyText: replyText }),
+      },
+    );
+    const data = await readJson(response);
+    if (response.status === 401 && data?.requiresReauth) {
+      setEmailReplyStatus("", false);
+      openReauthModal({
+        context: "reply",
+        method: data?.method || "totp",
+        onSuccess: async () => {
+          await handleEmailReplySend();
+        },
+      });
+      return;
+    }
+    if (!response.ok) {
+      throw new Error("Antwort konnte nicht gesendet werden.");
+    }
+    if (elements.emailReplyText) {
+      elements.emailReplyText.value = "";
+    }
+    setEmailReplyStatus("Antwort gesendet.", false);
+    await loadEmailThreadMessages(link.id);
+  } catch (error) {
+    setEmailReplyStatus(
       error?.message || "Antwort konnte nicht gesendet werden.",
       true,
     );
   }
 };
 
-const handleGmailThreadRefresh = async () => {
+const handleEmailPanelRefresh = async () => {
   const task = getTaskFromModal();
-  if (!task?.gmailThread) return;
-  await renderGmailThreadPanel(task, { forceRefresh: true });
+  if (!task) return;
+  await refreshEmailPanel(task, { force: true });
+};
+
+const cleanupEmailLinksForTask = async (taskId) => {
+  const token = getAuthToken();
+  if (!token) return;
+  try {
+    const response = await fetch(
+      `/api/tasks/${encodeURIComponent(taskId)}/email-links`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+    const data = await readJson(response);
+    if (!response.ok) return;
+    const links = Array.isArray(data?.links) ? data.links : [];
+    await Promise.all(
+      links.map((link) =>
+        fetch(`/api/email-links/${encodeURIComponent(link.id)}`, {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }).catch(() => null),
+      ),
+    );
+  } catch {
+    // best effort
+  }
 };
 
 const openTaskModal = (taskId) => {
@@ -6927,12 +7571,12 @@ const openTaskModal = (taskId) => {
   if (elements.taskEndDate) {
     elements.taskEndDate.value = task.endDate || "";
   }
-  if (elements.gmailReplyText) {
-    elements.gmailReplyText.value = "";
+  if (elements.emailReplyText) {
+    elements.emailReplyText.value = "";
   }
-  setGmailReplyStatus("", false);
+  setEmailReplyStatus("", false);
   renderDependencyOptions(task);
-  void renderGmailThreadPanel(task, { forceRefresh: false });
+  void refreshEmailPanel(task, { force: false });
   elements.taskModal.hidden = false;
 };
 
@@ -6940,9 +7584,9 @@ const closeTaskModal = () => {
   if (!elements.taskModal) return;
   elements.taskModal.hidden = true;
   taskModalState.taskId = null;
-  setGmailThreadStatus("", false);
-  setGmailReplyStatus("", false);
-  clearGmailThreadView();
+  setEmailPanelStatus("", false);
+  setEmailReplyStatus("", false);
+  clearEmailThreadView();
 };
 
 const openHelpModal = () => {
@@ -8237,6 +8881,7 @@ const removeTask = (taskId) => {
     item.dependencyIds = item.dependencyIds.filter((id) => id !== taskId);
   });
   saveState();
+  void cleanupEmailLinksForTask(taskId);
   renderTasksPanel();
 };
 
@@ -10117,6 +10762,16 @@ const bindEvents = () => {
       closeHelpModal();
     }
   });
+  elements.securityModal?.addEventListener("click", (event) => {
+    if (event.target === elements.securityModal) {
+      closeSecurityModal();
+    }
+  });
+  elements.reauthModal?.addEventListener("click", (event) => {
+    if (event.target === elements.reauthModal) {
+      closeReauthModal();
+    }
+  });
 
   elements.imageEditForm?.addEventListener("submit", handleImageEditSubmit);
   elements.imageModalClose?.addEventListener("click", closeImageModal);
@@ -10205,18 +10860,21 @@ const bindEvents = () => {
   elements.signupForm?.addEventListener("submit", handleSignup);
   elements.passwordResetForm?.addEventListener("submit", handlePasswordUpdate);
   elements.signOutBtn?.addEventListener("click", handleSignOut);
-  elements.gmailConnectBtn?.addEventListener("click", startGmailConnect);
-  elements.gmailDisconnectBtn?.addEventListener("click", disconnectGmail);
-  elements.gmailThreadPinBtn?.addEventListener("click", handleGmailThreadPin);
-  elements.gmailThreadClearBtn?.addEventListener(
-    "click",
-    handleGmailThreadClear,
+  elements.securitySettingsBtn?.addEventListener("click", openSecurityModal);
+  elements.securityModalClose?.addEventListener("click", closeSecurityModal);
+  elements.security2faStart?.addEventListener("click", handleSecurityStart);
+  elements.security2faConfirm?.addEventListener("click", handleSecurityConfirm);
+  elements.security2faDisable?.addEventListener("click", handleSecurityDisable);
+  elements.reauthModalClose?.addEventListener("click", closeReauthModal);
+  elements.reauthForm?.addEventListener("submit", handleReauthSubmit);
+  elements.emailConnectGmail?.addEventListener("click", () =>
+    startEmailConnect("gmail"),
   );
-  elements.gmailThreadRefreshBtn?.addEventListener(
-    "click",
-    handleGmailThreadRefresh,
+  elements.emailConnectMicrosoft?.addEventListener("click", () =>
+    startEmailConnect("microsoft"),
   );
-  elements.gmailReplySend?.addEventListener("click", handleGmailReplySend);
+  elements.emailPanelRefresh?.addEventListener("click", handleEmailPanelRefresh);
+  elements.emailReplySend?.addEventListener("click", handleEmailReplySend);
 
   elements.toggleArchitect.addEventListener("change", (event) => {
     setArchitectMode(event.target.checked);
@@ -10332,7 +10990,7 @@ const bindEvents = () => {
 };
 
 const init = () => {
-  captureGmailOAuthParams();
+  captureEmailOAuthParams();
   hydrateStateFromLocal();
   initChatControls();
   void fetchChatConfig({ force: false });

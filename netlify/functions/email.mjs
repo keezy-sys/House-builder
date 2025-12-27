@@ -1,4 +1,4 @@
-import { handleGmailApi } from "../../gmail-store.mjs";
+import { handleEmailApi } from "../../email-store.mjs";
 
 const jsonResponse = (statusCode, payload) => ({
   statusCode,
@@ -22,12 +22,12 @@ const parseBody = (event) => {
 
 export const handler = async (event) => {
   const urlPath = String(event.path || "")
-    .replace(/^\/\.netlify\/functions\/gmail/, "/api/gmail")
+    .replace(/^\/\.netlify\/functions\/email/, "/api/email")
     .trim();
   const query = new URLSearchParams(event.queryStringParameters || {});
   const body = parseBody(event);
 
-  const result = await handleGmailApi({
+  const result = await handleEmailApi({
     method: event.httpMethod,
     urlPath,
     headers: event.headers,

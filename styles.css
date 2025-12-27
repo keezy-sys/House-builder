@@ -235,34 +235,6 @@ body.auth-locked {
   padding: 0.4rem 0.8rem;
 }
 
-.gmail-status {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  background: #fdf2e6;
-  border: 1px solid #eadfce;
-  border-radius: 999px;
-  padding: 0.35rem 0.8rem;
-  flex-wrap: wrap;
-}
-
-.gmail-status-label {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #7d6956;
-  font-weight: 700;
-}
-
-.gmail-status-text {
-  font-size: 0.85rem;
-  color: #6c5845;
-}
-
-.gmail-status-text.error {
-  color: #b91c1c;
-}
-
 .auth-user {
   display: flex;
   flex-direction: column;
@@ -1060,6 +1032,84 @@ svg {
   border: 1px solid #e4d4c0;
 }
 
+.security-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.security-section {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.security-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.security-setup {
+  display: grid;
+  gap: 0.8rem;
+  padding: 0.8rem;
+  border-radius: 0.8rem;
+  border: 1px solid #eadfce;
+  background: #fffaf4;
+}
+
+.security-qr {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.security-qr img {
+  width: 140px;
+  height: 140px;
+  border-radius: 0.6rem;
+  border: 1px solid #eadfce;
+  background: #ffffff;
+}
+
+.security-secret {
+  padding: 0.5rem 0.7rem;
+  border-radius: 0.6rem;
+  border: 1px dashed #e4d4c0;
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.85rem;
+  color: #6c5845;
+  background: #fffaf4;
+}
+
+.security-recovery {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.security-recovery-title {
+  font-weight: 700;
+  color: #3b3127;
+}
+
+.security-recovery-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.4rem;
+}
+
+.security-recovery-list li {
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.6rem;
+  border: 1px solid #eadfce;
+  background: #fffaf4;
+  font-weight: 600;
+  text-align: center;
+}
+
 .chat-modal-surface {
   width: min(720px, 100%);
   max-height: min(85vh, 860px);
@@ -1162,23 +1212,23 @@ svg {
   border: 1px solid #eadfce;
 }
 
-.task-gmail-panel {
+.task-email-panel {
   display: grid;
-  gap: 0.6rem;
+  gap: 0.8rem;
   padding: 0.8rem;
   background: #fdf2e6;
   border-radius: 0.8rem;
   border: 1px solid #eadfce;
 }
 
-.task-gmail-header {
+.task-email-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.8rem;
 }
 
-.task-gmail-title {
+.task-email-title {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -1186,20 +1236,108 @@ svg {
   font-weight: 700;
 }
 
-.task-gmail-inputs {
+.email-accounts {
   display: grid;
   gap: 0.6rem;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: center;
 }
 
-.task-gmail-inputs input {
+.email-account-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
   padding: 0.6rem;
   border-radius: 0.6rem;
-  border: 1px solid #e4d4c0;
+  border: 1px solid #eadfce;
+  background: #fffaf4;
 }
 
-.gmail-thread-view {
+.email-account-meta {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.email-account-provider {
+  font-weight: 700;
+  color: #3b3127;
+}
+
+.email-account-status {
+  font-size: 0.75rem;
+  color: #7d6956;
+}
+
+.email-connect-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.email-section {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.email-section-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #7d6956;
+  font-weight: 700;
+}
+
+.email-thread-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.email-thread-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.6rem;
+  border-radius: 0.6rem;
+  border: 1px solid #eadfce;
+  background: #ffffff;
+}
+
+.email-thread-item.is-active {
+  border-color: #c65a2e;
+  background: #fff3ea;
+}
+
+.email-thread-body {
+  display: grid;
+  gap: 0.3rem;
+  flex: 1;
+}
+
+.email-thread-subject {
+  font-weight: 600;
+  color: #3b3127;
+}
+
+.email-thread-snippet {
+  color: #6c5845;
+  font-size: 0.85rem;
+}
+
+.email-thread-meta-line {
+  font-size: 0.75rem;
+  color: #7d6956;
+}
+
+.email-thread-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.email-thread-view {
   display: grid;
   gap: 0.6rem;
   padding: 0.6rem;
@@ -1208,14 +1346,14 @@ svg {
   border: 1px solid #eadfce;
 }
 
-.gmail-thread-meta {
+.email-thread-meta {
   display: grid;
   gap: 0.3rem;
   color: #6c5845;
   font-size: 0.85rem;
 }
 
-.gmail-thread-messages {
+.email-thread-messages {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -1225,7 +1363,7 @@ svg {
   overflow: auto;
 }
 
-.gmail-message {
+.email-message {
   display: grid;
   gap: 0.3rem;
   padding: 0.6rem;
@@ -1234,7 +1372,7 @@ svg {
   background: #ffffff;
 }
 
-.gmail-message-header {
+.email-message-header {
   display: flex;
   justify-content: space-between;
   gap: 0.6rem;
@@ -1242,25 +1380,25 @@ svg {
   color: #7d6956;
 }
 
-.gmail-message-subject {
+.email-message-subject {
   font-weight: 600;
   color: #3b3127;
 }
 
-.gmail-reply {
+.email-reply {
   display: grid;
   gap: 0.4rem;
   font-weight: 600;
 }
 
-.gmail-reply textarea {
+.email-reply textarea {
   padding: 0.6rem;
   border-radius: 0.6rem;
   border: 1px solid #e4d4c0;
   resize: vertical;
 }
 
-.gmail-reply-actions {
+.email-reply-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1324,7 +1462,7 @@ button {
   font-weight: 600;
 }
 
-.gmail-status button {
+.email-connect-actions button {
   padding: 0.35rem 0.8rem;
 }
 
@@ -3096,11 +3234,6 @@ button {
     display: none;
   }
 
-  .gmail-status {
-    width: 100%;
-    justify-content: space-between;
-  }
-
   .app {
     padding: 1rem;
     gap: 1rem;
@@ -3141,8 +3274,13 @@ button {
     border-radius: 999px;
   }
 
-  .task-gmail-inputs {
-    grid-template-columns: 1fr;
+  .email-connect-actions {
+    flex-direction: column;
+  }
+
+  .email-thread-item {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .task-filters {

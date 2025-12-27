@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { readFile } from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -152,8 +153,12 @@ const buildError = (statusCode, error, code) => ({
   },
 });
 
-const createTaskId = () =>
-  `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const createTaskId = () => {
+  if (typeof crypto.randomUUID === "function") {
+    return `task-${crypto.randomUUID()}`;
+  }
+  return `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+};
 
 const normalizeRoomId = (value) => {
   if (value === null || value === undefined) return null;
@@ -253,41 +258,6 @@ const normalizeTaskCosts = (costs) => {
     normalized[key] = normalizeCostValue(source[key]);
     return normalized;
   }, {});
-};
-
-const normalizeGmailThread = (thread) => {
-  if (!thread || typeof thread !== "object") return null;
-  const id =
-    typeof thread.id === "string"
-      ? thread.id.trim()
-      : typeof thread.threadId === "string"
-        ? thread.threadId.trim()
-        : "";
-  if (!id) return null;
-  const subject =
-    typeof thread.subject === "string" ? thread.subject.trim() : "";
-  const snippet =
-    typeof thread.snippet === "string" ? thread.snippet.trim() : "";
-  const lastMessageAt =
-    typeof thread.lastMessageAt === "string" && thread.lastMessageAt.trim()
-      ? thread.lastMessageAt.trim()
-      : null;
-  const ownerId =
-    typeof thread.ownerId === "string" && thread.ownerId.trim()
-      ? thread.ownerId.trim()
-      : null;
-  const ownerEmail =
-    typeof thread.ownerEmail === "string" && thread.ownerEmail.trim()
-      ? thread.ownerEmail.trim()
-      : null;
-  return {
-    id,
-    subject,
-    snippet,
-    lastMessageAt,
-    ownerId,
-    ownerEmail,
-  };
 };
 
 const parseFilters = (searchParams) => {
@@ -423,7 +393,7 @@ const applyTaskPatch = (task, patch) => {
     }
   }
   if (Object.prototype.hasOwnProperty.call(patch, "gmailThread")) {
-    task.gmailThread = normalizeGmailThread(patch.gmailThread);
+    delete task.gmailThread;
   }
 };
 
@@ -520,7 +490,6 @@ const handleTasksApi = async ({ method, urlPath, headers, body, query }) => {
       notes: typeof input.notes === "string" ? input.notes : "",
       link: normalizeTaskLink(input.link),
       costs: normalizeTaskCosts(input.costs),
-      gmailThread: normalizeGmailThread(input.gmailThread),
       createdAt: timestamp,
       updatedAt: timestamp,
     };

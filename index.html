@@ -122,14 +122,14 @@
         >
           ?
         </button>
-        <div class="gmail-status" id="gmail-status" hidden>
-          <span class="gmail-status-label">Gmail</span>
-          <span id="gmail-status-text" class="gmail-status-text"
-            >Nicht verbunden</span
-          >
-          <button id="gmail-connect" type="button">Gmail verbinden</button>
-          <button id="gmail-disconnect" type="button">Trennen</button>
-        </div>
+        <button
+          id="security-settings"
+          class="secondary"
+          type="button"
+          hidden
+        >
+          Sicherheit
+        </button>
         <div class="auth-info" id="auth-info" hidden>
           <div class="auth-user">
             <span class="auth-label">Angemeldet als</span>
@@ -842,52 +842,157 @@
             <div class="dependency-title">Abhängigkeiten</div>
             <div id="task-dependency-list" class="dependency-list"></div>
           </div>
-          <div class="task-gmail-panel">
-            <div class="task-gmail-header">
-              <div class="task-gmail-title">Gmail-Thread</div>
-              <button type="button" id="gmail-thread-refresh">
+          <div class="task-email-panel" id="task-email-panel">
+            <div class="task-email-header">
+              <div class="task-email-title">E-Mail-Integration</div>
+              <button type="button" id="email-panel-refresh">
                 Aktualisieren
               </button>
             </div>
-            <p id="gmail-thread-status" class="helper" hidden></p>
-            <p id="gmail-thread-connect" class="helper" hidden>
-              Gmail verbinden, um Threads anzupinnen und Antworten zu senden.
+            <p id="email-panel-status" class="helper" hidden></p>
+            <div class="email-accounts" id="email-accounts"></div>
+            <div class="email-connect-actions" id="email-connect-actions">
+              <button id="email-connect-gmail" type="button">
+                Gmail verbinden
+              </button>
+              <button id="email-connect-microsoft" type="button">
+                Outlook verbinden
+              </button>
+            </div>
+            <div class="email-section">
+              <div class="email-section-title">Unverknüpfte Lugano-Threads</div>
+              <p class="helper">
+                Zeigt Gespräche im Lugano-Ordner/Label, die noch keiner Aufgabe
+                zugeordnet sind.
+              </p>
+              <ul id="email-unlinked-threads" class="email-thread-list"></ul>
+            </div>
+            <div class="email-section">
+              <div class="email-section-title">Mit dieser Aufgabe verknüpft</div>
+              <ul id="email-linked-threads" class="email-thread-list"></ul>
+            </div>
+            <div id="email-thread-view" class="email-thread-view" hidden>
+              <div id="email-thread-meta" class="email-thread-meta"></div>
+              <ul
+                id="email-thread-messages"
+                class="email-thread-messages"
+              ></ul>
+              <label class="email-reply">
+                <span>Antwort</span>
+                <textarea
+                  id="email-reply-text"
+                  rows="3"
+                  placeholder="Antwort schreiben"
+                ></textarea>
+              </label>
+              <div class="email-reply-actions">
+                <button type="button" id="email-reply-send" class="primary">
+                  Antwort senden
+                </button>
+                <span id="email-reply-status" class="helper"></span>
+              </div>
+            </div>
+            <p class="helper">
+              Nur E-Mails im Ordner/Label „Lugano“ erscheinen hier.
             </p>
-            <div class="task-gmail-inputs">
-              <input
-                type="text"
-                id="gmail-thread-input"
-                placeholder="Thread-URL oder ID"
-              />
-              <button type="button" id="gmail-thread-pin" class="primary">
-                Anheften
-              </button>
-              <button type="button" id="gmail-thread-clear">Lösen</button>
-            </div>
-            <div id="gmail-thread-view" class="gmail-thread-view" hidden>
-              <div id="gmail-thread-meta" class="gmail-thread-meta"></div>
-              <ul id="gmail-thread-messages" class="gmail-thread-messages"></ul>
-            </div>
-            <label class="gmail-reply">
-              <span>Antwort</span>
-              <textarea
-                id="gmail-reply-text"
-                rows="3"
-                placeholder="Antwort schreiben"
-              ></textarea>
-            </label>
-            <div class="gmail-reply-actions">
-              <button type="button" id="gmail-reply-send" class="primary">
-                Antwort senden
-              </button>
-              <span id="gmail-reply-status" class="helper"></span>
-            </div>
           </div>
           <div class="modal-actions">
             <button type="button" id="task-modal-cancel">Abbrechen</button>
             <button type="submit" class="primary">Speichern</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <div id="security-modal" class="modal" hidden>
+      <div
+        class="modal-surface"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="security-modal-title"
+      >
+        <div class="modal-header">
+          <h3 id="security-modal-title">Sicherheit</h3>
+          <button type="button" id="security-modal-close">Schließen</button>
+        </div>
+        <div class="security-panel">
+          <section class="security-section">
+            <h4>Zwei-Faktor-Authentifizierung</h4>
+            <p id="security-2fa-status" class="helper"></p>
+            <div id="security-2fa-actions" class="security-actions">
+              <button id="security-2fa-start" type="button" class="primary">
+                2FA einrichten
+              </button>
+              <button id="security-2fa-disable" type="button">
+                2FA deaktivieren
+              </button>
+            </div>
+            <div id="security-2fa-setup" class="security-setup" hidden>
+              <div class="security-qr">
+                <img id="security-qr-image" alt="QR-Code für 2FA" />
+                <div id="security-secret" class="security-secret"></div>
+              </div>
+              <label>
+                Code bestätigen
+                <input
+                  id="security-2fa-code"
+                  type="text"
+                  inputmode="numeric"
+                  autocomplete="one-time-code"
+                />
+              </label>
+              <button id="security-2fa-confirm" type="button" class="primary">
+                2FA aktivieren
+              </button>
+              <div id="security-recovery-codes" class="security-recovery" hidden>
+                <div class="security-recovery-title">Recovery-Codes</div>
+                <ul
+                  id="security-recovery-list"
+                  class="security-recovery-list"
+                ></ul>
+                <p class="helper">
+                  Codes sicher speichern. Jeder Code funktioniert nur einmal.
+                </p>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <div id="reauth-modal" class="modal" hidden>
+      <div
+        class="modal-surface"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="reauth-modal-title"
+      >
+        <div class="modal-header">
+          <h3 id="reauth-modal-title">Bestätigung erforderlich</h3>
+          <button type="button" id="reauth-modal-close">Schließen</button>
+        </div>
+        <p id="reauth-helper" class="helper"></p>
+        <form id="reauth-form" class="modal-form">
+          <label id="reauth-code-row" hidden>
+            TOTP-Code
+            <input
+              id="reauth-code"
+              type="text"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+            />
+          </label>
+          <label id="reauth-recovery-row" hidden>
+            Recovery-Code
+            <input id="reauth-recovery" type="text" />
+          </label>
+          <label id="reauth-password-row" hidden>
+            Passwort
+            <input id="reauth-password" type="password" autocomplete="current-password" />
+          </label>
+          <button type="submit" class="primary">Bestätigen</button>
+        </form>
+        <p id="reauth-status" class="helper" role="alert"></p>
       </div>
     </div>
 

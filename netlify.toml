@@ -24,8 +24,23 @@
   status = 200
 
 [[redirects]]
-  from = "/api/gmail/*"
-  to = "/.netlify/functions/gmail"
+  from = "/api/email/*"
+  to = "/.netlify/functions/email"
+  status = 200
+
+[[redirects]]
+  from = "/api/email-links/*"
+  to = "/.netlify/functions/email"
+  status = 200
+
+[[redirects]]
+  from = "/api/security/*"
+  to = "/.netlify/functions/email"
+  status = 200
+
+[[redirects]]
+  from = "/api/tasks/*/email-links"
+  to = "/.netlify/functions/email"
   status = 200
 
 [[redirects]]
