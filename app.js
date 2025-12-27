@@ -4879,8 +4879,8 @@ const closeTaskPlanMenu = () => {
   taskPlanMenuState.trigger = null;
 };
 
-const handleTaskPlanMenuAction = (action) => {
-  const taskId = taskPlanMenuState.taskId;
+const handleTaskPlanMenuAction = (action, taskIdOverride) => {
+  const taskId = taskIdOverride ?? taskPlanMenuState.taskId;
   if (!taskId || !action) return;
   if (action === "plan") {
     openTaskModal(taskId);
@@ -11634,8 +11634,9 @@ const bindEvents = () => {
     if (!actionButton || actionButton.disabled) return;
     const action = actionButton.dataset.action;
     if (!action) return;
+    const taskId = taskPlanMenuState.taskId;
     closeTaskPlanMenu();
-    handleTaskPlanMenuAction(action);
+    handleTaskPlanMenuAction(action, taskId);
   });
 
   elements.clearSelectionBtn.addEventListener("click", () => {
