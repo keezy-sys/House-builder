@@ -2384,6 +2384,48 @@ button {
   gap: 0.6rem;
 }
 
+.task-file-list {
+  grid-template-columns: 1fr;
+}
+
+.task-file-links {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.task-link-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.6rem;
+  border: 1px solid #eadfce;
+  background: #fffaf4;
+}
+
+.task-link-title {
+  flex: 1;
+  min-width: 0;
+  color: #2563eb;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.task-link-title:hover {
+  color: #1d4ed8;
+}
+
+.task-link-remove {
+  padding: 0.35rem 0.6rem;
+  font-size: 0.7rem;
+  border-radius: 0.5rem;
+  white-space: nowrap;
+}
+
+.task-file-gallery {
+  width: 100%;
+}
+
 .image-card {
   background: #fdf2e6;
   border: 1px solid #eadfce;

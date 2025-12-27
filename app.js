@@ -747,7 +747,7 @@ const isLocalHost = ["localhost", "127.0.0.1"].includes(
 
 const state = {
   activeRoomId: null,
-  activeFloorId: "ground",
+  activeFloorId: "upper",
   activeView: "room",
   activeRoomTab: "overview",
   isMobileView: false,
@@ -970,7 +970,8 @@ const elements = {
   taskTagsInput: document.getElementById("task-tags-input"),
   taskStatusInput: document.getElementById("task-status-input"),
   taskList: document.getElementById("task-list"),
-  timelineList: document.getElementById("timeline-list"),
+  ganttChart: document.getElementById("gantt-chart"),
+  ganttRange: document.getElementById("gantt-range"),
   taskSelectAll: document.getElementById("task-select-all"),
   taskSelectionCount: document.getElementById("task-selection-count"),
   taskCount: document.getElementById("task-count"),
@@ -6969,70 +6970,434 @@ const handleKanbanDrop = (event) => {
   renderTasksPanel();
 };
 
-const buildTimelineItem = (task, taskMap) => {
-  const item = document.createElement("li");
-  item.className = "timeline-item";
+const DAY_MS = 24 * 60 * 60 * 1000;
+const GANTT_DAY_WIDTH = 34;
+const GANTT_LABEL_WIDTH = 220;
+const GANTT_MIN_DAYS = 21;
+const GANTT_BUFFER_DAYS = 7;
 
-  const title = document.createElement("div");
-  title.className = "task-title";
-  title.textContent = task.title;
-  item.appendChild(title);
-
-  const statusTags = buildTaskTags(task, taskMap);
-  if (statusTags) {
-    item.appendChild(statusTags);
-  }
-
-  const metaText = getTaskMetaText(task);
-  if (metaText) {
-    const meta = document.createElement("div");
-    meta.className = "timeline-meta";
-    meta.textContent = metaText;
-    item.appendChild(meta);
-  }
-
-  const blockingRow = buildBlockingRow(task, taskMap);
-  if (blockingRow) {
-    item.appendChild(blockingRow);
-  }
-
-  return item;
+const ganttState = {
+  body: null,
+  links: null,
+  dragging: null,
+  previewPath: null,
+  hoverHandle: null,
+  tasks: [],
+  range: null,
 };
 
-const buildTimelineDeliveryItem = (task) => {
-  const item = document.createElement("li");
-  item.className = "timeline-item is-delivery";
+let ganttLinkFrame = null;
 
-  const title = document.createElement("div");
-  title.className = "task-title";
-  title.textContent = `Lieferung: ${task.title}`;
-  item.appendChild(title);
+const getUtcDayValue = (date) =>
+  Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
 
-  const metaText = getDeliveryMetaText(task);
-  if (metaText) {
-    const meta = document.createElement("div");
-    meta.className = "timeline-meta";
-    meta.textContent = metaText;
-    item.appendChild(meta);
-  }
-
-  return item;
+const addDays = (date, amount) => {
+  const next = new Date(date);
+  next.setDate(next.getDate() + amount);
+  next.setHours(0, 0, 0, 0);
+  return next;
 };
 
-const buildTimelineEntry = (entry, taskMap) =>
-  entry.type === "delivery"
-    ? buildTimelineDeliveryItem(entry.task)
-    : buildTimelineItem(entry.task, taskMap);
+const getWeekEnd = (date) => addDays(getWeekStart(date), 6);
 
-const renderTimeline = (tasks = state.tasks) => {
-  if (!elements.timelineList) return;
-  elements.timelineList.innerHTML = "";
+const getDayIndex = (date, startDate) =>
+  Math.round((getUtcDayValue(date) - getUtcDayValue(startDate)) / DAY_MS);
+
+const formatShortDateFromDate = (date) =>
+  new Intl.DateTimeFormat("de-DE", {
+    day: "2-digit",
+    month: "short",
+  }).format(date);
+
+const formatGanttRangeLabel = (start, end) => {
+  if (!start || !end) return "";
+  const startLabel = formatShortDateFromDate(start);
+  const endLabel = new Intl.DateTimeFormat("de-DE", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(end);
+  return `${startLabel} – ${endLabel}`;
+};
+
+const getTaskDateRange = (task) => {
+  const startValue = task.startDate || task.dueDate || task.endDate;
+  const endValue = task.endDate || task.dueDate || task.startDate;
+  const start = parseDateInput(startValue);
+  const end = parseDateInput(endValue);
+  if (!start && !end) return null;
+  let startDate = start || end;
+  let endDate = end || start;
+  if (startDate > endDate) {
+    [startDate, endDate] = [endDate, startDate];
+  }
+  return { startDate, endDate };
+};
+
+const buildGanttRange = (ranges) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let minDate = today;
+  let maxDate = today;
+  ranges.forEach(({ startDate, endDate }) => {
+    if (startDate < minDate) minDate = startDate;
+    if (endDate > maxDate) maxDate = endDate;
+  });
+  const bufferedStart = addDays(minDate, -GANTT_BUFFER_DAYS);
+  const bufferedEnd = addDays(maxDate, GANTT_BUFFER_DAYS);
+  let rangeStart = getWeekStart(bufferedStart);
+  let rangeEnd = getWeekEnd(bufferedEnd);
+  let dayCount = getDayIndex(rangeEnd, rangeStart) + 1;
+  if (dayCount < GANTT_MIN_DAYS) {
+    rangeEnd = addDays(rangeEnd, GANTT_MIN_DAYS - dayCount);
+    dayCount = GANTT_MIN_DAYS;
+  }
+  return { start: rangeStart, end: rangeEnd, dayCount };
+};
+
+const buildGanttHeader = (range) => {
+  const row = document.createElement("div");
+  row.className = "gantt-row gantt-row-header";
+
+  const label = document.createElement("div");
+  label.className = "gantt-label gantt-label-header";
+  label.textContent = "Aufgabe";
+  row.appendChild(label);
+
+  const track = document.createElement("div");
+  track.className = "gantt-track gantt-track-header";
+
+  const monthRow = document.createElement("div");
+  monthRow.className = "gantt-month-row";
+  let cursor = new Date(range.start);
+  while (cursor <= range.end) {
+    const monthStart = new Date(cursor);
+    const month = cursor.getMonth();
+    let span = 0;
+    while (cursor <= range.end && cursor.getMonth() === month) {
+      span += 1;
+      cursor = addDays(cursor, 1);
+    }
+    const cell = document.createElement("div");
+    cell.className = "gantt-month-cell";
+    cell.style.width = `${span * GANTT_DAY_WIDTH}px`;
+    cell.textContent = formatMonthLabel(monthStart);
+    monthRow.appendChild(cell);
+  }
+
+  const dayRow = document.createElement("div");
+  dayRow.className = "gantt-day-row";
+  for (let i = 0; i < range.dayCount; i += 1) {
+    const day = addDays(range.start, i);
+    const cell = document.createElement("div");
+    cell.className = "gantt-day-cell";
+    cell.textContent = String(day.getDate()).padStart(2, "0");
+    cell.title = new Intl.DateTimeFormat("de-DE", {
+      weekday: "short",
+      day: "2-digit",
+      month: "short",
+    }).format(day);
+    if ([0, 6].includes(day.getDay())) {
+      cell.classList.add("is-weekend");
+    }
+    dayRow.appendChild(cell);
+  }
+
+  track.appendChild(monthRow);
+  track.appendChild(dayRow);
+  row.appendChild(track);
+  return row;
+};
+
+const buildGanttRow = (task, range, chartRange, taskMap) => {
+  const row = document.createElement("div");
+  row.className = "gantt-row";
+
+  const label = document.createElement("div");
+  label.className = "gantt-label";
+  const labelButton = document.createElement("button");
+  labelButton.type = "button";
+  labelButton.className = "gantt-label-button";
+  labelButton.textContent = task.title;
+  labelButton.addEventListener("click", () => openTaskModal(task.id));
+  label.appendChild(labelButton);
+
+  const meta = document.createElement("div");
+  meta.className = "gantt-label-meta";
+  const roomLabel = getRoomLabel(task.roomId);
+  const rangeLabel = `${formatShortDateFromDate(
+    range.startDate,
+  )} – ${formatShortDateFromDate(range.endDate)}`;
+  meta.textContent = `${roomLabel} · ${rangeLabel}`;
+  label.appendChild(meta);
+
+  row.appendChild(label);
+
+  const track = document.createElement("div");
+  track.className = "gantt-track";
+  track.dataset.taskId = task.id;
+
+  const bar = document.createElement("div");
+  bar.className = "gantt-bar";
+  if (isTaskDone(task)) {
+    bar.classList.add("is-done");
+  }
+  if (isTaskBlocked(task, taskMap)) {
+    bar.classList.add("is-blocked");
+  }
+
+  const startIndex = getDayIndex(range.startDate, chartRange.start);
+  const endIndex = getDayIndex(range.endDate, chartRange.start);
+  const left = Math.max(startIndex, 0) * GANTT_DAY_WIDTH;
+  const width = (Math.max(endIndex, startIndex) - Math.min(endIndex, startIndex) + 1) * GANTT_DAY_WIDTH;
+  bar.style.left = `${left}px`;
+  bar.style.width = `${width}px`;
+  bar.dataset.taskId = task.id;
+  bar.title = `${task.title} (${rangeLabel})`;
+
+  const barLabel = document.createElement("span");
+  barLabel.className = "gantt-bar-label";
+  barLabel.textContent = task.title;
+  bar.appendChild(barLabel);
+
+  const handleStart = document.createElement("button");
+  handleStart.type = "button";
+  handleStart.className = "gantt-handle";
+  handleStart.dataset.taskId = task.id;
+  handleStart.dataset.handle = "start";
+  handleStart.setAttribute("aria-label", "Abhängigkeit starten");
+  handleStart.addEventListener("click", (event) => event.stopPropagation());
+
+  const handleEnd = document.createElement("button");
+  handleEnd.type = "button";
+  handleEnd.className = "gantt-handle";
+  handleEnd.dataset.taskId = task.id;
+  handleEnd.dataset.handle = "end";
+  handleEnd.setAttribute("aria-label", "Abhängigkeit beenden");
+  handleEnd.addEventListener("click", (event) => event.stopPropagation());
+
+  bar.appendChild(handleStart);
+  bar.appendChild(handleEnd);
+  bar.addEventListener("click", (event) => {
+    if (event.target.closest(".gantt-handle")) return;
+    openTaskModal(task.id);
+  });
+
+  track.appendChild(bar);
+  row.appendChild(track);
+  return row;
+};
+
+const getGanttHandlePosition = (handle, container) => {
+  const handleRect = handle.getBoundingClientRect();
+  const containerRect = container.getBoundingClientRect();
+  return {
+    x: handleRect.left - containerRect.left + handleRect.width / 2,
+    y: handleRect.top - containerRect.top + handleRect.height / 2,
+  };
+};
+
+const getGanttPointerPosition = (event, container) => {
+  const containerRect = container.getBoundingClientRect();
+  return {
+    x: event.clientX - containerRect.left,
+    y: event.clientY - containerRect.top,
+  };
+};
+
+const buildGanttLinkPath = (start, end) => {
+  const delta = Math.max(36, Math.abs(end.x - start.x) / 2);
+  const c1x = start.x + delta;
+  const c2x = end.x - delta;
+  return `M ${start.x} ${start.y} C ${c1x} ${start.y} ${c2x} ${end.y} ${end.x} ${end.y}`;
+};
+
+const updateGanttLinks = () => {
+  if (!ganttState.body || !ganttState.links) return;
+  const { body, links, tasks } = ganttState;
+  if (!Array.isArray(tasks) || !tasks.length) {
+    links.innerHTML = "";
+    return;
+  }
+  links.innerHTML = "";
+  const width = Math.max(body.scrollWidth, body.clientWidth);
+  const height = Math.max(body.scrollHeight, body.clientHeight);
+  links.setAttribute("width", String(width));
+  links.setAttribute("height", String(height));
+  links.setAttribute("viewBox", `0 0 ${width} ${height}`);
+
+  const svgNS = "http://www.w3.org/2000/svg";
+  const defs = document.createElementNS(svgNS, "defs");
+  const marker = document.createElementNS(svgNS, "marker");
+  marker.setAttribute("id", "gantt-arrow");
+  marker.setAttribute("viewBox", "0 0 10 10");
+  marker.setAttribute("refX", "8");
+  marker.setAttribute("refY", "5");
+  marker.setAttribute("markerWidth", "6");
+  marker.setAttribute("markerHeight", "6");
+  marker.setAttribute("orient", "auto-start-reverse");
+  const arrow = document.createElementNS(svgNS, "path");
+  arrow.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
+  arrow.setAttribute("fill", "#c08457");
+  marker.appendChild(arrow);
+  defs.appendChild(marker);
+  links.appendChild(defs);
+
+  tasks.forEach((task) => {
+    if (!Array.isArray(task.dependencyIds)) return;
+    task.dependencyIds.forEach((dependencyId) => {
+      const fromHandle = body.querySelector(
+        `.gantt-handle[data-task-id="${dependencyId}"][data-handle="end"]`,
+      );
+      const toHandle = body.querySelector(
+        `.gantt-handle[data-task-id="${task.id}"][data-handle="start"]`,
+      );
+      if (!fromHandle || !toHandle) return;
+      const start = getGanttHandlePosition(fromHandle, body);
+      const end = getGanttHandlePosition(toHandle, body);
+      const path = document.createElementNS(svgNS, "path");
+      path.classList.add("gantt-link-path");
+      path.setAttribute("d", buildGanttLinkPath(start, end));
+      path.setAttribute("marker-end", "url(#gantt-arrow)");
+      links.appendChild(path);
+    });
+  });
+};
+
+const scheduleGanttLinksUpdate = () => {
+  if (ganttLinkFrame) return;
+  ganttLinkFrame = window.requestAnimationFrame(() => {
+    ganttLinkFrame = null;
+    updateGanttLinks();
+  });
+};
+
+const clearGanttDragState = () => {
+  if (ganttState.previewPath) {
+    ganttState.previewPath.remove();
+    ganttState.previewPath = null;
+  }
+  if (ganttState.hoverHandle) {
+    ganttState.hoverHandle.classList.remove("is-target");
+    ganttState.hoverHandle = null;
+  }
+  ganttState.dragging = null;
+  document.removeEventListener("pointermove", handleGanttPointerMove);
+};
+
+const handleGanttPointerMove = (event) => {
+  if (!ganttState.dragging || !ganttState.body || !ganttState.previewPath)
+    return;
+  const point = getGanttPointerPosition(event, ganttState.body);
+  const nextPath = buildGanttLinkPath(ganttState.dragging.startPos, point);
+  ganttState.previewPath.setAttribute("d", nextPath);
+
+  const hovered = document
+    .elementFromPoint(event.clientX, event.clientY)
+    ?.closest?.(".gantt-handle");
+  if (hovered === ganttState.hoverHandle) return;
+  if (ganttState.hoverHandle) {
+    ganttState.hoverHandle.classList.remove("is-target");
+  }
+  if (hovered && hovered.dataset.taskId !== ganttState.dragging.sourceTaskId) {
+    hovered.classList.add("is-target");
+    ganttState.hoverHandle = hovered;
+  } else {
+    ganttState.hoverHandle = null;
+  }
+};
+
+const handleGanttPointerUp = (event) => {
+  if (!ganttState.dragging) {
+    clearGanttDragState();
+    return;
+  }
+  const targetHandle = document
+    .elementFromPoint(event.clientX, event.clientY)
+    ?.closest?.(".gantt-handle");
+  const sourceTaskId = ganttState.dragging.sourceTaskId;
+  let didUpdate = false;
+
+  if (
+    targetHandle &&
+    targetHandle.dataset.taskId &&
+    targetHandle.dataset.taskId !== sourceTaskId
+  ) {
+    const targetTaskId = targetHandle.dataset.taskId;
+    const taskMap = buildTaskMap();
+    const targetTask = taskMap.get(targetTaskId);
+    if (targetTask) {
+      const nextDependencies = Array.isArray(targetTask.dependencyIds)
+        ? [...targetTask.dependencyIds]
+        : [];
+      if (!nextDependencies.includes(sourceTaskId)) {
+        if (wouldCreateCycle(targetTaskId, sourceTaskId, taskMap)) {
+          window.alert("Diese Abhängigkeit würde einen Zyklus erzeugen.");
+        } else {
+          nextDependencies.push(sourceTaskId);
+          targetTask.dependencyIds = nextDependencies;
+          targetTask.updatedAt = new Date().toISOString();
+          logTaskUpdate(targetTask, { dependencies: nextDependencies });
+          saveState();
+          didUpdate = true;
+        }
+      }
+    }
+  }
+
+  clearGanttDragState();
+  if (didUpdate) {
+    renderTasksPanel();
+  } else {
+    scheduleGanttLinksUpdate();
+  }
+};
+
+const handleGanttPointerDown = (event) => {
+  const handle = event.target?.closest?.(".gantt-handle");
+  if (!handle || !ganttState.body || !ganttState.links) return;
+  const taskId = handle.dataset.taskId;
+  if (!taskId) return;
+  event.preventDefault();
+  event.stopPropagation();
+
+  const startPos = getGanttHandlePosition(handle, ganttState.body);
+  const svgNS = "http://www.w3.org/2000/svg";
+  const preview = document.createElementNS(svgNS, "path");
+  preview.classList.add("gantt-link-path", "is-preview");
+  preview.setAttribute("d", buildGanttLinkPath(startPos, startPos));
+  ganttState.links.appendChild(preview);
+
+  ganttState.dragging = {
+    sourceTaskId: taskId,
+    startPos,
+  };
+  ganttState.previewPath = preview;
+
+  handle.setPointerCapture(event.pointerId);
+  document.addEventListener("pointermove", handleGanttPointerMove);
+  document.addEventListener("pointerup", handleGanttPointerUp, { once: true });
+  document.addEventListener("pointercancel", handleGanttPointerUp, {
+    once: true,
+  });
+};
+
+const renderGanttCalendar = (tasks = state.tasks) => {
+  if (!elements.ganttChart) return;
+  elements.ganttChart.innerHTML = "";
+  ganttState.body = null;
+  ganttState.links = null;
+  ganttState.tasks = [];
+  ganttState.range = null;
 
   if (!tasks.length) {
     const empty = document.createElement("div");
-    empty.className = "timeline-empty";
-    empty.textContent = "Noch keine Aufgaben für die Timeline.";
-    elements.timelineList.appendChild(empty);
+    empty.className = "gantt-empty";
+    empty.textContent = "Noch keine Aufgaben für den Kalender.";
+    elements.ganttChart.appendChild(empty);
+    if (elements.ganttRange) {
+      elements.ganttRange.textContent = "";
+    }
     return;
   }
 
@@ -7041,97 +7406,101 @@ const renderTimeline = (tasks = state.tasks) => {
   const unscheduled = [];
 
   tasks.forEach((task) => {
-    const dateKey = getTaskScheduleDate(task);
-    const parsed = parseDateInput(dateKey);
-    if (!parsed) {
+    const range = getTaskDateRange(task);
+    if (!range) {
       unscheduled.push(task);
     } else {
-      scheduled.push({ task, date: parsed, type: "task" });
-    }
-
-    const deliveryDate = getTaskDeliveryDate(task);
-    if (deliveryDate) {
-      const deliveryParsed = parseDateInput(deliveryDate);
-      if (deliveryParsed) {
-        scheduled.push({ task, date: deliveryParsed, type: "delivery" });
-      }
+      scheduled.push({ task, range });
     }
   });
 
-  scheduled.sort((a, b) => a.date - b.date);
+  if (!scheduled.length) {
+    const empty = document.createElement("div");
+    empty.className = "gantt-empty";
+    empty.textContent =
+      "Keine Aufgaben mit Start-/Enddatum. Bitte Aufgaben planen.";
+    elements.ganttChart.appendChild(empty);
+  } else {
+    const chartRange = buildGanttRange(scheduled.map((entry) => entry.range));
+    ganttState.range = chartRange;
 
-  const monthGroups = new Map();
-  scheduled.forEach((entry) => {
-    const monthKey = `${entry.date.getFullYear()}-${String(
-      entry.date.getMonth() + 1,
-    ).padStart(2, "0")}`;
-    if (!monthGroups.has(monthKey)) {
-      monthGroups.set(monthKey, {
-        date: new Date(entry.date.getFullYear(), entry.date.getMonth(), 1),
-        weeks: new Map(),
-      });
-    }
-    const group = monthGroups.get(monthKey);
-    const weekStart = getWeekStart(entry.date);
-    const weekKey = weekStart.toISOString().slice(0, 10);
-    if (!group.weeks.has(weekKey)) {
-      group.weeks.set(weekKey, {
-        date: weekStart,
-        entries: [],
-      });
-    }
-    group.weeks.get(weekKey).entries.push(entry);
-  });
-
-  const orderedMonths = Array.from(monthGroups.values()).sort(
-    (a, b) => a.date - b.date,
-  );
-
-  orderedMonths.forEach((monthGroup) => {
-    const section = document.createElement("div");
-    const heading = document.createElement("div");
-    heading.className = "timeline-month";
-    heading.textContent = formatMonthLabel(monthGroup.date);
-    section.appendChild(heading);
-
-    const orderedWeeks = Array.from(monthGroup.weeks.values()).sort(
-      (a, b) => a.date - b.date,
+    const scroll = document.createElement("div");
+    scroll.className = "gantt-scroll";
+    const frame = document.createElement("div");
+    frame.className = "gantt-frame";
+    frame.style.setProperty("--gantt-day-width", `${GANTT_DAY_WIDTH}px`);
+    frame.style.setProperty("--gantt-label-width", `${GANTT_LABEL_WIDTH}px`);
+    frame.style.setProperty(
+      "--gantt-grid-width",
+      `${chartRange.dayCount * GANTT_DAY_WIDTH}px`,
     );
+    scroll.appendChild(frame);
+    elements.ganttChart.appendChild(scroll);
 
-    orderedWeeks.forEach((weekGroup) => {
-      const weekSection = document.createElement("div");
-      weekSection.className = "timeline-week";
+    frame.appendChild(buildGanttHeader(chartRange));
 
-      const weekLabel = document.createElement("div");
-      weekLabel.className = "timeline-week-label";
-      weekLabel.textContent = formatWeekLabel(weekGroup.date);
-      weekSection.appendChild(weekLabel);
+    const body = document.createElement("div");
+    body.className = "gantt-body";
+    frame.appendChild(body);
+    ganttState.body = body;
 
-      const list = document.createElement("ul");
-      list.className = "timeline-items";
-      weekGroup.entries.forEach((entry) => {
-        list.appendChild(buildTimelineEntry(entry, taskMap));
-      });
-      weekSection.appendChild(list);
-      section.appendChild(weekSection);
+    const todayIndex = getDayIndex(new Date(), chartRange.start);
+    if (todayIndex >= 0 && todayIndex < chartRange.dayCount) {
+      const todayLine = document.createElement("div");
+      todayLine.className = "gantt-today-line";
+      todayLine.style.left = `${todayIndex * GANTT_DAY_WIDTH}px`;
+      body.appendChild(todayLine);
+    }
+
+    const sorted = scheduled.slice().sort((a, b) => {
+      const startDiff = a.range.startDate - b.range.startDate;
+      if (startDiff !== 0) return startDiff;
+      return a.range.endDate - b.range.endDate;
     });
-    elements.timelineList.appendChild(section);
-  });
+
+    sorted.forEach(({ task, range }) => {
+      body.appendChild(buildGanttRow(task, range, chartRange, taskMap));
+    });
+
+    const links = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "svg",
+    );
+    links.classList.add("gantt-links");
+    body.appendChild(links);
+    ganttState.links = links;
+    ganttState.tasks = sorted.map((entry) => entry.task);
+
+    if (elements.ganttRange) {
+      elements.ganttRange.textContent = formatGanttRangeLabel(
+        chartRange.start,
+        chartRange.end,
+      );
+    }
+
+    scheduleGanttLinksUpdate();
+  }
 
   if (unscheduled.length) {
-    const section = document.createElement("div");
-    const heading = document.createElement("div");
-    heading.className = "timeline-month";
-    heading.textContent = "Ohne Termin";
-    section.appendChild(heading);
+    const unscheduledPanel = document.createElement("div");
+    unscheduledPanel.className = "gantt-unscheduled";
+    const title = document.createElement("h4");
+    title.textContent = "Ohne Termin";
+    unscheduledPanel.appendChild(title);
 
     const list = document.createElement("ul");
-    list.className = "timeline-items";
+    list.className = "gantt-unscheduled-list";
     unscheduled.forEach((task) => {
-      list.appendChild(buildTimelineItem(task, taskMap));
+      const item = document.createElement("li");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = task.title;
+      button.addEventListener("click", () => openTaskModal(task.id));
+      item.appendChild(button);
+      list.appendChild(item);
     });
-    section.appendChild(list);
-    elements.timelineList.appendChild(section);
+    unscheduledPanel.appendChild(list);
+    elements.ganttChart.appendChild(unscheduledPanel);
   }
 };
 
@@ -7495,9 +7864,12 @@ const renderTasksPanel = () => {
   renderDecisionTaskOptions();
   const filtered = renderTaskList();
   if (!state.isMobileView) {
-    renderTimeline(Array.isArray(filtered) ? filtered : state.tasks);
-  } else if (elements.timelineList) {
-    elements.timelineList.innerHTML = "";
+    renderGanttCalendar(Array.isArray(filtered) ? filtered : state.tasks);
+  } else if (elements.ganttChart) {
+    elements.ganttChart.innerHTML = "";
+    if (elements.ganttRange) {
+      elements.ganttRange.textContent = "";
+    }
   }
   renderEvidenceUploadTargets();
 };
@@ -7533,11 +7905,60 @@ const renderTaskFiles = (task) => {
     return;
   }
   elements.taskFileEmpty.hidden = true;
-  entries.forEach(({ file, roomId }) => {
-    elements.taskFileList.appendChild(
-      buildEvidenceCard(file, { roomId, showTaskTag: false }),
-    );
-  });
+  const linkEntries = entries.filter(
+    ({ file }) => file?.type === "link" || file?.source === "link",
+  );
+  const otherEntries = entries.filter(
+    ({ file }) => file?.type !== "link" && file?.source !== "link",
+  );
+
+  if (linkEntries.length) {
+    const linkList = document.createElement("div");
+    linkList.className = "task-file-links";
+    linkEntries.forEach(({ file, roomId }) => {
+      const row = document.createElement("div");
+      row.className = "task-link-row";
+      const label = file?.label || file?.name || file?.url || "Link";
+      const resolvedRoomId =
+        typeof file?.roomId === "string" && file.roomId.trim()
+          ? file.roomId.trim()
+          : roomId;
+      if (file?.url) {
+        const link = document.createElement("a");
+        link.className = "task-link-title";
+        link.href = file.url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = label;
+        row.appendChild(link);
+      } else {
+        const labelText = document.createElement("span");
+        labelText.className = "task-link-title";
+        labelText.textContent = label;
+        row.appendChild(labelText);
+      }
+
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.className = "task-link-remove image-delete";
+      deleteButton.textContent = "Löschen";
+      deleteButton.addEventListener("click", () =>
+        removeImage(file.id, resolvedRoomId),
+      );
+      row.appendChild(deleteButton);
+      linkList.appendChild(row);
+    });
+    elements.taskFileList.appendChild(linkList);
+  }
+
+  if (otherEntries.length) {
+    const gallery = document.createElement("div");
+    gallery.className = "image-gallery task-file-gallery";
+    otherEntries.forEach(({ file, roomId }) => {
+      gallery.appendChild(buildEvidenceCard(file, { roomId, showTaskTag: false }));
+    });
+    elements.taskFileList.appendChild(gallery);
+  }
 };
 
 const maybeUpdateTaskModalFiles = (taskId) => {
@@ -11747,6 +12168,7 @@ const bindEvents = () => {
       closeTaskModal();
     }
   });
+  elements.ganttChart?.addEventListener("pointerdown", handleGanttPointerDown);
   elements.roomChatTrigger?.addEventListener("click", () => {
     if (!state.activeRoomId) return;
     openChatModal({ scope: "room", roomId: state.activeRoomId });
@@ -11869,6 +12291,7 @@ const bindEvents = () => {
   });
   window.addEventListener("resize", closeCommentContextMenu);
   window.addEventListener("resize", closeTaskPlanMenu);
+  window.addEventListener("resize", scheduleGanttLinksUpdate);
   window.addEventListener("scroll", closeCommentContextMenu, true);
   window.addEventListener("scroll", closeTaskPlanMenu, true);
 

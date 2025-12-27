@@ -382,41 +382,49 @@ const startServer = () =>
       const needsBody = ["POST", "PATCH", "PUT", "DELETE"].includes(method);
       const body = needsBody ? await readRequestBody(req) : null;
 
-      const tasksResponse = await handleTasksApi({
-        method,
-        urlPath,
-        headers: req.headers,
-        query: parsedUrl.searchParams,
-        body,
-      });
+      try {
+        const tasksResponse = await handleTasksApi({
+          method,
+          urlPath,
+          headers: req.headers,
+          query: parsedUrl.searchParams,
+          body,
+        });
 
-      if (tasksResponse) {
-        sendJson(res, tasksResponse.statusCode, tasksResponse.payload);
-        return;
-      }
+        if (tasksResponse) {
+          sendJson(res, tasksResponse.statusCode, tasksResponse.payload);
+          return;
+        }
 
-      const emailResponse = await handleEmailApi({
-        method,
-        urlPath,
-        headers: req.headers,
-        query: parsedUrl.searchParams,
-        body,
-      });
+        const emailResponse = await handleEmailApi({
+          method,
+          urlPath,
+          headers: req.headers,
+          query: parsedUrl.searchParams,
+          body,
+        });
 
-      if (emailResponse) {
-        sendJson(res, emailResponse.statusCode, emailResponse.payload);
-        return;
-      }
+        if (emailResponse) {
+          sendJson(res, emailResponse.statusCode, emailResponse.payload);
+          return;
+        }
 
-      const evidenceResponse = await handleEvidenceApi({
-        method,
-        urlPath,
-        headers: req.headers,
-        body: method === "POST" ? body : null,
-      });
+        const evidenceResponse = await handleEvidenceApi({
+          method,
+          urlPath,
+          headers: req.headers,
+          body: method === "POST" ? body : null,
+        });
 
-      if (evidenceResponse) {
-        sendJson(res, evidenceResponse.statusCode, evidenceResponse.payload);
+        if (evidenceResponse) {
+          sendJson(res, evidenceResponse.statusCode, evidenceResponse.payload);
+          return;
+        }
+      } catch (error) {
+        sendJson(res, 500, {
+          error: error?.message || "Unhandled error.",
+          code: "unhandled_error",
+        });
         return;
       }
 

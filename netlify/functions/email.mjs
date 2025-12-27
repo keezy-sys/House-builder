@@ -21,26 +21,35 @@ const parseBody = (event) => {
 };
 
 export const handler = async (event) => {
-  const urlPath = String(event.path || "")
-    .replace(/^\/\.netlify\/functions\/email/, "/api/email")
-    .trim();
-  const query = new URLSearchParams(event.queryStringParameters || {});
-  const body = parseBody(event);
+  try {
+    const urlPath = String(event.path || "")
+      .replace(/^\/\.netlify\/functions\/email/, "/api/email")
+      .trim();
+    const query = new URLSearchParams(event.queryStringParameters || {});
+    const body = parseBody(event);
 
-  const result = await handleEmailApi({
-    method: event.httpMethod,
-    urlPath,
-    headers: event.headers,
-    body,
-    query,
-  });
+    const result = await handleEmailApi({
+      method: event.httpMethod,
+      urlPath,
+      headers: event.headers,
+      body,
+      query,
+    });
 
-  if (!result) {
-    return jsonResponse(404, {
-      error: "Not found.",
-      code: "not_found",
+    if (!result) {
+      return jsonResponse(404, {
+        error: "Not found.",
+        code: "not_found",
+      });
+    }
+
+    return jsonResponse(result.statusCode, result.payload);
+  } catch (error) {
+    // Surface function crashes in Netlify logs.
+    console.error("Email function error:", error);
+    return jsonResponse(500, {
+      error: error?.message || "Unhandled error.",
+      code: "unhandled_error",
     });
   }
-
-  return jsonResponse(result.statusCode, result.payload);
 };
