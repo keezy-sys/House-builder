@@ -892,6 +892,7 @@ svg {
   --gantt-day-width: 34px;
   --gantt-label-width: 220px;
   --gantt-grid-width: 480px;
+
   display: grid;
   gap: 0.4rem;
   width: max-content;
@@ -1136,17 +1137,6 @@ svg {
   margin: 0;
   display: grid;
   gap: 0.4rem;
-}
-
-.gantt-unscheduled-list button {
-  border: none;
-  background: #f6e0c7;
-  color: #7f1d1d;
-  padding: 0.3rem 0.6rem;
-  border-radius: 999px;
-  font-weight: 700;
-  cursor: pointer;
-  text-align: left;
 }
 
 .modal {
@@ -1779,6 +1769,17 @@ button {
   background: #fffaf4;
   cursor: pointer;
   font-weight: 600;
+}
+
+.gantt-unscheduled-list button {
+  border: none;
+  background: #f6e0c7;
+  color: #7f1d1d;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
 }
 
 .email-connect-actions button {

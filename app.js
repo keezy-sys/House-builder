@@ -747,7 +747,7 @@ const isLocalHost = ["localhost", "127.0.0.1"].includes(
 
 const state = {
   activeRoomId: null,
-  activeFloorId: "upper",
+  activeFloorId: "ground",
   activeView: "room",
   activeRoomTab: "overview",
   isMobileView: false,
@@ -2713,6 +2713,11 @@ const getEmailOAuthErrorMessage = (response, data, fallback) => {
     return "Unbekannter E-Mail-Anbieter.";
   }
   if (code === "oauth_connect_failed") {
+    const detail =
+      String(data?._rawText || "").trim() || String(data?.error || "").trim();
+    if (detail) {
+      return `OAuth konnte nicht abgeschlossen werden: ${detail.slice(0, 180)}`;
+    }
     return "OAuth konnte nicht abgeschlossen werden.";
   }
   const rawText = String(data?._rawText || "").trim();
@@ -7470,10 +7475,7 @@ const renderGanttCalendar = (tasks = state.tasks) => {
       body.appendChild(buildGanttRow(task, range, chartRange, taskMap));
     });
 
-    const links = document.createElementNS(
-      "http://www.w3.org/2000/svg",
-      "svg",
-    );
+    const links = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     links.classList.add("gantt-links");
     body.appendChild(links);
     ganttState.links = links;
@@ -7963,7 +7965,9 @@ const renderTaskFiles = (task) => {
     const gallery = document.createElement("div");
     gallery.className = "image-gallery task-file-gallery";
     otherEntries.forEach(({ file, roomId }) => {
-      gallery.appendChild(buildEvidenceCard(file, { roomId, showTaskTag: false }));
+      gallery.appendChild(
+        buildEvidenceCard(file, { roomId, showTaskTag: false }),
+      );
     });
     elements.taskFileList.appendChild(gallery);
   }
@@ -8215,9 +8219,7 @@ const renderEmailThreadView = () => {
     elements.emailReplyTranslate.disabled = false;
   }
   if (elements.emailReplyTranslation) {
-    const hasTranslation = Boolean(
-      elements.emailReplyTextIt?.value?.trim(),
-    );
+    const hasTranslation = Boolean(elements.emailReplyTextIt?.value?.trim());
     elements.emailReplyTranslation.hidden = !hasTranslation;
   }
   if (elements.emailReplySend) {

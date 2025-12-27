@@ -187,11 +187,7 @@ const buildMessageCacheRows = (messages, linkId) =>
     })
     .filter(Boolean);
 
-const upsertMessageCache = async ({
-  supabaseConfig,
-  accessToken,
-  rows,
-}) => {
+const upsertMessageCache = async ({ supabaseConfig, accessToken, rows }) => {
   if (!rows?.length) return;
   await supabaseRequest({
     supabaseConfig,
@@ -203,11 +199,7 @@ const upsertMessageCache = async ({
   });
 };
 
-const fetchCachedMessages = async ({
-  supabaseConfig,
-  accessToken,
-  linkId,
-}) =>
+const fetchCachedMessages = async ({ supabaseConfig, accessToken, linkId }) =>
   supabaseRequest({
     supabaseConfig,
     accessToken,
@@ -812,7 +804,9 @@ const handleEmailApi = async ({ method, urlPath, headers, body, query }) => {
       return buildError(405, "Method not allowed.", "method_not_allowed");
     }
     const messageCacheId = String(body?.messageCacheId || "").trim();
-    const targetLang = String(body?.targetLang || "").trim().toLowerCase();
+    const targetLang = String(body?.targetLang || "")
+      .trim()
+      .toLowerCase();
     if (!messageCacheId || !targetLang) {
       return buildError(
         400,
@@ -851,11 +845,7 @@ const handleEmailApi = async ({ method, urlPath, headers, body, query }) => {
       String(message.body_text || "").trim() ||
       stripHtml(message.body_html || "");
     if (!messageText) {
-      return buildError(
-        400,
-        "Message body missing.",
-        "missing_message_body",
-      );
+      return buildError(400, "Message body missing.", "missing_message_body");
     }
     try {
       const result = await translate({
@@ -916,7 +906,9 @@ const handleEmailApi = async ({ method, urlPath, headers, body, query }) => {
       return buildError(405, "Method not allowed.", "method_not_allowed");
     }
     const text = String(body?.text || "").trim();
-    const targetLang = String(body?.targetLang || "").trim().toLowerCase();
+    const targetLang = String(body?.targetLang || "")
+      .trim()
+      .toLowerCase();
     if (!text || !targetLang) {
       return buildError(
         400,
@@ -1057,7 +1049,13 @@ const handleEmailApi = async ({ method, urlPath, headers, body, query }) => {
       return buildError(400, "Missing auth code.", "missing_code");
     }
     try {
-      const tokens = await provider.exchangeCode({ code });
+      const tokens = await provider.exchangeCode({ code }).catch((error) => {
+        const wrapped = new Error(
+          `Token exchange failed: ${error?.message || "Unknown error."}`,
+        );
+        wrapped.statusCode = error?.statusCode || 502;
+        throw wrapped;
+      });
       const expiresAt = tokens.expires_in
         ? new Date(Date.now() + tokens.expires_in * 1000).toISOString()
         : null;
@@ -1067,39 +1065,63 @@ const handleEmailApi = async ({ method, urlPath, headers, body, query }) => {
         userId: user.id,
         provider: providerKey,
       });
-      const profile = await provider.fetchProfile({
-        accessToken: tokens.access_token,
-      });
+      const profile = await provider
+        .fetchProfile({
+          accessToken: tokens.access_token,
+        })
+        .catch((error) => {
+          const wrapped = new Error(
+            `Profile fetch failed: ${error?.message || "Unknown error."}`,
+          );
+          wrapped.statusCode = error?.statusCode || 502;
+          throw wrapped;
+        });
       const emailAddress =
         profile?.emailAddress ||
         profile?.mail ||
         profile?.userPrincipalName ||
         "";
-      const containerId = await provider.ensureLuganoContainer({
-        accessToken: tokens.access_token,
-      });
+      const containerId = await provider
+        .ensureLuganoContainer({
+          accessToken: tokens.access_token,
+        })
+        .catch((error) => {
+          const wrapped = new Error(
+            `Lugano container failed: ${error?.message || "Unknown error."}`,
+          );
+          wrapped.statusCode = error?.statusCode || 502;
+          throw wrapped;
+        });
       const scopeList = String(tokens.scope || "")
         .split(" ")
         .map((scope) => scope.trim())
         .filter(Boolean);
-      await upsertEmailAccount({
-        supabaseConfig,
-        accessToken,
-        payload: {
-          user_id: user.id,
-          provider: providerKey,
-          email_address: emailAddress || user.email || "",
-          access_token_enc: encrypt(tokens.access_token),
-          refresh_token_enc: tokens.refresh_token
-            ? encrypt(tokens.refresh_token)
-            : existingAccount?.refresh_token_enc || null,
-          token_expires_at: expiresAt,
-          scopes: scopeList.length ? scopeList : null,
-          lugano_container_id: containerId,
-          is_paused: false,
-          updated_at: new Date().toISOString(),
-        },
-      });
+      try {
+        await upsertEmailAccount({
+          supabaseConfig,
+          accessToken,
+          payload: {
+            user_id: user.id,
+            provider: providerKey,
+            email_address: emailAddress || user.email || "",
+            access_token_enc: encrypt(tokens.access_token),
+            refresh_token_enc: tokens.refresh_token
+              ? encrypt(tokens.refresh_token)
+              : existingAccount?.refresh_token_enc || null,
+            token_expires_at: expiresAt,
+            scopes: scopeList.length ? scopeList : null,
+            lugano_container_id: containerId,
+            is_paused: false,
+            updated_at: new Date().toISOString(),
+          },
+        });
+      } catch (error) {
+        const wrapped = new Error(
+          `Account save failed: ${error?.message || "Unknown error."}`,
+        );
+        wrapped.statusCode = error?.statusCode || 502;
+        throw wrapped;
+      }
       await logEmailActivity({
         supabaseConfig,
         accessToken,
