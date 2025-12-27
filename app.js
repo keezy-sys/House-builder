@@ -7149,7 +7149,9 @@ const buildGanttRow = (task, range, chartRange, taskMap) => {
   const startIndex = getDayIndex(range.startDate, chartRange.start);
   const endIndex = getDayIndex(range.endDate, chartRange.start);
   const left = Math.max(startIndex, 0) * GANTT_DAY_WIDTH;
-  const width = (Math.max(endIndex, startIndex) - Math.min(endIndex, startIndex) + 1) * GANTT_DAY_WIDTH;
+  const width =
+    (Math.max(endIndex, startIndex) - Math.min(endIndex, startIndex) + 1) *
+    GANTT_DAY_WIDTH;
   bar.style.left = `${left}px`;
   bar.style.width = `${width}px`;
   bar.dataset.taskId = task.id;
@@ -7283,6 +7285,8 @@ const clearGanttDragState = () => {
   }
   ganttState.dragging = null;
   document.removeEventListener("pointermove", handleGanttPointerMove);
+  document.removeEventListener("pointerup", handleGanttPointerUp);
+  document.removeEventListener("pointercancel", handleGanttPointerUp);
 };
 
 const handleGanttPointerMove = (event) => {
@@ -7384,6 +7388,7 @@ const handleGanttPointerDown = (event) => {
 
 const renderGanttCalendar = (tasks = state.tasks) => {
   if (!elements.ganttChart) return;
+  clearGanttDragState();
   elements.ganttChart.innerHTML = "";
   ganttState.body = null;
   ganttState.links = null;
@@ -7420,6 +7425,9 @@ const renderGanttCalendar = (tasks = state.tasks) => {
     empty.textContent =
       "Keine Aufgaben mit Start-/Enddatum. Bitte Aufgaben planen.";
     elements.ganttChart.appendChild(empty);
+    if (elements.ganttRange) {
+      elements.ganttRange.textContent = "";
+    }
   } else {
     const chartRange = buildGanttRange(scheduled.map((entry) => entry.range));
     ganttState.range = chartRange;
@@ -8925,10 +8933,21 @@ const handleTaskModalSubmit = (event) => {
     return;
   }
 
-  const nextStartDate = isValidDateInput(nextStartValue)
-    ? nextStartValue
-    : null;
-  const nextEndDate = isValidDateInput(nextEndValue) ? nextEndValue : null;
+  let nextStartDate = isValidDateInput(nextStartValue) ? nextStartValue : null;
+  let nextEndDate = isValidDateInput(nextEndValue) ? nextEndValue : null;
+  if (nextStartDate && !nextEndDate) {
+    nextEndDate = nextStartDate;
+  }
+  if (nextEndDate && !nextStartDate) {
+    nextStartDate = nextEndDate;
+  }
+  if (nextStartDate && nextEndDate) {
+    const parsedStart = parseDateInput(nextStartDate);
+    const parsedEnd = parseDateInput(nextEndDate);
+    if (parsedStart && parsedEnd && parsedStart > parsedEnd) {
+      [nextStartDate, nextEndDate] = [nextEndDate, nextStartDate];
+    }
+  }
   const dependenciesChanged =
     previousDependencies.length !== validDependencyIds.length ||
     previousDependencies.some((id) => !validDependencyIds.includes(id));
