@@ -1,29 +1,13 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+import {
+  buildLuganoFloorPlans,
+  EXTERIOR_ROOMS,
+  FLOORPLAN_CONFIG,
+  MM_PER_PX,
+} from "./src/data/lugano/floorplan-data.js";
 
-const DEFAULT_VIEWBOX = { x: 0, y: 0, width: 800, height: 520 };
-const OUTER_WALL_BOUNDS = { x: 30, y: 30, width: 740, height: 460 };
-const EXTERIOR_SCALE = 2.5;
-const EXTERIOR_TERRACE_DEPTH_PX = Math.round(80 * EXTERIOR_SCALE);
-const EXTERIOR_CORRIDOR_DEPTH_PX = Math.round(40 * EXTERIOR_SCALE);
-const EXTERIOR_STAIRS_DEPTH_PX = Math.round(80 * EXTERIOR_SCALE);
-const EXTERIOR_STAIRS_HEIGHT_PX = 170;
-const EXTERIOR_STAIRS_Y_PX = 320;
-const EXTERIOR_OG_TERRACE_HEIGHT_PX = 300;
-const EXTERIOR_OG_TERRACE_Y_PX = 190;
-const EXTERIOR_VIEWBOX = {
-  x: OUTER_WALL_BOUNDS.x - EXTERIOR_TERRACE_DEPTH_PX,
-  y: OUTER_WALL_BOUNDS.y - EXTERIOR_TERRACE_DEPTH_PX,
-  width:
-    OUTER_WALL_BOUNDS.width +
-    EXTERIOR_TERRACE_DEPTH_PX +
-    EXTERIOR_STAIRS_DEPTH_PX,
-  height:
-    OUTER_WALL_BOUNDS.height +
-    EXTERIOR_TERRACE_DEPTH_PX +
-    EXTERIOR_CORRIDOR_DEPTH_PX,
-};
-const floorBounds = { x: 50, y: 50, width: 680, height: 400 };
-const MM_PER_PX = 20;
+const { DEFAULT_VIEWBOX, OUTER_WALL_BOUNDS, EXTERIOR_VIEWBOX, floorBounds } =
+  FLOORPLAN_CONFIG;
 const WALL_HEIGHT_MM = 2800;
 const DEFAULT_DOOR_HEIGHT_MM = 2100;
 const DEFAULT_WINDOW_HEIGHT_MM = 1400;
@@ -247,49 +231,6 @@ const LEGACY_UPPER_LAYOUT = [
   { id: "upper-storage", x: 610, y: 360, width: 120, height: 90 },
 ];
 
-const EXTERIOR_ROOMS = {
-  ground: [
-    {
-      id: "ground-terrace",
-      name: "Terrasse unten",
-      exteriorType: "terrace",
-      x: OUTER_WALL_BOUNDS.x,
-      y: OUTER_WALL_BOUNDS.y - EXTERIOR_TERRACE_DEPTH_PX,
-      width: OUTER_WALL_BOUNDS.width,
-      height: EXTERIOR_TERRACE_DEPTH_PX,
-    },
-    {
-      id: "ground-stairs",
-      name: "Aussentreppe",
-      exteriorType: "stairs",
-      x: OUTER_WALL_BOUNDS.x + OUTER_WALL_BOUNDS.width,
-      y: EXTERIOR_STAIRS_Y_PX,
-      width: EXTERIOR_STAIRS_DEPTH_PX,
-      height: EXTERIOR_STAIRS_HEIGHT_PX,
-    },
-  ],
-  upper: [
-    {
-      id: "upper-terrace",
-      name: "Terrasse oben",
-      exteriorType: "terrace",
-      x: OUTER_WALL_BOUNDS.x - EXTERIOR_TERRACE_DEPTH_PX,
-      y: EXTERIOR_OG_TERRACE_Y_PX,
-      width: EXTERIOR_TERRACE_DEPTH_PX,
-      height: EXTERIOR_OG_TERRACE_HEIGHT_PX,
-    },
-    {
-      id: "upper-corridor",
-      name: "Durchgang",
-      exteriorType: "corridor",
-      x: OUTER_WALL_BOUNDS.x,
-      y: OUTER_WALL_BOUNDS.y + OUTER_WALL_BOUNDS.height,
-      width: OUTER_WALL_BOUNDS.width,
-      height: EXTERIOR_CORRIDOR_DEPTH_PX,
-    },
-  ],
-};
-
 const getDefaultOpeningHeightMm = (type) =>
   type === "door" ? DEFAULT_DOOR_HEIGHT_MM : DEFAULT_WINDOW_HEIGHT_MM;
 
@@ -341,343 +282,14 @@ const ensureExteriorRooms = (floorPlans) => {
   return floorPlans;
 };
 
-const buildDefaultFloorPlans = () =>
-  ensureExteriorRooms({
-    ground: {
-      id: "ground",
-      name: "Erdgeschoss",
-      rooms: [
-        {
-          id: "ground-bedroom-left",
-          name: "Schlafzimmer",
-          x: 50,
-          y: 50,
-          width: 230,
-          height: 160,
-        },
-        {
-          id: "ground-living",
-          name: "Wohnzimmer",
-          x: 280,
-          y: 50,
-          width: 260,
-          height: 160,
-        },
-        {
-          id: "ground-bedroom-right",
-          name: "Schlafzimmer",
-          x: 540,
-          y: 50,
-          width: 190,
-          height: 230,
-        },
-        {
-          id: "ground-cellar",
-          name: "Keller",
-          x: 50,
-          y: 210,
-          width: 230,
-          height: 200,
-        },
-        {
-          id: "ground-kitchen",
-          name: "Küche",
-          x: 280,
-          y: 210,
-          width: 200,
-          height: 150,
-        },
-        {
-          id: "ground-bathroom",
-          name: "Bad",
-          x: 480,
-          y: 210,
-          width: 170,
-          height: 150,
-        },
-        {
-          id: "ground-hallway",
-          name: "Flur",
-          x: 280,
-          y: 360,
-          width: 330,
-          height: 90,
-        },
-        {
-          id: "ground-storage",
-          name: "Abstellschrank",
-          x: 610,
-          y: 360,
-          width: 120,
-          height: 90,
-        },
-      ],
-      openings: applyOpeningDefaults([
-        {
-          id: "ground-window-left",
-          type: "window",
-          roomId: "ground-bedroom-left",
-          label: "Fenster Schlafzimmer links (EG)",
-          x1: 80,
-          y1: 40,
-          x2: 220,
-          y2: 40,
-        },
-        {
-          id: "ground-window-living",
-          type: "window",
-          roomId: "ground-living",
-          label: "Fenster Wohnzimmer (EG)",
-          x1: 320,
-          y1: 40,
-          x2: 520,
-          y2: 40,
-        },
-        {
-          id: "ground-window-right",
-          type: "window",
-          roomId: "ground-bedroom-right",
-          label: "Fenster Schlafzimmer rechts (EG)",
-          x1: 580,
-          y1: 40,
-          x2: 710,
-          y2: 40,
-        },
-        {
-          id: "ground-door-living-hall",
-          type: "door",
-          roomId: "ground-living",
-          label: "Tür Wohnzimmer → Flur (EG)",
-          x1: 380,
-          y1: 210,
-          x2: 460,
-          y2: 210,
-        },
-        {
-          id: "ground-door-kitchen-hall",
-          type: "door",
-          roomId: "ground-kitchen",
-          label: "Tür Küche → Flur (EG)",
-          x1: 340,
-          y1: 360,
-          x2: 400,
-          y2: 360,
-        },
-        {
-          id: "ground-door-bathroom-hall",
-          type: "door",
-          roomId: "ground-bathroom",
-          label: "Tür Bad → Flur (EG)",
-          x1: 520,
-          y1: 360,
-          x2: 580,
-          y2: 360,
-        },
-        {
-          id: "ground-door-bedroom-right",
-          type: "door",
-          roomId: "ground-bedroom-right",
-          label: "Tür Schlafzimmer rechts (EG)",
-          x1: 540,
-          y1: 190,
-          x2: 540,
-          y2: 220,
-        },
-        {
-          id: "ground-door-cellar",
-          type: "door",
-          roomId: "ground-cellar",
-          label: "Tür Keller (EG)",
-          x1: 250,
-          y1: 260,
-          x2: 280,
-          y2: 260,
-        },
-      ]),
-    },
-    upper: {
-      id: "upper",
-      name: "Obergeschoss",
-      rooms: [
-        {
-          id: "upper-living",
-          name: "Wohnzimmer",
-          x: 50,
-          y: 50,
-          width: 310,
-          height: 190,
-        },
-        {
-          id: "upper-bedroom-left",
-          name: "Schlafzimmer",
-          x: 360,
-          y: 50,
-          width: 200,
-          height: 120,
-        },
-        {
-          id: "upper-bedroom-right",
-          name: "Schlafzimmer",
-          x: 560,
-          y: 50,
-          width: 170,
-          height: 400,
-        },
-        {
-          id: "upper-cellar",
-          name: "Arbeitszimmer",
-          x: 50,
-          y: 240,
-          width: 180,
-          height: 210,
-        },
-        {
-          id: "upper-kitchen",
-          name: "Küche",
-          x: 230,
-          y: 240,
-          width: 130,
-          height: 210,
-        },
-        {
-          id: "upper-hallway",
-          name: "Flur",
-          x: 360,
-          y: 170,
-          width: 200,
-          height: 140,
-        },
-        {
-          id: "upper-storage",
-          name: "Treppe",
-          x: 360,
-          y: 310,
-          width: 90,
-          height: 140,
-        },
-        {
-          id: "upper-bathroom",
-          name: "Bad",
-          x: 450,
-          y: 310,
-          width: 110,
-          height: 140,
-        },
-      ],
-      openings: applyOpeningDefaults([
-        {
-          id: "upper-window-living",
-          type: "window",
-          roomId: "upper-living",
-          label: "Fenster Wohnzimmer (OG)",
-          x1: 120,
-          y1: 40,
-          x2: 280,
-          y2: 40,
-        },
-        {
-          id: "upper-window-bedroom",
-          type: "window",
-          roomId: "upper-bedroom-left",
-          label: "Fenster Schlafzimmer (OG)",
-          x1: 400,
-          y1: 40,
-          x2: 520,
-          y2: 40,
-        },
-        {
-          id: "upper-window-office",
-          type: "window",
-          roomId: "upper-cellar",
-          label: "Fenster Arbeitszimmer (OG)",
-          x1: 40,
-          y1: 300,
-          x2: 40,
-          y2: 360,
-        },
-        {
-          id: "upper-door-living-hall",
-          type: "door",
-          roomId: "upper-living",
-          label: "Tür Wohnzimmer → Flur (OG)",
-          x1: 360,
-          y1: 200,
-          x2: 360,
-          y2: 230,
-        },
-        {
-          id: "upper-door-bedroom-hall",
-          type: "door",
-          roomId: "upper-bedroom-left",
-          label: "Tür Schlafzimmer → Flur (OG)",
-          x1: 430,
-          y1: 170,
-          x2: 470,
-          y2: 170,
-        },
-        {
-          id: "upper-door-bathroom-hall",
-          type: "door",
-          roomId: "upper-bathroom",
-          label: "Tür Bad → Flur (OG)",
-          x1: 490,
-          y1: 310,
-          x2: 530,
-          y2: 310,
-        },
-        {
-          id: "upper-door-bedroom-right",
-          type: "door",
-          roomId: "upper-bedroom-right",
-          label: "Tür Schlafzimmer rechts (OG)",
-          x1: 560,
-          y1: 230,
-          x2: 560,
-          y2: 260,
-        },
-        {
-          id: "upper-door-stairs-hall",
-          type: "door",
-          roomId: "upper-storage",
-          label: "Tür Treppe → Flur (OG)",
-          x1: 380,
-          y1: 310,
-          x2: 420,
-          y2: 310,
-        },
-        {
-          id: "upper-door-kitchen-stairs",
-          type: "door",
-          roomId: "upper-kitchen",
-          label: "Tür Küche → Treppe (OG)",
-          x1: 360,
-          y1: 340,
-          x2: 360,
-          y2: 370,
-        },
-        {
-          id: "upper-door-office-living",
-          type: "door",
-          roomId: "upper-cellar",
-          label: "Tür Arbeitszimmer → Wohnzimmer (OG)",
-          x1: 110,
-          y1: 240,
-          x2: 150,
-          y2: 240,
-        },
-        {
-          id: "upper-door-bedroom-balcony",
-          type: "door",
-          roomId: "upper-bedroom-right",
-          label: "Tür Schlafzimmer rechts → Balkon (OG)",
-          x1: 620,
-          y1: 40,
-          x2: 680,
-          y2: 40,
-        },
-      ]),
-    },
+const buildDefaultFloorPlans = () => {
+  const floorPlans = buildLuganoFloorPlans();
+  Object.values(floorPlans).forEach((floor) => {
+    if (!floor || !Array.isArray(floor.openings)) return;
+    floor.openings = applyOpeningDefaults(floor.openings);
   });
+  return ensureExteriorRooms(floorPlans);
+};
 
 const SHARED_STATE_TABLE = "house_state";
 const SHARED_STATE_ID = "default";
@@ -1743,6 +1355,7 @@ const buildStatePayload = () => ({
 });
 
 const saveStateLocal = () => {
+  markKnownUserDirectoryDirty();
   localStorage.setItem(storageKey, JSON.stringify(buildStatePayload()));
 };
 
@@ -1775,6 +1388,7 @@ const applyStatePayload = (payload) => {
     }
   }
   ensureRoomDataForFloors();
+  markKnownUserDirectoryDirty();
   return didMigrateTasks;
 };
 
@@ -4023,6 +3637,7 @@ const handleSessionChange = async (session) => {
   authState.session = session;
   authState.user = session?.user ?? null;
   authState.displayName = authState.user ? getDisplayName(authState.user) : "";
+  markKnownUserDirectoryDirty();
   updateAuthUI();
   if (authState.user) {
     setAuthMessage("", false);
@@ -6664,6 +6279,120 @@ const getRoomLabel = (roomId) => {
   return `${info.room.name}${floorLabel}`;
 };
 
+let knownUserDirectoryCache = null;
+let knownUserDirectoryDirty = true;
+
+const markKnownUserDirectoryDirty = () => {
+  knownUserDirectoryDirty = true;
+};
+
+const normalizeUserLabel = (value) => {
+  const label = typeof value === "string" ? value.trim() : "";
+  if (!label || label === "Unbekannt" || label === "Jemand") return "";
+  return label;
+};
+
+const isLikelyEmail = (value) => value.includes("@");
+
+const addKnownUser = (directory, { id, name, email }) => {
+  const key = typeof id === "string" ? id.trim() : "";
+  if (!key) return;
+  const nextName = normalizeUserLabel(name);
+  const nextEmail = typeof email === "string" ? email.trim() : "";
+  if (!nextName && !nextEmail) return;
+
+  const existing = directory.get(key) || {};
+  const currentName = normalizeUserLabel(existing.name);
+  const currentEmail =
+    typeof existing.email === "string" ? existing.email.trim() : "";
+  const shouldReplaceName =
+    !currentName || (nextName && isLikelyEmail(currentName));
+  const resolvedName = nextName && shouldReplaceName ? nextName : currentName;
+  const resolvedEmail = currentEmail || nextEmail;
+  directory.set(key, {
+    name: resolvedName,
+    email: resolvedEmail,
+  });
+};
+
+const buildKnownUserDirectory = () => {
+  const directory = new Map();
+  if (authState.user?.id) {
+    addKnownUser(directory, {
+      id: authState.user.id,
+      name: authState.displayName || getDisplayName(authState.user),
+      email: authState.user.email || "",
+    });
+  }
+
+  (Array.isArray(state.activityEvents) ? state.activityEvents : []).forEach(
+    (event) => {
+      addKnownUser(directory, {
+        id: event.actorId,
+        name: event.actor,
+        email: event.actorEmail,
+      });
+    },
+  );
+
+  Object.values(state.roomData || {}).forEach((roomData) => {
+    (Array.isArray(roomData.comments) ? roomData.comments : []).forEach(
+      (comment) => {
+        addKnownUser(directory, {
+          id: comment.userId,
+          name: comment.userName,
+          email: comment.userEmail,
+        });
+      },
+    );
+    (Array.isArray(roomData.decisions) ? roomData.decisions : []).forEach(
+      (decision) => {
+        addKnownUser(directory, {
+          id: decision.userId,
+          name: decision.userName || decision.actor,
+          email: decision.userEmail,
+        });
+      },
+    );
+    (Array.isArray(roomData.images) ? roomData.images : []).forEach((file) => {
+      addKnownUser(directory, {
+        id: file.userId,
+        name: file.userName,
+        email: file.userEmail,
+      });
+    });
+    const messages = roomData.chat?.messages;
+    (Array.isArray(messages) ? messages : []).forEach((message) => {
+      addKnownUser(directory, {
+        id: message.userId,
+        name: message.userName,
+        email: message.userEmail,
+      });
+    });
+  });
+
+  return directory;
+};
+
+const getKnownUserDirectory = () => {
+  if (!knownUserDirectoryCache || knownUserDirectoryDirty) {
+    knownUserDirectoryCache = buildKnownUserDirectory();
+    knownUserDirectoryDirty = false;
+  }
+  return knownUserDirectoryCache;
+};
+
+const resolveKnownUserLabel = (assignee) => {
+  const key = typeof assignee === "string" ? assignee.trim() : "";
+  if (!key) return "";
+  const entry = getKnownUserDirectory().get(key);
+  if (!entry) return "";
+  const name = normalizeUserLabel(entry.name);
+  if (name) return name;
+  const email = typeof entry.email === "string" ? entry.email.trim() : "";
+  return email || "";
+};
+
 const formatAssigneeLabel = (assignee) => {
   if (!assignee) return "Unzugewiesen";
   if (authState.user?.id && assignee === authState.user.id) {
@@ -6671,6 +6400,8 @@ const formatAssigneeLabel = (assignee) => {
   }
   if (assignee === "me") return "Ich";
   if (assignee === "dad") return "Dad";
+  const knownLabel = resolveKnownUserLabel(assignee);
+  if (knownLabel) return knownLabel;
   return assignee;
 };
 

@@ -1,0 +1,1042 @@
+{
+  "project": "Lugano Haus",
+  "source": {
+    "pdf": "Pläne Lugano Haus082.pdf",
+    "note": "Values in centimeters extracted manually from the original raster PDF pages.",
+    "pages": {
+      "1": "First floor (left half / bedrooms + core)",
+      "2": "First floor (right half / kitchen+dining+living+garden)",
+      "3": "Ground floor (left half / rooms + core)",
+      "4": "Ground floor (right half / keller + rooms)"
+    }
+  },
+  "units": "cm",
+  "floors": {
+    "first_floor": {
+      "floor": "FF",
+      "units": "cm",
+      "measurements": [
+        {
+          "id": "FF_P1_TOP_TOTAL_590",
+          "valueCm": 590,
+          "kind": "outer_chain",
+          "where": "Outer top dimension (main)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "top",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P1_TOP_EXT_100",
+          "valueCm": 100,
+          "kind": "outer_chain",
+          "where": "Outer top extension at right",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "top",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P1_TOP_SEG_375",
+          "valueCm": 375,
+          "kind": "outer_chain",
+          "where": "Outer top segment 1",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "top",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P1_TOP_OPEN_130x90_w",
+          "valueCm": 130,
+          "kind": "opening_width",
+          "where": "Outer top opening labeled 130/90 FERRATINA (width)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "top",
+          "confidence": "high",
+          "rawText": "130/90 FERRATINA"
+        },
+        {
+          "id": "FF_P1_TOP_OPEN_130x90_h",
+          "valueCm": 90,
+          "kind": "opening_height",
+          "where": "Outer top opening labeled 130/90 FERRATINA (height)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "top",
+          "confidence": "high",
+          "rawText": "130/90 FERRATINA"
+        },
+        {
+          "id": "FF_P1_TOP_SEG_85",
+          "valueCm": 85,
+          "kind": "outer_chain",
+          "where": "Outer top segment 2",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "top",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P1_TOP_OPEN_100x260_w",
+          "valueCm": 100,
+          "kind": "opening_width",
+          "where": "Outer top opening labeled 100/260 (width)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "top",
+          "confidence": "high",
+          "rawText": "100/260"
+        },
+        {
+          "id": "FF_P1_TOP_OPEN_100x260_h",
+          "valueCm": 260,
+          "kind": "opening_height",
+          "where": "Outer top opening labeled 100/260 (height)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "top",
+          "confidence": "high",
+          "rawText": "100/260"
+        },
+        {
+          "id": "FF_P1_TOP_SEG_65",
+          "valueCm": 65,
+          "kind": "outer_chain",
+          "where": "Outer top segment 3",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "top",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P1_LEFT_TOTAL_830",
+          "valueCm": 830,
+          "kind": "outer_chain",
+          "where": "Outer left vertical total",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "left",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P1_LEFT_SEG_100",
+          "valueCm": 100,
+          "kind": "outer_chain",
+          "where": "Outer left vertical top segment",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "left",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P1_LEFT_SEG_615",
+          "valueCm": 615,
+          "kind": "outer_chain",
+          "where": "Outer left vertical middle segment",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "left",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P1_LEFT_SEG_115",
+          "valueCm": 115,
+          "kind": "outer_chain",
+          "where": "Outer left vertical bottom segment",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "left",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P1_BOTTOM_TOTAL_330",
+          "valueCm": 330,
+          "kind": "outer_chain",
+          "where": "Outer bottom (balcony side) total",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "bottom",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P1_BOTTOM_SEG_12",
+          "valueCm": 12,
+          "kind": "outer_chain",
+          "where": "Outer bottom small segment labeled 12",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "bottom",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P1_BOTTOM_SEG_76",
+          "valueCm": 76,
+          "kind": "outer_chain",
+          "where": "Outer bottom segment before opening",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "bottom",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P1_BOTTOM_OPEN_190x211p4_w",
+          "valueCm": 190,
+          "kind": "opening_width",
+          "where": "Outer bottom opening labeled 190/211+4 LAMELLE (width)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "bottom",
+          "confidence": "high",
+          "rawText": "190/211+4 LAMELLE"
+        },
+        {
+          "id": "FF_P1_BOTTOM_OPEN_190x211p4_h",
+          "valueCm": 215,
+          "kind": "opening_height",
+          "where": "Outer bottom opening labeled 190/211+4 LAMELLE (height)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "bottom",
+          "confidence": "high",
+          "rawText": "190/211+4 LAMELLE"
+        },
+        {
+          "id": "FF_P1_BOTTOM_SEG_84",
+          "valueCm": 84,
+          "kind": "outer_chain",
+          "where": "Outer bottom segment between openings",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "bottom",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P1_BOTTOM_SEG_150",
+          "valueCm": 150,
+          "kind": "outer_chain",
+          "where": "Outer bottom segment between openings",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "bottom",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P1_BOTTOM_OPEN_190x150_w",
+          "valueCm": 190,
+          "kind": "opening_width",
+          "where": "Outer bottom opening labeled 190/150 LAMELLE (width)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "bottom",
+          "confidence": "high",
+          "rawText": "190/150 LAMELLE"
+        },
+        {
+          "id": "FF_P1_BOTTOM_OPEN_190x150_h",
+          "valueCm": 150,
+          "kind": "opening_height",
+          "where": "Outer bottom opening labeled 190/150 LAMELLE (height)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "bottom",
+          "confidence": "high",
+          "rawText": "190/150 LAMELLE"
+        },
+        {
+          "id": "FF_P1_ROOM_BED1_DIM_320",
+          "valueCm": 320,
+          "kind": "interior_clear",
+          "where": "Bedroom (west) internal clear width (horizontal)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "bedroom_west",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P1_ROOM_BED1_DIM_535",
+          "valueCm": 535,
+          "kind": "interior_clear",
+          "where": "Bedroom (west) internal clear length (vertical)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "bedroom_west",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P1_ROOM_BED2_DIM_460",
+          "valueCm": 460,
+          "kind": "interior_clear",
+          "where": "Bedroom (east) internal clear width (horizontal)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "bedroom_east",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P1_ROOM_BED2_DIM_320",
+          "valueCm": 320,
+          "kind": "interior_clear",
+          "where": "Bedroom (east) internal clear length (vertical)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "bedroom_east",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P1_ROOM_BATH_SEG_170",
+          "valueCm": 170,
+          "kind": "interior_clear",
+          "where": "Bathroom horizontal segment labeled 170 (part of 210)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "bathroom",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P1_ROOM_BATH_SEG_40",
+          "valueCm": 40,
+          "kind": "interior_clear",
+          "where": "Bathroom horizontal segment labeled 40 (part of 210)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "bathroom",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P1_ROOM_BATH_TOTAL_210",
+          "valueCm": 210,
+          "kind": "interior_clear",
+          "where": "Bathroom total horizontal dimension labeled 210",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "bathroom",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P1_ROOM_BATH_DIM_242",
+          "valueCm": 242,
+          "kind": "interior_clear",
+          "where": "Bathroom internal clear length",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "bathroom",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P1_FIXTURE_VASCA_140x67_w",
+          "valueCm": 140,
+          "kind": "opening_width",
+          "where": "Bathtub labeled VASCA 140/67 (width)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "bathroom",
+          "confidence": "high",
+          "rawText": "VASCA 140/67"
+        },
+        {
+          "id": "FF_P1_FIXTURE_VASCA_140x67_h",
+          "valueCm": 67,
+          "kind": "opening_height",
+          "where": "Bathtub labeled VASCA 140/67 (height)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "bathroom",
+          "confidence": "high",
+          "rawText": "VASCA 140/67"
+        },
+        {
+          "id": "FF_P1_ATRIO_DIM_240",
+          "valueCm": 240,
+          "kind": "interior_clear",
+          "where": "Atrio / hall clear dimension labeled 240",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "atrio",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P1_ATRIO_DIM_452",
+          "valueCm": 452,
+          "kind": "interior_clear",
+          "where": "Atrio / hall clear dimension labeled 452",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "atrio",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P1_CORE_SEG_130",
+          "valueCm": 130,
+          "kind": "interior_clear",
+          "where": "Core/hall horizontal segment labeled 130",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "atrio",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P1_CORE_SEG_19",
+          "valueCm": 19,
+          "kind": "interior_clear",
+          "where": "Core/hall horizontal segment labeled 19",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "atrio",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P1_CORE_SEG_80",
+          "valueCm": 80,
+          "kind": "interior_clear",
+          "where": "Core/hall horizontal segment labeled 80",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "atrio",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P1_CORE_SEG_70",
+          "valueCm": 70,
+          "kind": "interior_clear",
+          "where": "Core/hall horizontal segment labeled 70",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "atrio",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P1_CORE_SEG_220",
+          "valueCm": 220,
+          "kind": "interior_clear",
+          "where": "Core/hall horizontal segment labeled 220",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page1",
+          "approxRegion": "core",
+          "confidence": "medium"
+        },
+        {
+          "id": "FF_P2_TOP_TOTAL_810",
+          "valueCm": 810,
+          "kind": "outer_chain",
+          "where": "Outer top total (right half)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "top",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P2_TOP_OPEN_90x150_w",
+          "valueCm": 90,
+          "kind": "opening_width",
+          "where": "Outer top opening labeled 90/150 FERRATINA (width)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "top",
+          "confidence": "high",
+          "rawText": "90/150 FERRATINA"
+        },
+        {
+          "id": "FF_P2_TOP_OPEN_90x150_h",
+          "valueCm": 150,
+          "kind": "opening_height",
+          "where": "Outer top opening labeled 90/150 FERRATINA (height)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "top",
+          "confidence": "high",
+          "rawText": "90/150 FERRATINA"
+        },
+        {
+          "id": "FF_P2_TOP_SEG_95",
+          "valueCm": 95,
+          "kind": "outer_chain",
+          "where": "Outer top segment labeled 95",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "top",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P2_TOP_OPEN_130x90_w",
+          "valueCm": 130,
+          "kind": "opening_width",
+          "where": "Outer top opening labeled 130/90 FERRATINA (width)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "top",
+          "confidence": "high",
+          "rawText": "130/90 FERRATINA"
+        },
+        {
+          "id": "FF_P2_TOP_OPEN_130x90_h",
+          "valueCm": 90,
+          "kind": "opening_height",
+          "where": "Outer top opening labeled 130/90 FERRATINA (height)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "top",
+          "confidence": "high",
+          "rawText": "130/90 FERRATINA"
+        },
+        {
+          "id": "FF_P2_TOP_SEG_390",
+          "valueCm": 390,
+          "kind": "outer_chain",
+          "where": "Outer top segment labeled 390",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "top",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P2_BOTTOM_TOTAL_1055",
+          "valueCm": 1055,
+          "kind": "outer_chain",
+          "where": "Outer bottom total",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "bottom",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P2_BOTTOM_SEG_275",
+          "valueCm": 275,
+          "kind": "outer_chain",
+          "where": "Outer bottom segment labeled 275",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "bottom",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P2_BOTTOM_OPEN_300x150_w",
+          "valueCm": 300,
+          "kind": "opening_width",
+          "where": "Outer bottom opening labeled 300/150 LAMELLE (width)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "bottom",
+          "confidence": "high",
+          "rawText": "300/150 LAMELLE"
+        },
+        {
+          "id": "FF_P2_BOTTOM_OPEN_300x150_h",
+          "valueCm": 150,
+          "kind": "opening_height",
+          "where": "Outer bottom opening labeled 300/150 LAMELLE (height)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "bottom",
+          "confidence": "high",
+          "rawText": "300/150 LAMELLE"
+        },
+        {
+          "id": "FF_P2_BOTTOM_SEG_150",
+          "valueCm": 150,
+          "kind": "outer_chain",
+          "where": "Outer bottom segment labeled 150",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "bottom",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P2_BOTTOM_SEG_105",
+          "valueCm": 105,
+          "kind": "outer_chain",
+          "where": "Outer bottom segment labeled 105",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "bottom",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P2_RIGHT_OPEN_120x130_w",
+          "valueCm": 120,
+          "kind": "opening_width",
+          "where": "Outer right opening labeled 120/130 CLOSIE (width)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "right",
+          "confidence": "high",
+          "rawText": "120/130 CLOSIE"
+        },
+        {
+          "id": "FF_P2_RIGHT_OPEN_120x130_h",
+          "valueCm": 130,
+          "kind": "opening_height",
+          "where": "Outer right opening labeled 120/130 CLOSIE (height)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "right",
+          "confidence": "high",
+          "rawText": "120/130 CLOSIE"
+        },
+        {
+          "id": "FF_P2_RIGHT_OPEN_120x214p4_w",
+          "valueCm": 120,
+          "kind": "opening_width",
+          "where": "Outer right opening labeled 120/214+4 FERRATINA (width)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "right",
+          "confidence": "high",
+          "rawText": "120/214+4 FERRATINA"
+        },
+        {
+          "id": "FF_P2_RIGHT_OPEN_120x214p4_h",
+          "valueCm": 218,
+          "kind": "opening_height",
+          "where": "Outer right opening labeled 120/214+4 FERRATINA (height)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "right",
+          "confidence": "high",
+          "rawText": "120/214+4 FERRATINA"
+        },
+        {
+          "id": "FF_P2_RIGHT_SEG_150",
+          "valueCm": 150,
+          "kind": "outer_chain",
+          "where": "Outer right vertical segment labeled 150",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "right",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P2_RIGHT_SEG_120",
+          "valueCm": 120,
+          "kind": "outer_chain",
+          "where": "Outer right vertical segment labeled 120",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "right",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P2_RIGHT_SEG_130",
+          "valueCm": 130,
+          "kind": "outer_chain",
+          "where": "Outer right vertical segment labeled 130",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "right",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P2_RIGHT_TOTAL_320",
+          "valueCm": 320,
+          "kind": "outer_chain",
+          "where": "Outer right vertical total labeled 320",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "right",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P2_RIGHT_TOTAL_840",
+          "valueCm": 840,
+          "kind": "outer_chain",
+          "where": "Outer right vertical dimension labeled 840 (garden/terrace)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "right",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P2_ROOM_KITCHEN_DIM_189",
+          "valueCm": 189,
+          "kind": "interior_clear",
+          "where": "Kitchen internal clear width",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "kitchen",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P2_ROOM_KITCHEN_DIM_330",
+          "valueCm": 330,
+          "kind": "interior_clear",
+          "where": "Kitchen internal clear length",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "kitchen",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P2_ROOM_DINING_DIM_310",
+          "valueCm": 310,
+          "kind": "interior_clear",
+          "where": "Dining/Essraum internal clear width (labeled 310)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "dining",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P2_ROOM_LIVING_DIM_545",
+          "valueCm": 545,
+          "kind": "interior_clear",
+          "where": "Living/Wohnraum internal clear width (labeled 545)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "living",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P2_ROOM_LIVING_DIM_438",
+          "valueCm": 438,
+          "kind": "interior_clear",
+          "where": "Living/Wohnraum internal clear length (labeled 438)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "living",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P2_LIVING_SEG_365",
+          "valueCm": 365,
+          "kind": "interior_clear",
+          "where": "Internal segment labeled 365 (living/hall)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "living",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P2_CORE_SEG_205",
+          "valueCm": 205,
+          "kind": "interior_clear",
+          "where": "Internal segment labeled 205 (hall/corridor near dining)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "junction",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P2_CORE_SEG_18",
+          "valueCm": 18,
+          "kind": "interior_clear",
+          "where": "Internal segment labeled 18 (near door/junction)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "junction",
+          "confidence": "high"
+        },
+        {
+          "id": "FF_P2_CORE_SEG_87",
+          "valueCm": 87,
+          "kind": "interior_clear",
+          "where": "Internal segment labeled 87 (near door/junction)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page2",
+          "approxRegion": "junction",
+          "confidence": "high"
+        }
+      ]
+    },
+    "ground_floor": {
+      "floor": "GF",
+      "units": "cm",
+      "measurements": [
+        {
+          "id": "GF_P3_TOP_TOTAL_590",
+          "valueCm": 590,
+          "kind": "outer_chain",
+          "where": "Outer top total",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page3",
+          "approxRegion": "top",
+          "confidence": "high"
+        },
+        {
+          "id": "GF_P3_LEFT_TOTAL_830",
+          "valueCm": 830,
+          "kind": "outer_chain",
+          "where": "Outer left vertical total",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page3",
+          "approxRegion": "left",
+          "confidence": "high"
+        },
+        {
+          "id": "GF_P3_LEFT_SEG_615",
+          "valueCm": 615,
+          "kind": "outer_chain",
+          "where": "Outer left vertical middle segment",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page3",
+          "approxRegion": "left",
+          "confidence": "high"
+        },
+        {
+          "id": "GF_P3_LEFT_SEG_115",
+          "valueCm": 115,
+          "kind": "outer_chain",
+          "where": "Outer left vertical bottom segment",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page3",
+          "approxRegion": "left",
+          "confidence": "high"
+        },
+        {
+          "id": "GF_P3_BOTTOM_SEG_76",
+          "valueCm": 76,
+          "kind": "outer_chain",
+          "where": "Outer bottom segment labeled 76",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page3",
+          "approxRegion": "bottom",
+          "confidence": "high"
+        },
+        {
+          "id": "GF_P3_BOTTOM_OPEN_190x130_w",
+          "valueCm": 190,
+          "kind": "opening_width",
+          "where": "Outer bottom opening labeled 190/130 GELOSIE (width)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page3",
+          "approxRegion": "bottom",
+          "confidence": "high",
+          "rawText": "190/130 GELOSIE"
+        },
+        {
+          "id": "GF_P3_BOTTOM_OPEN_190x130_h",
+          "valueCm": 130,
+          "kind": "opening_height",
+          "where": "Outer bottom opening labeled 190/130 GELOSIE (height)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page3",
+          "approxRegion": "bottom",
+          "confidence": "high",
+          "rawText": "190/130 GELOSIE"
+        },
+        {
+          "id": "GF_P3_BOTTOM_SEG_214",
+          "valueCm": 214,
+          "kind": "outer_chain",
+          "where": "Outer bottom segment labeled 214",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page3",
+          "approxRegion": "bottom",
+          "confidence": "high"
+        },
+        {
+          "id": "GF_P3_BOTTOM_OPEN_190x211p4_w",
+          "valueCm": 190,
+          "kind": "opening_width",
+          "where": "Outer bottom opening labeled 190/211+4 GELOSIE (width)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page3",
+          "approxRegion": "bottom",
+          "confidence": "high",
+          "rawText": "190/211+4 GELOSIE"
+        },
+        {
+          "id": "GF_P3_BOTTOM_OPEN_190x211p4_h",
+          "valueCm": 215,
+          "kind": "opening_height",
+          "where": "Outer bottom opening labeled 190/211+4 GELOSIE (height)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page3",
+          "approxRegion": "bottom",
+          "confidence": "high",
+          "rawText": "190/211+4 GELOSIE"
+        },
+        {
+          "id": "GF_P3_ROOM_BED_DIM_305",
+          "valueCm": 305,
+          "kind": "interior_clear",
+          "where": "Bedroom internal clear width (labeled 305)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page3",
+          "approxRegion": "bedroom",
+          "confidence": "high"
+        },
+        {
+          "id": "GF_P3_ROOM_BED_DIM_555",
+          "valueCm": 555,
+          "kind": "interior_clear",
+          "where": "Bedroom internal clear length (labeled 555)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page3",
+          "approxRegion": "bedroom",
+          "confidence": "high"
+        },
+        {
+          "id": "GF_P3_ROOM_LIVING_DIM_450",
+          "valueCm": 450,
+          "kind": "interior_clear",
+          "where": "Wohnraum/Soggiorno internal clear width (labeled 450)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page3",
+          "approxRegion": "living",
+          "confidence": "high"
+        },
+        {
+          "id": "GF_P3_ROOM_LIVING_DIM_320",
+          "valueCm": 320,
+          "kind": "interior_clear",
+          "where": "Wohnraum/Soggiorno internal clear length (labeled 320)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page3",
+          "approxRegion": "living",
+          "confidence": "high"
+        },
+        {
+          "id": "GF_P3_CORE_SEG_75",
+          "valueCm": 75,
+          "kind": "interior_clear",
+          "where": "Internal segment labeled 75 (corridor)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page3",
+          "approxRegion": "living",
+          "confidence": "high"
+        },
+        {
+          "id": "GF_P3_DOCCIA_DIM_220",
+          "valueCm": 220,
+          "kind": "interior_clear",
+          "where": "DOCCIA internal dimension labeled 220",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page3",
+          "approxRegion": "doccia",
+          "confidence": "high"
+        },
+        {
+          "id": "GF_P4_TOP_TOTAL_810",
+          "valueCm": 810,
+          "kind": "outer_chain",
+          "where": "Outer top total (right half)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page4",
+          "approxRegion": "top",
+          "confidence": "high"
+        },
+        {
+          "id": "GF_P4_TOP_SEG_320",
+          "valueCm": 320,
+          "kind": "outer_chain",
+          "where": "Outer top segment labeled 320",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page4",
+          "approxRegion": "top",
+          "confidence": "high"
+        },
+        {
+          "id": "GF_P4_TOP_OPEN_70x40_w",
+          "valueCm": 70,
+          "kind": "opening_width",
+          "where": "Outer top opening labeled 70/40 (width)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page4",
+          "approxRegion": "top",
+          "confidence": "high",
+          "rawText": "70/40"
+        },
+        {
+          "id": "GF_P4_TOP_OPEN_70x40_h",
+          "valueCm": 40,
+          "kind": "opening_height",
+          "where": "Outer top opening labeled 70/40 (height)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page4",
+          "approxRegion": "top",
+          "confidence": "high",
+          "rawText": "70/40"
+        },
+        {
+          "id": "GF_P4_TOP_SEG_420",
+          "valueCm": 420,
+          "kind": "outer_chain",
+          "where": "Outer top segment labeled 420",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page4",
+          "approxRegion": "top",
+          "confidence": "high"
+        },
+        {
+          "id": "GF_P4_RIGHT_TOTAL_630",
+          "valueCm": 630,
+          "kind": "outer_chain",
+          "where": "Outer right vertical total labeled 630",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page4",
+          "approxRegion": "right",
+          "confidence": "high"
+        },
+        {
+          "id": "GF_P4_RIGHT_SEG_390",
+          "valueCm": 390,
+          "kind": "outer_chain",
+          "where": "Outer right vertical dimension labeled 390",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page4",
+          "approxRegion": "right",
+          "confidence": "high"
+        },
+        {
+          "id": "GF_P4_RIGHT_SEG_325",
+          "valueCm": 325,
+          "kind": "outer_chain",
+          "where": "Outer right vertical segment labeled 325",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page4",
+          "approxRegion": "right",
+          "confidence": "high"
+        },
+        {
+          "id": "GF_P4_RIGHT_SEG_115",
+          "valueCm": 115,
+          "kind": "outer_chain",
+          "where": "Outer right vertical segment labeled 115",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page4",
+          "approxRegion": "right",
+          "confidence": "high"
+        },
+        {
+          "id": "GF_P4_RIGHT_SEG_35",
+          "valueCm": 35,
+          "kind": "outer_chain",
+          "where": "Outer right horizontal offset labeled 35",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page4",
+          "approxRegion": "right",
+          "confidence": "high"
+        },
+        {
+          "id": "GF_P4_BOTTOM_SEG_330",
+          "valueCm": 330,
+          "kind": "outer_chain",
+          "where": "Outer bottom segment labeled 330",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page4",
+          "approxRegion": "bottom",
+          "confidence": "high"
+        },
+        {
+          "id": "GF_P4_BOTTOM_OPEN_190x211p4_w",
+          "valueCm": 190,
+          "kind": "opening_width",
+          "where": "Outer bottom opening labeled 190/211+4 GELOSIE (width)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page4",
+          "approxRegion": "bottom",
+          "confidence": "high",
+          "rawText": "190/211+4 GELOSIE"
+        },
+        {
+          "id": "GF_P4_BOTTOM_OPEN_190x211p4_h",
+          "valueCm": 215,
+          "kind": "opening_height",
+          "where": "Outer bottom opening labeled 190/211+4 GELOSIE (height)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page4",
+          "approxRegion": "bottom",
+          "confidence": "high",
+          "rawText": "190/211+4 GELOSIE"
+        },
+        {
+          "id": "GF_P4_BOTTOM_SEG_205",
+          "valueCm": 205,
+          "kind": "outer_chain",
+          "where": "Outer bottom segment labeled 205",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page4",
+          "approxRegion": "bottom",
+          "confidence": "high"
+        },
+        {
+          "id": "GF_P4_BOTTOM_SEG_105",
+          "valueCm": 105,
+          "kind": "outer_chain",
+          "where": "Outer bottom segment labeled 105",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page4",
+          "approxRegion": "bottom",
+          "confidence": "high"
+        },
+        {
+          "id": "GF_P4_INTERNAL_SEG_10",
+          "valueCm": 10,
+          "kind": "interior_clear",
+          "where": "Internal/offset segment labeled 10 (near room boundary)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page4",
+          "approxRegion": "bottom",
+          "confidence": "high"
+        },
+        {
+          "id": "GF_P4_INTERNAL_SEG_70",
+          "valueCm": 70,
+          "kind": "interior_clear",
+          "where": "Internal/offset segment labeled 70 (near room boundary)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page4",
+          "approxRegion": "bottom",
+          "confidence": "high"
+        },
+        {
+          "id": "GF_P4_INTERNAL_SEG_35",
+          "valueCm": 35,
+          "kind": "interior_clear",
+          "where": "Internal/offset segment labeled 35 (near room boundary)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page4",
+          "approxRegion": "bottom",
+          "confidence": "high"
+        },
+        {
+          "id": "GF_P4_ROOM_ZIMMER_DIM_535",
+          "valueCm": 535,
+          "kind": "interior_clear",
+          "where": "Zimmer/CAMERA internal clear width (labeled 535)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page4",
+          "approxRegion": "zimmer",
+          "confidence": "high"
+        },
+        {
+          "id": "GF_P4_ROOM_ZIMMER_DIM_320",
+          "valueCm": 320,
+          "kind": "interior_clear",
+          "where": "Zimmer/CAMERA internal clear length (labeled 320)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page4",
+          "approxRegion": "zimmer",
+          "confidence": "high"
+        },
+        {
+          "id": "GF_P4_ROOM_KELLER_DIM_310",
+          "valueCm": 310,
+          "kind": "interior_clear",
+          "where": "KELLER internal clear width (labeled 310)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page4",
+          "approxRegion": "keller",
+          "confidence": "high"
+        },
+        {
+          "id": "GF_P4_ROOM_KELLER_DIM_330",
+          "valueCm": 330,
+          "kind": "interior_clear",
+          "where": "KELLER internal clear length (labeled 330)",
+          "sourceImage": "Pläne Lugano Haus082.pdf#page4",
+          "approxRegion": "keller",
+          "confidence": "high"
+        }
+      ]
+    }
+  },
+  "uncertainties": [
+    {
+      "floor": "FF",
+      "page": 1,
+      "issue": "There are additional small dimension strings in the core (stairs/doors) that are present but too ambiguous/overlapped to record with high confidence from the raster scan.",
+      "examples": "Door-size labels in the core area are not clearly legible."
+    },
+    {
+      "floor": "GF",
+      "page": 3,
+      "issue": "Some small core dimensions around kitchen/stairs are overlapped with hand-markups and are not fully legible.",
+      "examples": "Several 80/200-style door labels appear but are not readable."
+    }
+  ]
+}

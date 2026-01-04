@@ -1,0 +1,130 @@
+{
+  "source": "lugano_original_dimensionSpec.json",
+  "units": "cm",
+  "outer": {
+    "width": 1400,
+    "height": 830,
+    "derivedFrom": [
+      "GF_P3_TOP_TOTAL_590",
+      "GF_P4_TOP_TOTAL_810",
+      "GF_P3_LEFT_TOTAL_830"
+    ]
+  },
+  "rooms": {
+    "ground-bedroom-left": {
+      "width": 305,
+      "height": 555,
+      "label": "CAMERA/ZIMMER (west)",
+      "derivedFrom": [
+        "GF_P3_ROOM_BED_DIM_305",
+        "GF_P3_ROOM_BED_DIM_555"
+      ]
+    },
+    "ground-living": {
+      "width": 450,
+      "height": 320,
+      "label": "SOGGIORNO/WOHNRAUM",
+      "derivedFrom": [
+        "GF_P3_ROOM_LIVING_DIM_450",
+        "GF_P3_ROOM_LIVING_DIM_320"
+      ]
+    },
+    "ground-bedroom-right": {
+      "width": 535,
+      "height": 320,
+      "label": "ZIMMER/CAMERA (east)",
+      "derivedFrom": [
+        "GF_P4_ROOM_ZIMMER_DIM_535",
+        "GF_P4_ROOM_ZIMMER_DIM_320"
+      ]
+    },
+    "ground-cellar": {
+      "width": 310,
+      "height": 330,
+      "label": "KELLER",
+      "derivedFrom": [
+        "GF_P4_ROOM_KELLER_DIM_310",
+        "GF_P4_ROOM_KELLER_DIM_330"
+      ]
+    },
+    "ground-bathroom": {
+      "width": 220,
+      "label": "DOCCIA (width only)",
+      "derivedFrom": [
+        "GF_P3_DOCCIA_DIM_220"
+      ]
+    },
+    "ground-hallway": {
+      "label": "ATRIO (layout-derived)"
+    },
+    "ground-kitchen": {
+      "label": "CORRIDOIO (layout-derived)"
+    },
+    "ground-storage": {
+      "label": "SCALA/TREPPE (layout-derived)"
+    }
+  },
+  "openings": {
+    "ground-bottom-window-190x130": {
+      "width": 190,
+      "height": 130,
+      "label": "190/130 GELOSIE",
+      "derivedFrom": [
+        "GF_P3_BOTTOM_OPEN_190x130_w",
+        "GF_P3_BOTTOM_OPEN_190x130_h"
+      ]
+    },
+    "ground-bottom-door-190x211p4-left": {
+      "width": 190,
+      "height": 215,
+      "label": "190/211+4 GELOSIE",
+      "derivedFrom": [
+        "GF_P3_BOTTOM_OPEN_190x211p4_w",
+        "GF_P3_BOTTOM_OPEN_190x211p4_h"
+      ]
+    },
+    "ground-top-window-70x40": {
+      "width": 70,
+      "height": 40,
+      "label": "70/40",
+      "derivedFrom": [
+        "GF_P4_TOP_OPEN_70x40_w",
+        "GF_P4_TOP_OPEN_70x40_h"
+      ]
+    },
+    "ground-bottom-door-190x211p4-right": {
+      "width": 190,
+      "height": 215,
+      "label": "190/211+4 GELOSIE",
+      "derivedFrom": [
+        "GF_P4_BOTTOM_OPEN_190x211p4_w",
+        "GF_P4_BOTTOM_OPEN_190x211p4_h"
+      ]
+    }
+  },
+  "unmappedMeasurements": [
+    "GF_P3_LEFT_SEG_615",
+    "GF_P3_LEFT_SEG_115",
+    "GF_P3_BOTTOM_SEG_76",
+    "GF_P3_BOTTOM_SEG_214",
+    "GF_P3_CORE_SEG_75",
+    "GF_P4_TOP_SEG_320",
+    "GF_P4_TOP_SEG_420",
+    "GF_P4_RIGHT_TOTAL_630",
+    "GF_P4_RIGHT_SEG_390",
+    "GF_P4_RIGHT_SEG_325",
+    "GF_P4_RIGHT_SEG_115",
+    "GF_P4_RIGHT_SEG_35",
+    "GF_P4_BOTTOM_SEG_330",
+    "GF_P4_BOTTOM_SEG_205",
+    "GF_P4_BOTTOM_SEG_105",
+    "GF_P4_INTERNAL_SEG_10",
+    "GF_P4_INTERNAL_SEG_70",
+    "GF_P4_INTERNAL_SEG_35"
+  ],
+  "notes": [
+    "Room topology is rebuilt to match measured dimensions; corridor and stair rooms are layout-derived.",
+    "Opening widths/heights are enforced from the source labels; offsets along walls are centered.",
+    "Unmapped measurements are listed for segments not represented in the current rectangular-room model."
+  ]
+}

@@ -1,0 +1,205 @@
+{
+  "source": "lugano_original_dimensionSpec.json",
+  "units": "cm",
+  "outer": {
+    "width": 1400,
+    "height": 830,
+    "derivedFrom": [
+      "FF_P1_TOP_TOTAL_590",
+      "FF_P2_TOP_TOTAL_810",
+      "FF_P1_LEFT_TOTAL_830"
+    ]
+  },
+  "rooms": {
+    "upper-bedroom-left": {
+      "width": 320,
+      "height": 535,
+      "label": "CAMERA/ZIMMER (west)",
+      "derivedFrom": [
+        "FF_P1_ROOM_BED1_DIM_320",
+        "FF_P1_ROOM_BED1_DIM_535"
+      ]
+    },
+    "upper-bedroom-right": {
+      "width": 460,
+      "height": 320,
+      "label": "CAMERA/ZIMMER (east)",
+      "derivedFrom": [
+        "FF_P1_ROOM_BED2_DIM_460",
+        "FF_P1_ROOM_BED2_DIM_320"
+      ]
+    },
+    "upper-living": {
+      "width": 545,
+      "height": 438,
+      "label": "SOGGIORNO/WOHNRAUM",
+      "derivedFrom": [
+        "FF_P2_ROOM_LIVING_DIM_545",
+        "FF_P2_ROOM_LIVING_DIM_438"
+      ]
+    },
+    "upper-kitchen": {
+      "width": 189,
+      "height": 330,
+      "label": "CUCINA/KUCHE",
+      "derivedFrom": [
+        "FF_P2_ROOM_KITCHEN_DIM_189",
+        "FF_P2_ROOM_KITCHEN_DIM_330"
+      ]
+    },
+    "upper-cellar": {
+      "width": 310,
+      "label": "PRANZO/ESSRAUM (width only)",
+      "derivedFrom": [
+        "FF_P2_ROOM_DINING_DIM_310"
+      ]
+    },
+    "upper-bathroom": {
+      "width": 210,
+      "height": 242,
+      "label": "BAGNO/BAD",
+      "derivedFrom": [
+        "FF_P1_ROOM_BATH_TOTAL_210",
+        "FF_P1_ROOM_BATH_DIM_242"
+      ]
+    },
+    "upper-hallway": {
+      "width": 240,
+      "height": 452,
+      "label": "ATRIO",
+      "derivedFrom": [
+        "FF_P1_ATRIO_DIM_240",
+        "FF_P1_ATRIO_DIM_452"
+      ]
+    },
+    "upper-storage": {
+      "label": "SCALA/TREPPE (layout-derived)"
+    }
+  },
+  "openings": {
+    "upper-top-window-130x90-left": {
+      "width": 130,
+      "height": 90,
+      "label": "130/90 FERRATINA",
+      "derivedFrom": [
+        "FF_P1_TOP_OPEN_130x90_w",
+        "FF_P1_TOP_OPEN_130x90_h"
+      ]
+    },
+    "upper-top-door-100x260": {
+      "width": 100,
+      "height": 260,
+      "label": "100/260",
+      "derivedFrom": [
+        "FF_P1_TOP_OPEN_100x260_w",
+        "FF_P1_TOP_OPEN_100x260_h"
+      ]
+    },
+    "upper-top-window-90x150": {
+      "width": 90,
+      "height": 150,
+      "label": "90/150 FERRATINA",
+      "derivedFrom": [
+        "FF_P2_TOP_OPEN_90x150_w",
+        "FF_P2_TOP_OPEN_90x150_h"
+      ]
+    },
+    "upper-top-window-130x90-right": {
+      "width": 130,
+      "height": 90,
+      "label": "130/90 FERRATINA",
+      "derivedFrom": [
+        "FF_P2_TOP_OPEN_130x90_w",
+        "FF_P2_TOP_OPEN_130x90_h"
+      ]
+    },
+    "upper-bottom-door-190x211p4": {
+      "width": 190,
+      "height": 215,
+      "label": "190/211+4 LAMELLE",
+      "derivedFrom": [
+        "FF_P1_BOTTOM_OPEN_190x211p4_w",
+        "FF_P1_BOTTOM_OPEN_190x211p4_h"
+      ]
+    },
+    "upper-bottom-window-190x150": {
+      "width": 190,
+      "height": 150,
+      "label": "190/150 LAMELLE",
+      "derivedFrom": [
+        "FF_P1_BOTTOM_OPEN_190x150_w",
+        "FF_P1_BOTTOM_OPEN_190x150_h"
+      ]
+    },
+    "upper-bottom-window-300x150": {
+      "width": 300,
+      "height": 150,
+      "label": "300/150 LAMELLE",
+      "derivedFrom": [
+        "FF_P2_BOTTOM_OPEN_300x150_w",
+        "FF_P2_BOTTOM_OPEN_300x150_h"
+      ]
+    },
+    "upper-right-window-120x130": {
+      "width": 120,
+      "height": 130,
+      "label": "120/130 CLOSIE",
+      "derivedFrom": [
+        "FF_P2_RIGHT_OPEN_120x130_w",
+        "FF_P2_RIGHT_OPEN_120x130_h"
+      ]
+    },
+    "upper-right-door-120x214p4": {
+      "width": 120,
+      "height": 218,
+      "label": "120/214+4 FERRATINA",
+      "derivedFrom": [
+        "FF_P2_RIGHT_OPEN_120x214p4_w",
+        "FF_P2_RIGHT_OPEN_120x214p4_h"
+      ]
+    }
+  },
+  "unmappedMeasurements": [
+    "FF_P1_TOP_EXT_100",
+    "FF_P1_TOP_SEG_375",
+    "FF_P1_TOP_SEG_85",
+    "FF_P1_TOP_SEG_65",
+    "FF_P1_LEFT_SEG_100",
+    "FF_P1_LEFT_SEG_615",
+    "FF_P1_LEFT_SEG_115",
+    "FF_P1_BOTTOM_TOTAL_330",
+    "FF_P1_BOTTOM_SEG_12",
+    "FF_P1_BOTTOM_SEG_76",
+    "FF_P1_BOTTOM_SEG_84",
+    "FF_P1_BOTTOM_SEG_150",
+    "FF_P1_ROOM_BATH_SEG_170",
+    "FF_P1_ROOM_BATH_SEG_40",
+    "FF_P1_FIXTURE_VASCA_140x67_w",
+    "FF_P1_FIXTURE_VASCA_140x67_h",
+    "FF_P1_CORE_SEG_130",
+    "FF_P1_CORE_SEG_19",
+    "FF_P1_CORE_SEG_80",
+    "FF_P1_CORE_SEG_70",
+    "FF_P1_CORE_SEG_220",
+    "FF_P2_TOP_SEG_95",
+    "FF_P2_TOP_SEG_390",
+    "FF_P2_BOTTOM_TOTAL_1055",
+    "FF_P2_BOTTOM_SEG_275",
+    "FF_P2_BOTTOM_SEG_150",
+    "FF_P2_BOTTOM_SEG_105",
+    "FF_P2_RIGHT_SEG_150",
+    "FF_P2_RIGHT_SEG_120",
+    "FF_P2_RIGHT_SEG_130",
+    "FF_P2_RIGHT_TOTAL_320",
+    "FF_P2_RIGHT_TOTAL_840",
+    "FF_P2_LIVING_SEG_365",
+    "FF_P2_CORE_SEG_205",
+    "FF_P2_CORE_SEG_18",
+    "FF_P2_CORE_SEG_87"
+  ],
+  "notes": [
+    "Room topology is rebuilt to match measured dimensions; layout-derived heights are used where the source did not provide a second dimension.",
+    "Opening widths/heights are enforced from the source labels; offsets along walls are centered unless explicitly overridden.",
+    "Unmapped measurements are listed for segments or fixtures not represented in the current rectangular-room model."
+  ]
+}
