@@ -15,28 +15,19 @@
       "width": 320,
       "height": 535,
       "label": "CAMERA/ZIMMER (west)",
-      "derivedFrom": [
-        "FF_P1_ROOM_BED1_DIM_320",
-        "FF_P1_ROOM_BED1_DIM_535"
-      ]
+      "derivedFrom": ["FF_P1_ROOM_BED1_DIM_320", "FF_P1_ROOM_BED1_DIM_535"]
     },
     "upper-bedroom-right": {
       "width": 460,
       "height": 320,
       "label": "CAMERA/ZIMMER (east)",
-      "derivedFrom": [
-        "FF_P1_ROOM_BED2_DIM_460",
-        "FF_P1_ROOM_BED2_DIM_320"
-      ]
+      "derivedFrom": ["FF_P1_ROOM_BED2_DIM_460", "FF_P1_ROOM_BED2_DIM_320"]
     },
     "upper-living": {
       "width": 545,
       "height": 438,
       "label": "SOGGIORNO/WOHNRAUM",
-      "derivedFrom": [
-        "FF_P2_ROOM_LIVING_DIM_545",
-        "FF_P2_ROOM_LIVING_DIM_438"
-      ]
+      "derivedFrom": ["FF_P2_ROOM_LIVING_DIM_545", "FF_P2_ROOM_LIVING_DIM_438"]
     },
     "upper-kitchen": {
       "width": 189,
@@ -50,27 +41,19 @@
     "upper-cellar": {
       "width": 310,
       "label": "PRANZO/ESSRAUM (width only)",
-      "derivedFrom": [
-        "FF_P2_ROOM_DINING_DIM_310"
-      ]
+      "derivedFrom": ["FF_P2_ROOM_DINING_DIM_310"]
     },
     "upper-bathroom": {
       "width": 210,
       "height": 242,
       "label": "BAGNO/BAD",
-      "derivedFrom": [
-        "FF_P1_ROOM_BATH_TOTAL_210",
-        "FF_P1_ROOM_BATH_DIM_242"
-      ]
+      "derivedFrom": ["FF_P1_ROOM_BATH_TOTAL_210", "FF_P1_ROOM_BATH_DIM_242"]
     },
     "upper-hallway": {
       "width": 240,
       "height": 452,
       "label": "ATRIO",
-      "derivedFrom": [
-        "FF_P1_ATRIO_DIM_240",
-        "FF_P1_ATRIO_DIM_452"
-      ]
+      "derivedFrom": ["FF_P1_ATRIO_DIM_240", "FF_P1_ATRIO_DIM_452"]
     },
     "upper-storage": {
       "label": "SCALA/TREPPE (layout-derived)"
@@ -81,37 +64,25 @@
       "width": 130,
       "height": 90,
       "label": "130/90 FERRATINA",
-      "derivedFrom": [
-        "FF_P1_TOP_OPEN_130x90_w",
-        "FF_P1_TOP_OPEN_130x90_h"
-      ]
+      "derivedFrom": ["FF_P1_TOP_OPEN_130x90_w", "FF_P1_TOP_OPEN_130x90_h"]
     },
     "upper-top-door-100x260": {
       "width": 100,
       "height": 260,
       "label": "100/260",
-      "derivedFrom": [
-        "FF_P1_TOP_OPEN_100x260_w",
-        "FF_P1_TOP_OPEN_100x260_h"
-      ]
+      "derivedFrom": ["FF_P1_TOP_OPEN_100x260_w", "FF_P1_TOP_OPEN_100x260_h"]
     },
     "upper-top-window-90x150": {
       "width": 90,
       "height": 150,
       "label": "90/150 FERRATINA",
-      "derivedFrom": [
-        "FF_P2_TOP_OPEN_90x150_w",
-        "FF_P2_TOP_OPEN_90x150_h"
-      ]
+      "derivedFrom": ["FF_P2_TOP_OPEN_90x150_w", "FF_P2_TOP_OPEN_90x150_h"]
     },
     "upper-top-window-130x90-right": {
       "width": 130,
       "height": 90,
       "label": "130/90 FERRATINA",
-      "derivedFrom": [
-        "FF_P2_TOP_OPEN_130x90_w",
-        "FF_P2_TOP_OPEN_130x90_h"
-      ]
+      "derivedFrom": ["FF_P2_TOP_OPEN_130x90_w", "FF_P2_TOP_OPEN_130x90_h"]
     },
     "upper-bottom-door-190x211p4": {
       "width": 190,

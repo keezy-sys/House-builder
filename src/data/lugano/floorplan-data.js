@@ -362,7 +362,6 @@ const buildOpening = (opening, room) => {
   }
 
   const lengthCm = opening.widthCm;
-  const lengthPx = cmToPx(lengthCm);
   const roomWidthCm = room.widthCm;
   const roomHeightCm = room.heightCm;
   const offsetCm =

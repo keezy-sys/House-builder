@@ -864,6 +864,13 @@
                 >
                   Kreis
                 </button>
+                <button
+                  class="segmented-option"
+                  type="button"
+                  data-interior-insert="triangle"
+                >
+                  Dreieck
+                </button>
               </div>
               <p id="interior-tool-hint" class="helper"></p>
             </div>
@@ -1501,6 +1508,20 @@
       </button>
       <button type="button" class="danger" data-action="delete">
         Kommentar löschen
+      </button>
+    </div>
+
+    <div
+      id="object-context-menu"
+      class="comment-context-menu object-context-menu"
+      role="menu"
+      aria-label="Objektaktionen"
+      aria-hidden="true"
+      hidden
+    >
+      <button type="button" data-action="toggle-lock">Objekt sperren</button>
+      <button type="button" class="danger" data-action="delete">
+        Objekt löschen
       </button>
     </div>
 

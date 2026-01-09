@@ -5,6 +5,7 @@ import {
   FLOORPLAN_CONFIG,
   MM_PER_PX,
 } from "./src/data/lugano/floorplan-data.js";
+import { GLOBAL_CHAT_CONTEXT } from "./src/data/chat-context.js";
 
 const { DEFAULT_VIEWBOX, OUTER_WALL_BOUNDS, EXTERIOR_VIEWBOX, floorBounds } =
   FLOORPLAN_CONFIG;
@@ -18,8 +19,12 @@ const OPENING_HEIGHT_STEP_MM = 10;
 const MIN_ROOM_SIZE_PX = 60;
 const MIN_OPENING_SIZE_PX = 30;
 const DRAG_THRESHOLD_PX = 4;
-const OPENING_INSET_PX = 8;
-const WINDOW_GAP_PX = 4;
+const DOOR_MARK_OFFSET_PX = 0;
+const WINDOW_FRAME_OFFSET_PX = 2;
+const WINDOW_CROSS_HALF_PX = 6;
+const DIMENSION_OUTER_OFFSET_PX = 24;
+const DIMENSION_INNER_OFFSET_PX = 16;
+const DIMENSION_DOOR_OFFSET_PX = 12;
 const DEFAULT_DOOR_WIDTH_PX = 60;
 const DEFAULT_WINDOW_WIDTH_PX = 120;
 const DEFAULT_OBJECT_WIDTH_PX = 100;
@@ -32,7 +37,7 @@ const ROTATION_SNAP_DEG = 15;
 const SVG_NS = "http://www.w3.org/2000/svg";
 const DEFAULT_FLOORPLAN_HINT =
   "Bewegen Sie die Maus über einen Raum, um ihn hervorzuheben.";
-const ROOM_OBJECT_TYPES = ["rect", "circle"];
+const ROOM_OBJECT_TYPES = ["rect", "circle", "triangle"];
 const PLANNER_MODES = ["architect", "interior"];
 const DEFAULT_PLANNER_MODE = PLANNER_MODES[0];
 const OBJECT_HANDLES = [
@@ -331,6 +336,18 @@ const syncState = {
   subscription: null,
 };
 
+const chatContextStorageKey = "house-builder-chat-context";
+const chatContextVersion = 1;
+
+const contextState = {
+  loaded: false,
+  version: chatContextVersion,
+  global: "",
+  property: "",
+  rooms: {},
+  updatedAt: null,
+};
+
 const activityNotificationState = {
   lastViewedAt: null,
   pendingViewedAt: null,
@@ -448,6 +465,12 @@ const commentContextState = {
   isOpen: false,
 };
 
+const objectContextState = {
+  roomId: null,
+  objectId: null,
+  isOpen: false,
+};
+
 const userMenuState = {
   isOpen: false,
 };
@@ -519,6 +542,7 @@ const elements = {
   commentTooltipAuthor: document.getElementById("comment-tooltip-author"),
   commentTooltipText: document.getElementById("comment-tooltip-text"),
   commentContextMenu: document.getElementById("comment-context-menu"),
+  objectContextMenu: document.getElementById("object-context-menu"),
   taskPlanMenu: document.getElementById("task-plan-menu"),
   decisionList: document.getElementById("decision-list"),
   decisionForm: document.getElementById("decision-form"),
@@ -1281,6 +1305,7 @@ const normalizeRoomObject = (object, index) => {
       Number.isFinite(height) ? height : DEFAULT_OBJECT_HEIGHT_PX,
     ),
     rotation: normalizeRotation(Number.isFinite(rotation) ? rotation : 0),
+    locked: object.locked === true,
     createdAt:
       typeof object.createdAt === "string" && object.createdAt.trim()
         ? object.createdAt.trim()
@@ -1356,6 +1381,7 @@ const buildStatePayload = () => ({
 
 const saveStateLocal = () => {
   markKnownUserDirectoryDirty();
+  refreshContextCache();
   localStorage.setItem(storageKey, JSON.stringify(buildStatePayload()));
 };
 
@@ -1389,6 +1415,7 @@ const applyStatePayload = (payload) => {
   }
   ensureRoomDataForFloors();
   markKnownUserDirectoryDirty();
+  refreshContextCache();
   return didMigrateTasks;
 };
 
@@ -1406,6 +1433,7 @@ const hydrateStateFromLocal = () => {
   clearTaskSelection();
   state.activityEvents = [];
   ensureRoomDataForFloors();
+  refreshContextCache();
 };
 
 const saveState = () => {
@@ -1638,22 +1666,48 @@ const getNextRoomName = (floor) => {
   return `${base} ${index}`;
 };
 
-const getNextObjectName = (roomData) => {
+const normalizeObjectNameKey = (value) =>
+  String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
+
+const getNextObjectName = () => {
   const base = "Objekt";
-  if (!roomData || !Array.isArray(roomData.objects)) {
-    return `${base} 1`;
-  }
+  const taken = new Set();
   let maxIndex = 0;
-  roomData.objects.forEach((item) => {
-    if (!item?.name) return;
-    const match = item.name.match(/^Objekt\s+(\d+)$/i);
-    if (!match) return;
-    const value = Number(match[1]);
-    if (Number.isFinite(value)) {
-      maxIndex = Math.max(maxIndex, value);
-    }
+  Object.values(state.roomData || {}).forEach((data) => {
+    (Array.isArray(data?.objects) ? data.objects : []).forEach((item) => {
+      if (!item?.name) return;
+      taken.add(normalizeObjectNameKey(item.name));
+      const match = item.name.match(/^Objekt\s+(\d+)$/i);
+      if (!match) return;
+      const value = Number(match[1]);
+      if (Number.isFinite(value)) {
+        maxIndex = Math.max(maxIndex, value);
+      }
+    });
   });
-  return `${base} ${maxIndex + 1}`;
+  let index = Math.max(1, maxIndex + 1);
+  let candidate = `${base} ${index}`;
+  while (taken.has(normalizeObjectNameKey(candidate))) {
+    index += 1;
+    candidate = `${base} ${index}`;
+  }
+  return candidate;
+};
+
+const isObjectNameUnique = (name, ignoreObjectId = null) => {
+  const key = normalizeObjectNameKey(name);
+  if (!key) return true;
+  for (const data of Object.values(state.roomData || {})) {
+    const objects = Array.isArray(data?.objects) ? data.objects : [];
+    for (const object of objects) {
+      if (!object?.name) continue;
+      if (ignoreObjectId && object.id === ignoreObjectId) continue;
+      if (normalizeObjectNameKey(object.name) === key) {
+        return false;
+      }
+    }
+  }
+  return true;
 };
 
 const getRoomCenter = (room) => ({
@@ -1685,6 +1739,7 @@ const createRoomObject = ({
   width,
   height,
   rotation,
+  locked,
 }) => {
   const timestamp = new Date().toISOString();
   return {
@@ -1703,6 +1758,7 @@ const createRoomObject = ({
       Number(height) || DEFAULT_OBJECT_HEIGHT_PX,
     ),
     rotation: normalizeRotation(Number(rotation) || 0),
+    locked: locked === true,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -1723,6 +1779,7 @@ const formatNumber = (value, precision = 0) => {
   const fixed = value.toFixed(precision);
   return fixed.endsWith(".0") ? String(Math.round(value)) : fixed;
 };
+const formatDimensionMm = (px) => `${formatNumber(toMm(px), 0)} mm`;
 const rotatePoint = (point, angleRad) => {
   const cos = Math.cos(angleRad);
   const sin = Math.sin(angleRad);
@@ -1777,6 +1834,59 @@ const getInputNumber = (primary, fallback) => {
   }
   const value = Number(raw);
   return Number.isNaN(value) ? Number(fallback?.value) : value;
+};
+
+const getDataAttribute = (element, key) => {
+  if (!element) return null;
+  if (element.dataset && element.dataset[key] !== undefined) {
+    return element.dataset[key];
+  }
+  if (typeof element.getAttribute === "function") {
+    const attr = `data-${key.replace(
+      /[A-Z]/g,
+      (match) => `-${match.toLowerCase()}`,
+    )}`;
+    return element.getAttribute(attr);
+  }
+  return null;
+};
+
+const findClosestElement = (element, predicate) => {
+  let node = element;
+  while (node && node !== document && node !== window) {
+    if (node.nodeType === 1 && predicate(node)) return node;
+    node = node.parentNode;
+  }
+  return null;
+};
+
+const getObjectTargetFromElement = (element) => {
+  if (!element) return null;
+  if (typeof element.closest === "function") {
+    const match = element.closest("[data-object-id]");
+    if (match) return match;
+  }
+  return findClosestElement(element, (node) =>
+    Boolean(getDataAttribute(node, "objectId")),
+  );
+};
+
+const getObjectHandleTargetFromElement = (element) => {
+  if (!element) return null;
+  if (typeof element.closest === "function") {
+    const match = element.closest("[data-object-handle]");
+    if (match) return match;
+  }
+  return findClosestElement(element, (node) =>
+    Boolean(getDataAttribute(node, "objectHandle")),
+  );
+};
+
+const getObjectIdsFromTarget = (target) => {
+  const roomId = getDataAttribute(target, "roomId");
+  const objectId = getDataAttribute(target, "objectId");
+  if (!roomId || !objectId) return null;
+  return { roomId, objectId };
 };
 
 const isEditableTarget = (target) => {
@@ -3891,6 +4001,23 @@ const createSvgCircle = (cx, cy, r, className) => {
   return circle;
 };
 
+const createDimensionLabel = (x, y, text, rotation = 0, className = "") => {
+  const label = createSvgElement("text");
+  label.setAttribute("x", x);
+  label.setAttribute("y", y);
+  label.setAttribute(
+    "class",
+    className ? `dimension-label ${className}` : "dimension-label",
+  );
+  label.setAttribute("text-anchor", "middle");
+  label.setAttribute("dominant-baseline", "middle");
+  if (rotation) {
+    label.setAttribute("transform", `rotate(${rotation} ${x} ${y})`);
+  }
+  label.textContent = text;
+  return label;
+};
+
 const getRoomDraftRect = (draft) => {
   if (!draft) return null;
   const start = {
@@ -3956,9 +4083,11 @@ const getOffsetLineCoords = (data, offset) => {
   };
 };
 
-const appendDoorSymbol = (group, data, showSwing = true) => {
-  const frameCoords = getOffsetLineCoords(data, OPENING_INSET_PX);
+const appendDoorSymbol = (group, data, showSwing = false) => {
+  const frameCoords = getOffsetLineCoords(data, DOOR_MARK_OFFSET_PX);
   group.appendChild(createSvgLine(frameCoords, "door-frame"));
+
+  if (!showSwing) return;
 
   const hinge =
     data.axis === "x"
@@ -3976,9 +4105,7 @@ const appendDoorSymbol = (group, data, showSwing = true) => {
     data.wallDir.x * data.normal.y - data.wallDir.y * data.normal.x > 0 ? 1 : 0;
 
   const arcPath = `M ${wallEnd.x} ${wallEnd.y} A ${data.length} ${data.length} 0 0 ${sweep} ${leafEnd.x} ${leafEnd.y}`;
-  if (showSwing) {
-    group.appendChild(createSvgPath(arcPath, "door-arc"));
-  }
+  group.appendChild(createSvgPath(arcPath, "door-arc"));
   group.appendChild(
     createSvgLine(
       { x1: hinge.x, y1: hinge.y, x2: leafEnd.x, y2: leafEnd.y },
@@ -3989,26 +4116,21 @@ const appendDoorSymbol = (group, data, showSwing = true) => {
 };
 
 const appendWindowSymbol = (group, data) => {
-  const outerCoords = getOffsetLineCoords(data, OPENING_INSET_PX);
-  const innerCoords = getOffsetLineCoords(
-    data,
-    OPENING_INSET_PX + WINDOW_GAP_PX,
-  );
+  const outerCoords = getOffsetLineCoords(data, -WINDOW_FRAME_OFFSET_PX);
+  const innerCoords = getOffsetLineCoords(data, WINDOW_FRAME_OFFSET_PX);
   group.appendChild(createSvgLine(outerCoords, "window-line"));
   group.appendChild(createSvgLine(innerCoords, "window-line"));
 
   const center = (data.start + data.end) / 2;
   if (data.axis === "x") {
-    const y1 = data.position + data.normal.y * OPENING_INSET_PX;
-    const y2 =
-      data.position + data.normal.y * (OPENING_INSET_PX + WINDOW_GAP_PX);
+    const y1 = data.position - WINDOW_CROSS_HALF_PX;
+    const y2 = data.position + WINDOW_CROSS_HALF_PX;
     group.appendChild(
       createSvgLine({ x1: center, y1, x2: center, y2 }, "window-cross"),
     );
   } else {
-    const x1 = data.position + data.normal.x * OPENING_INSET_PX;
-    const x2 =
-      data.position + data.normal.x * (OPENING_INSET_PX + WINDOW_GAP_PX);
+    const x1 = data.position - WINDOW_CROSS_HALF_PX;
+    const x2 = data.position + WINDOW_CROSS_HALF_PX;
     group.appendChild(
       createSvgLine({ x1, y1: center, x2, y2: center }, "window-cross"),
     );
@@ -4038,7 +4160,7 @@ const createOpeningGroup = (opening, room, floorId, isSelected) => {
 
   const renderData = getOpeningRenderData(opening, room);
   if (opening.type === "door") {
-    const showSwing = opening.showSwing === true;
+    const showSwing = isSelected;
     appendDoorSymbol(group, renderData, showSwing);
   } else {
     appendWindowSymbol(group, renderData);
@@ -4051,6 +4173,20 @@ const getObjectLocalPoint = (point, object) => {
   return rotatePoint(delta, toRadians(-object.rotation));
 };
 
+const isPointInsideTriangle = (point, width, height) => {
+  const a = { x: 0, y: -height / 2 };
+  const b = { x: width / 2, y: height / 2 };
+  const c = { x: -width / 2, y: height / 2 };
+  const sign = (p1, p2, p3) =>
+    (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
+  const d1 = sign(point, a, b);
+  const d2 = sign(point, b, c);
+  const d3 = sign(point, c, a);
+  const hasNeg = d1 < 0 || d2 < 0 || d3 < 0;
+  const hasPos = d1 > 0 || d2 > 0 || d3 > 0;
+  return !(hasNeg && hasPos);
+};
+
 const isPointInsideObject = (point, object) => {
   const local = getObjectLocalPoint(point, object);
   const halfWidth = object.width / 2;
@@ -4059,6 +4195,9 @@ const isPointInsideObject = (point, object) => {
     const nx = local.x / Math.max(halfWidth, 1);
     const ny = local.y / Math.max(halfHeight, 1);
     return nx * nx + ny * ny <= 1;
+  }
+  if (object.type === "triangle") {
+    return isPointInsideTriangle(local, object.width, object.height);
   }
   return Math.abs(local.x) <= halfWidth && Math.abs(local.y) <= halfHeight;
 };
@@ -4086,6 +4225,9 @@ const getObjectHitTest = (point, floor) => {
   return null;
 };
 
+const getTrianglePoints = (width, height) =>
+  `0,${-height / 2} ${width / 2},${height / 2} ${-width / 2},${height / 2}`;
+
 const createObjectShape = (object, className) => {
   if (object.type === "circle") {
     const ellipse = createSvgElement("ellipse");
@@ -4098,6 +4240,17 @@ const createObjectShape = (object, className) => {
     }
     return ellipse;
   }
+  if (object.type === "triangle") {
+    const polygon = createSvgElement("polygon");
+    polygon.setAttribute(
+      "points",
+      getTrianglePoints(object.width, object.height),
+    );
+    if (className) {
+      polygon.setAttribute("class", className);
+    }
+    return polygon;
+  }
   const rect = createSvgElement("rect");
   rect.setAttribute("x", -object.width / 2);
   rect.setAttribute("y", -object.height / 2);
@@ -4109,11 +4262,37 @@ const createObjectShape = (object, className) => {
   return rect;
 };
 
+const createObjectLockIcon = (y) => {
+  const lockGroup = createSvgElement("g");
+  lockGroup.setAttribute("class", "room-object-lock");
+  lockGroup.setAttribute("transform", `translate(0 ${y})`);
+
+  const shackle = createSvgPath(
+    "M -3 -2 V -5 A 3 3 0 0 1 3 -5 V -2",
+    "room-object-lock-shackle",
+  );
+  lockGroup.appendChild(shackle);
+
+  const body = createSvgElement("rect");
+  body.setAttribute("x", -6);
+  body.setAttribute("y", -2);
+  body.setAttribute("width", 12);
+  body.setAttribute("height", 8);
+  body.setAttribute("rx", 1.6);
+  body.setAttribute("ry", 1.6);
+  body.setAttribute("class", "room-object-lock-body");
+  lockGroup.appendChild(body);
+
+  return lockGroup;
+};
+
 const createRoomObjectGroup = (object, roomId, isSelected, showHandles) => {
   const group = createSvgElement("g");
   group.setAttribute(
     "class",
-    `room-object room-object-${object.type}${isSelected ? " selected" : ""}`,
+    `room-object room-object-${object.type}${isSelected ? " selected" : ""}${
+      object.locked ? " is-locked" : ""
+    }`,
   );
   group.dataset.roomId = roomId;
   group.dataset.objectId = object.id;
@@ -4151,18 +4330,87 @@ const createRoomObjectGroup = (object, roomId, isSelected, showHandles) => {
       rotateLine.setAttribute("class", "room-object-rotate-line");
       group.appendChild(rotateLine);
 
-      const rotateHandle = createSvgCircle(
-        0,
-        rotateY,
-        OBJECT_ROTATE_HANDLE_RADIUS_PX,
-        "room-object-rotate-handle",
-      );
-      rotateHandle.dataset.objectHandle = "rotate";
-      group.appendChild(rotateHandle);
+      if (object.locked) {
+        group.appendChild(createObjectLockIcon(rotateY));
+      } else {
+        const rotateHandle = createSvgCircle(
+          0,
+          rotateY,
+          OBJECT_ROTATE_HANDLE_RADIUS_PX,
+          "room-object-rotate-handle",
+        );
+        rotateHandle.dataset.objectHandle = "rotate";
+        group.appendChild(rotateHandle);
+      }
     }
   }
 
   return group;
+};
+
+const getWallDimensionPlacement = (wall) => {
+  const meta = getWallMeta(wall);
+  if (!meta || !Number.isFinite(meta.length) || meta.length <= 0) return null;
+  const centerX = (wall.x1 + wall.x2) / 2;
+  const centerY = (wall.y1 + wall.y2) / 2;
+  const boundsCenterX = floorBounds.x + floorBounds.width / 2;
+  const boundsCenterY = floorBounds.y + floorBounds.height / 2;
+  const tolerance = 0.5;
+  let normal = { x: 0, y: 0 };
+  let isOuter = false;
+
+  if (meta.orientation === "vertical") {
+    if (Math.abs(wall.x1 - floorBounds.x) <= tolerance) {
+      normal = { x: -1, y: 0 };
+      isOuter = true;
+    } else if (
+      Math.abs(wall.x1 - (floorBounds.x + floorBounds.width)) <= tolerance
+    ) {
+      normal = { x: 1, y: 0 };
+      isOuter = true;
+    } else {
+      normal = { x: centerX < boundsCenterX ? -1 : 1, y: 0 };
+    }
+  } else {
+    if (Math.abs(wall.y1 - floorBounds.y) <= tolerance) {
+      normal = { x: 0, y: -1 };
+      isOuter = true;
+    } else if (
+      Math.abs(wall.y1 - (floorBounds.y + floorBounds.height)) <= tolerance
+    ) {
+      normal = { x: 0, y: 1 };
+      isOuter = true;
+    } else {
+      normal = { x: 0, y: centerY < boundsCenterY ? -1 : 1 };
+    }
+  }
+
+  const offset = isOuter
+    ? DIMENSION_OUTER_OFFSET_PX
+    : DIMENSION_INNER_OFFSET_PX;
+  return {
+    x: centerX + normal.x * offset,
+    y: centerY + normal.y * offset,
+    rotation: meta.orientation === "vertical" ? -90 : 0,
+    length: meta.length,
+  };
+};
+
+const getDoorDimensionPlacement = (opening, room) => {
+  const meta = getOpeningMeta(opening);
+  if (!meta || !Number.isFinite(meta.length) || meta.length <= 0) return null;
+  const renderData = getOpeningRenderData(opening, room);
+  const center = getOpeningCenterPoint(opening, meta);
+  const normal = {
+    x: -renderData.normal.x,
+    y: -renderData.normal.y,
+  };
+  return {
+    x: center.x + normal.x * DIMENSION_DOOR_OFFSET_PX,
+    y: center.y + normal.y * DIMENSION_DOOR_OFFSET_PX,
+    rotation: meta.axis === "y" ? -90 : 0,
+    length: meta.length,
+  };
 };
 
 const renderFloorplan = () => {
@@ -4203,7 +4451,8 @@ const renderFloorplan = () => {
   outline.setAttribute("class", "outer-wall");
   elements.floorplan.appendChild(outline);
 
-  buildWallSegments(interiorRooms).forEach((wall) => {
+  const wallSegments = buildWallSegments(interiorRooms);
+  wallSegments.forEach((wall) => {
     const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
     line.setAttribute("x1", wall.x1);
     line.setAttribute("y1", wall.y1);
@@ -4348,6 +4597,41 @@ const renderFloorplan = () => {
       createOpeningGroup(opening, room, floor.id, isSelected),
     );
   });
+
+  if (state.isArchitectMode && !state.isExteriorMode) {
+    const dimensionLayer = createSvgElement("g");
+    dimensionLayer.setAttribute("class", "dimension-layer");
+    wallSegments.forEach((wall) => {
+      const placement = getWallDimensionPlacement(wall);
+      if (!placement) return;
+      const label = createDimensionLabel(
+        placement.x,
+        placement.y,
+        formatDimensionMm(placement.length),
+        placement.rotation,
+        "dimension-wall",
+      );
+      dimensionLayer.appendChild(label);
+    });
+
+    floor.openings.forEach((opening) => {
+      if (opening.type !== "door") return;
+      const room =
+        interiorRooms.find((item) => item.id === opening.roomId) || null;
+      const placement = getDoorDimensionPlacement(opening, room);
+      if (!placement) return;
+      const label = createDimensionLabel(
+        placement.x,
+        placement.y,
+        formatDimensionMm(placement.length),
+        placement.rotation,
+        "dimension-door",
+      );
+      dimensionLayer.appendChild(label);
+    });
+
+    elements.floorplan.appendChild(dimensionLayer);
+  }
 
   roomLabels.forEach((label) => {
     elements.floorplan.appendChild(label);
@@ -4621,9 +4905,8 @@ const focusCommentFromMarker = (marker) => {
   return true;
 };
 
-const positionCommentContextMenu = (clientX, clientY) => {
-  if (!elements.commentContextMenu) return;
-  const menu = elements.commentContextMenu;
+const positionContextMenu = (menu, clientX, clientY) => {
+  if (!menu) return;
   menu.style.left = `${clientX}px`;
   menu.style.top = `${clientY}px`;
   const rect = menu.getBoundingClientRect();
@@ -4634,6 +4917,16 @@ const positionCommentContextMenu = (clientX, clientY) => {
   const y = clamp(clientY, margin, maxY);
   menu.style.left = `${x}px`;
   menu.style.top = `${y}px`;
+};
+
+const positionCommentContextMenu = (clientX, clientY) => {
+  if (!elements.commentContextMenu) return;
+  positionContextMenu(elements.commentContextMenu, clientX, clientY);
+};
+
+const positionObjectContextMenu = (clientX, clientY) => {
+  if (!elements.objectContextMenu) return;
+  positionContextMenu(elements.objectContextMenu, clientX, clientY);
 };
 
 const updateCommentContextMenu = (comment) => {
@@ -5104,7 +5397,211 @@ const fetchChatConfig = async ({ force = false } = {}) => {
   return chatConfigState.loading;
 };
 
-const buildChatRequestPayload = ({ thread, contextLabel }) => {
+const sanitizeContextValue = (value) =>
+  String(value || "")
+    .replace(/\s+/g, " ")
+    .replace(/[|;,]/g, " ")
+    .trim();
+
+const formatContextList = (items) => (items.length ? items.join(", ") : "none");
+
+const loadContextCache = () => {
+  if (contextState.loaded) return contextState;
+  const raw = localStorage.getItem(chatContextStorageKey);
+  if (!raw) {
+    contextState.loaded = true;
+    return contextState;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed?.version !== chatContextVersion) {
+      contextState.loaded = true;
+      return contextState;
+    }
+    contextState.global =
+      typeof parsed?.global === "string" ? parsed.global : "";
+    contextState.property =
+      typeof parsed?.property === "string" ? parsed.property : "";
+    contextState.rooms =
+      parsed?.rooms && typeof parsed.rooms === "object" ? parsed.rooms : {};
+    contextState.updatedAt =
+      typeof parsed?.updatedAt === "string" ? parsed.updatedAt : null;
+  } catch {
+    // Ignore cache parsing errors.
+  }
+  contextState.loaded = true;
+  return contextState;
+};
+
+const persistContextCache = () => {
+  try {
+    localStorage.setItem(
+      chatContextStorageKey,
+      JSON.stringify({
+        version: chatContextVersion,
+        global: contextState.global,
+        property: contextState.property,
+        rooms: contextState.rooms,
+        updatedAt: contextState.updatedAt,
+      }),
+    );
+  } catch {
+    // Ignore storage errors.
+  }
+};
+
+const buildPropertyContextDoc = () => {
+  const rooms = [];
+  Object.entries(state.floorPlans || {}).forEach(([floorId, floor]) => {
+    (Array.isArray(floor?.rooms) ? floor.rooms : []).forEach((room) => {
+      if (!room) return;
+      const name = sanitizeContextValue(room.name || room.id);
+      const widthMm = toMm(room.width);
+      const heightMm = toMm(room.height);
+      const roomType = room.isExterior ? "ext" : "int";
+      rooms.push(
+        `${floorId}|${room.id}|${name}|${widthMm}x${heightMm}|${roomType}`,
+      );
+    });
+  });
+  rooms.sort();
+
+  const objects = [];
+  Object.values(state.roomData || {}).forEach((data) => {
+    (Array.isArray(data?.objects) ? data.objects : []).forEach((object) => {
+      if (!object) return;
+      const name = sanitizeContextValue(object.name || object.id);
+      objects.push(`${object.id}|${name}|${object.roomId || "unknown"}`);
+    });
+  });
+  objects.sort();
+
+  return `PROPERTY mm_per_px=${MM_PER_PX}; object_names_unique=1; rooms=[${formatContextList(
+    rooms,
+  )}]; objects=[${formatContextList(objects)}]`;
+};
+
+const buildRoomContextDoc = (roomId) => {
+  if (!roomId) return "";
+  const room = findRoomById(roomId);
+  if (!room) return "";
+  const floorId = getFloorIdForRoom(roomId);
+  const floor = floorId ? state.floorPlans[floorId] : null;
+  const name = sanitizeContextValue(room.name || room.id);
+  const roomType = room.isExterior ? "ext" : "int";
+  const widthMm = toMm(room.width);
+  const heightMm = toMm(room.height);
+
+  const objects = [];
+  const roomData = ensureRoomData(roomId);
+  (Array.isArray(roomData?.objects) ? roomData.objects : []).forEach(
+    (object) => {
+      if (!object) return;
+      const objectName = sanitizeContextValue(object.name || object.id);
+      const cxMm = toMm(object.cx - room.x);
+      const cyMm = toMm(object.cy - room.y);
+      const width = toMm(object.width);
+      const height = toMm(object.height);
+      const rotation = formatNumber(normalizeRotation(object.rotation), 1);
+      objects.push(
+        `${object.id}|${objectName}|${object.type}|${cxMm}|${cyMm}|${width}|${height}|${rotation}`,
+      );
+    },
+  );
+  objects.sort();
+
+  const openings = [];
+  (Array.isArray(floor?.openings) ? floor.openings : []).forEach((opening) => {
+    if (!opening || opening.roomId !== roomId) return;
+    const meta = getOpeningMeta(opening);
+    const wallSide = resolveOpeningWallSide(opening, room, meta) || "unknown";
+    const center = getOpeningCenterPoint(opening, meta);
+    const centerOffset =
+      wallSide === "top" || wallSide === "bottom"
+        ? toMm(center.x - room.x)
+        : toMm(center.y - room.y);
+    const spanMm = toMm(meta.length);
+    const heightMm = Math.round(opening.heightMm || 0);
+    const swing =
+      opening.type === "door" ? `|s=${opening.showSwing ? 1 : 0}` : "";
+    openings.push(
+      `${opening.id}|${opening.type}|${wallSide}|${centerOffset}|${spanMm}|${heightMm}${swing}`,
+    );
+  });
+  openings.sort();
+
+  return `ROOM id=${room.id} name=${name} floor=${floorId || ""} type=${roomType} size_mm=${widthMm}x${heightMm} height_mm=${WALL_HEIGHT_MM} origin=top-left axes=x_right,y_down units=mm objects=[${formatContextList(
+    objects,
+  )}] openings=[${formatContextList(
+    openings,
+  )}] fields=obj(id|name|type|cx|cy|w|h|rot_deg),open(id|type|side|center|span|height|s(door))`;
+};
+
+const refreshContextCache = () => {
+  contextState.global = String(GLOBAL_CHAT_CONTEXT || "").trim();
+  contextState.property = buildPropertyContextDoc();
+  contextState.rooms = {};
+  const roomIds = new Set();
+  Object.values(state.floorPlans || {}).forEach((floor) => {
+    (Array.isArray(floor?.rooms) ? floor.rooms : []).forEach((room) => {
+      if (room?.id) roomIds.add(room.id);
+    });
+  });
+  roomIds.forEach((roomId) => {
+    const doc = buildRoomContextDoc(roomId);
+    if (doc) {
+      contextState.rooms[roomId] = doc;
+    }
+  });
+  contextState.updatedAt = new Date().toISOString();
+  contextState.loaded = true;
+  persistContextCache();
+};
+
+const ensureContextCache = () => {
+  loadContextCache();
+  if (!contextState.global || !contextState.property || !contextState.rooms) {
+    refreshContextCache();
+  }
+};
+
+const getRoomContextFromCache = (roomId) => {
+  if (!roomId) return "";
+  ensureContextCache();
+  const cached = contextState.rooms?.[roomId];
+  if (cached) return cached;
+  const doc = buildRoomContextDoc(roomId);
+  if (doc) {
+    contextState.rooms[roomId] = doc;
+    persistContextCache();
+  }
+  return doc;
+};
+
+const buildScopeContextLine = (contextTarget) => {
+  if (!contextTarget?.scope || contextTarget.scope === "room") return "";
+  const label = sanitizeContextValue(
+    contextTarget.contextLabel || contextTarget.label || contextTarget.scope,
+  );
+  return label ? `SCOPE ${label}` : "";
+};
+
+const buildChatContext = (contextTarget) => {
+  ensureContextCache();
+  const segments = [];
+  const globalDoc = contextState.global || String(GLOBAL_CHAT_CONTEXT || "");
+  if (globalDoc) segments.push(globalDoc.trim());
+  if (contextState.property) segments.push(contextState.property);
+  const roomId =
+    contextTarget?.roomId || contextTarget?.target?.roomId || null;
+  const roomDoc = roomId ? getRoomContextFromCache(roomId) : "";
+  if (roomDoc) segments.push(roomDoc);
+  const scopeLine = buildScopeContextLine(contextTarget);
+  if (scopeLine) segments.push(scopeLine);
+  return segments.join("\n");
+};
+
+const buildChatRequestPayload = ({ thread, contextTarget }) => {
   const trimmed = Array.isArray(thread?.messages)
     ? thread.messages.slice(-CHAT_MESSAGE_LIMIT)
     : [];
@@ -5116,12 +5613,12 @@ const buildChatRequestPayload = ({ thread, contextLabel }) => {
     .filter((message) => message.content);
   return {
     messages,
-    context: contextLabel || "",
+    context: buildChatContext(contextTarget),
   };
 };
 
-const requestChatResponse = async ({ thread, contextLabel }) => {
-  const payload = buildChatRequestPayload({ thread, contextLabel });
+const requestChatResponse = async ({ thread, contextTarget }) => {
+  const payload = buildChatRequestPayload({ thread, contextTarget });
   const response = await fetch("/api/chat", {
     method: "POST",
     headers: {
@@ -5244,7 +5741,7 @@ const handleChatSubmit = async (event) => {
     const config = await fetchChatConfig();
     const response = await requestChatResponse({
       thread,
-      contextLabel: resolved?.contextLabel || "",
+      contextTarget: resolved,
     });
     thread.messages.push({
       id: createChatMessageId(),
@@ -9502,29 +9999,36 @@ const renderInteriorPanel = () => {
     elements.interiorTitle.textContent = object.name || "Objekt";
   }
   if (elements.interiorHelp) {
-    elements.interiorHelp.textContent =
-      "Ziehen zum Verschieben, Ecken zum Skalieren, Griff zum Drehen.";
+    elements.interiorHelp.textContent = object.locked
+      ? "Objekt gesperrt. Rechtsklick zum Entsperren."
+      : "Ziehen zum Verschieben, Ecken zum Skalieren, Griff zum Drehen.";
   }
   if (elements.objectNameInput) {
     elements.objectNameInput.value = object.name || "";
+    elements.objectNameInput.setCustomValidity("");
   }
   if (elements.objectXInput) {
     elements.objectXInput.value = formatNumber(object.cx, 0);
+    elements.objectXInput.disabled = object.locked === true;
   }
   if (elements.objectYInput) {
     elements.objectYInput.value = formatNumber(object.cy, 0);
+    elements.objectYInput.disabled = object.locked === true;
   }
   if (elements.objectWidthInput) {
     elements.objectWidthInput.value = formatNumber(object.width, 0);
+    elements.objectWidthInput.disabled = object.locked === true;
   }
   if (elements.objectHeightInput) {
     elements.objectHeightInput.value = formatNumber(object.height, 0);
+    elements.objectHeightInput.disabled = object.locked === true;
   }
   if (elements.objectRotationInput) {
     elements.objectRotationInput.value = formatNumber(
       normalizeRotation(object.rotation),
       1,
     );
+    elements.objectRotationInput.disabled = object.locked === true;
   }
   if (elements.objectForm) {
     elements.objectForm.hidden = false;
@@ -9671,71 +10175,13 @@ const renderArchitectPanel = () => {
       elements.measurementForm.hidden = true;
       return;
     }
-
-    const widthMinMm = toMm(MIN_ROOM_SIZE_PX);
-    const widthMaxPx = Math.max(
-      MIN_ROOM_SIZE_PX,
-      floorBounds.x + floorBounds.width - room.x,
-      room.width,
-    );
-    const heightMaxPx = Math.max(
-      MIN_ROOM_SIZE_PX,
-      floorBounds.y + floorBounds.height - room.y,
-      room.height,
-    );
-    const widthMaxMm = toMm(widthMaxPx);
-    const heightMaxMm = toMm(heightMaxPx);
-    const widthMm = toMm(room.width);
-    const heightMm = toMm(room.height);
-
-    if (elements.measurementAxisLabel) {
-      elements.measurementAxisLabel.textContent = "Raumbreite (mm)";
-    }
-    if (elements.measurementSpanLabel) {
-      elements.measurementSpanLabel.textContent = "Raumtiefe (mm)";
-    }
-    if (elements.measurementLockRow) {
-      elements.measurementLockRow.hidden = true;
-    }
-    if (elements.measurementHeightRow) {
-      elements.measurementHeightRow.hidden = true;
-    }
-    if (elements.measurementSwingRow) {
-      elements.measurementSwingRow.hidden = true;
-    }
-    if (elements.measurementNote) {
-      elements.measurementNote.hidden = true;
+    if (elements.measurementForm) {
+      elements.measurementForm.hidden = true;
     }
     if (elements.architectHelp) {
       elements.architectHelp.textContent =
-        "Raum ziehen, um ihn zu verschieben. Breite und Tiefe hier anpassen.";
+        "Raummaße sind fixiert. Raum lässt sich nur verschieben.";
     }
-
-    elements.measurementAxis.min = widthMinMm;
-    elements.measurementAxis.max = widthMaxMm;
-    elements.measurementAxis.step = MM_PER_PX;
-    elements.measurementAxis.value = widthMm;
-    elements.measurementAxis.disabled = false;
-
-    elements.measurementAxisNumber.min = widthMinMm;
-    elements.measurementAxisNumber.max = widthMaxMm;
-    elements.measurementAxisNumber.step = MM_PER_PX;
-    elements.measurementAxisNumber.value = widthMm;
-    elements.measurementAxisNumber.disabled = false;
-
-    elements.measurementSpan.min = widthMinMm;
-    elements.measurementSpan.max = heightMaxMm;
-    elements.measurementSpan.step = MM_PER_PX;
-    elements.measurementSpan.value = heightMm;
-    elements.measurementSpan.disabled = false;
-
-    elements.measurementSpanNumber.min = widthMinMm;
-    elements.measurementSpanNumber.max = heightMaxMm;
-    elements.measurementSpanNumber.step = MM_PER_PX;
-    elements.measurementSpanNumber.value = heightMm;
-    elements.measurementSpanNumber.disabled = false;
-
-    elements.measurementForm.hidden = false;
     return;
   }
 
@@ -9794,7 +10240,7 @@ const renderArchitectPanel = () => {
     elements.measurementHeightRow.hidden = false;
   }
   if (elements.measurementSwingRow) {
-    elements.measurementSwingRow.hidden = elementType !== "door";
+    elements.measurementSwingRow.hidden = true;
   }
   if (elements.measurementNote) {
     elements.measurementNote.hidden = true;
@@ -9845,8 +10291,8 @@ const renderArchitectPanel = () => {
   }
 
   if (elements.measurementSwing) {
-    elements.measurementSwing.checked = openingData.opening.showSwing === true;
-    elements.measurementSwing.disabled = elementType !== "door";
+    elements.measurementSwing.checked = false;
+    elements.measurementSwing.disabled = true;
   }
 
   elements.measurementForm.hidden = false;
@@ -12060,59 +12506,8 @@ const applyArchitectAdjustments = ({
   }
 
   if (state.selectedElement.elementType === "room") {
-    const floor =
-      state.floorPlans[state.selectedElement.floorId] || getActiveFloor();
-    const room = floor.rooms.find(
-      (item) => item.id === state.selectedElement.roomId,
-    );
-    if (!room) return;
-
-    const widthMaxPx = Math.max(
-      MIN_ROOM_SIZE_PX,
-      floorBounds.x + floorBounds.width - room.x,
-      room.width,
-    );
-    const heightMaxPx = Math.max(
-      MIN_ROOM_SIZE_PX,
-      floorBounds.y + floorBounds.height - room.y,
-      room.height,
-    );
-    const newWidth = clamp(
-      toPx(
-        getInputNumber(
-          elements.measurementAxisNumber,
-          elements.measurementAxis,
-        ),
-      ),
-      MIN_ROOM_SIZE_PX,
-      widthMaxPx,
-    );
-    const newHeight = clamp(
-      toPx(
-        getInputNumber(
-          elements.measurementSpanNumber,
-          elements.measurementSpan,
-        ),
-      ),
-      MIN_ROOM_SIZE_PX,
-      heightMaxPx,
-    );
-
-    const widthChanged = Math.abs(newWidth - room.width) > 0.01;
-    const heightChanged = Math.abs(newHeight - room.height) > 0.01;
-    if (widthChanged || heightChanged) {
-      room.width = newWidth;
-      room.height = newHeight;
-      updateOpeningsForRoomResize(floor, room);
-      renderFloorplan();
-      renderRoomPanel();
-      update3DScene(room.id);
-    }
     if (refreshPanel) {
       renderArchitectPanel();
-    }
-    if (commit && (widthChanged || heightChanged)) {
-      saveState();
     }
     return;
   }
@@ -12146,29 +12541,12 @@ const applyArchitectAdjustments = ({
     heightBounds.max,
   );
 
-  const wantsSwing =
-    opening.type === "door" && elements.measurementSwing
-      ? elements.measurementSwing.checked
-      : opening.showSwing === true;
-
   const geometryChanged =
     Math.abs(newCenter - meta.position) > 0.01 ||
     Math.abs(newLength - meta.length) > 0.01;
-  const swingChanged =
-    opening.type === "door" &&
-    typeof wantsSwing === "boolean" &&
-    wantsSwing !== (opening.showSwing === true);
-  let needsRender = false;
   if (geometryChanged) {
     const wallPosition = meta.axis === "x" ? opening.y1 : opening.x1;
     setOpeningOnWall(opening, meta.axis, wallPosition, newCenter, newLength);
-    needsRender = true;
-  }
-  if (swingChanged) {
-    opening.showSwing = wantsSwing;
-    needsRender = true;
-  }
-  if (needsRender) {
     renderFloorplan();
   }
   const heightChanged = Math.abs(newHeight - opening.heightMm) > 0.5;
@@ -12181,7 +12559,7 @@ const applyArchitectAdjustments = ({
   if (refreshPanel) {
     renderArchitectPanel();
   }
-  if (commit && (geometryChanged || heightChanged || swingChanged)) {
+  if (commit && (geometryChanged || heightChanged)) {
     saveState();
   }
 };
@@ -12272,7 +12650,7 @@ const addRoomObject = (type) => {
   const object = createRoomObject({
     roomId: context.room.id,
     type,
-    name: getNextObjectName(roomData),
+    name: getNextObjectName(),
     cx: context.point.x,
     cy: context.point.y,
     width: DEFAULT_OBJECT_WIDTH_PX,
@@ -12319,10 +12697,11 @@ const duplicateSelectedObject = () => {
   const copy = {
     ...source,
     id: createObjectId(),
-    name: getNextObjectName(roomData),
+    name: getNextObjectName(),
     cx: source.cx + 12,
     cy: source.cy + 12,
     rotation: normalizeRotation(source.rotation),
+    locked: source.locked === true,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -12331,6 +12710,67 @@ const duplicateSelectedObject = () => {
   renderFloorplan();
   renderArchitectPanel();
   saveState();
+};
+
+const updateObjectContextMenu = (object) => {
+  if (!elements.objectContextMenu) return;
+  const menu = elements.objectContextMenu;
+  const lockBtn = menu.querySelector("button[data-action='toggle-lock']");
+  if (lockBtn) {
+    lockBtn.textContent = object.locked
+      ? "Objekt entsperren"
+      : "Objekt sperren";
+  }
+};
+
+const openObjectContextMenu = (event, object, roomId) => {
+  if (!elements.objectContextMenu) return;
+  closeCommentContextMenu();
+  hideCommentTooltip();
+  updateObjectContextMenu(object);
+  elements.objectContextMenu.hidden = false;
+  elements.objectContextMenu.setAttribute("aria-hidden", "false");
+  objectContextState.roomId = roomId;
+  objectContextState.objectId = object.id;
+  objectContextState.isOpen = true;
+  positionObjectContextMenu(event.clientX, event.clientY);
+};
+
+const closeObjectContextMenu = () => {
+  if (!elements.objectContextMenu || !objectContextState.isOpen) return;
+  elements.objectContextMenu.hidden = true;
+  elements.objectContextMenu.setAttribute("aria-hidden", "true");
+  objectContextState.roomId = null;
+  objectContextState.objectId = null;
+  objectContextState.isOpen = false;
+};
+
+const handleObjectContextAction = (action) => {
+  const roomId = objectContextState.roomId;
+  const objectId = objectContextState.objectId;
+  if (!roomId || !objectId) return;
+  const roomData = ensureRoomData(roomId);
+  const index = roomData.objects.findIndex((item) => item.id === objectId);
+  if (index < 0) return;
+  const object = roomData.objects[index];
+  if (!object) return;
+
+  if (action === "delete") {
+    roomData.objects.splice(index, 1);
+    if (
+      state.selectedObject?.roomId === roomId &&
+      state.selectedObject?.objectId === objectId
+    ) {
+      state.selectedObject = null;
+    }
+  } else if (action === "toggle-lock") {
+    object.locked = !object.locked;
+    object.updatedAt = new Date().toISOString();
+  }
+
+  saveState();
+  renderFloorplan();
+  renderArchitectPanel();
 };
 
 const beginRoomDraft = (point) => {
@@ -12496,17 +12936,22 @@ const startInteriorDrag = (event, target, handle) => {
   ) {
     return;
   }
-  const objectTarget = target?.closest?.("[data-object-id]") || target;
-  const roomId = objectTarget?.dataset?.roomId;
-  const objectId = objectTarget?.dataset?.objectId;
-  if (!roomId || !objectId) return;
+  const objectTarget = getObjectTargetFromElement(target);
+  if (!objectTarget) return;
+  const ids = getObjectIdsFromTarget(objectTarget);
+  if (!ids) return;
+  const { roomId, objectId } = ids;
   const object = getRoomObjectById(roomId, objectId);
   if (!object) return;
   selectInteriorObject(roomId, objectId);
+  if (object.locked) {
+    return;
+  }
 
   const pointer = getFloorplanPoint(event);
-  const handleId = handle?.dataset?.objectHandle || null;
+  const handleId = getDataAttribute(handle, "objectHandle") || null;
 
+  event.preventDefault();
   dragState.active = true;
   dragState.didMove = false;
   dragState.pointerId = event.pointerId;
@@ -12552,7 +12997,11 @@ const startInteriorDrag = (event, target, handle) => {
     };
   }
 
-  elements.floorplan.setPointerCapture(event.pointerId);
+  try {
+    elements.floorplan.setPointerCapture(event.pointerId);
+  } catch {
+    // Ignore pointer capture failures.
+  }
   setPlannerDragging(true);
 };
 
@@ -12560,6 +13009,7 @@ const handleInteriorPointerMove = (event) => {
   if (!state.isArchitectMode || state.plannerMode !== "interior") return;
   if (!dragState.active || event.pointerId !== dragState.pointerId) return;
   if (!isInteriorDragType(dragState.type)) return;
+  if (dragState.context?.object?.locked) return;
 
   const pointer = getFloorplanPoint(event);
   const movedDistance = Math.hypot(
@@ -12905,12 +13355,12 @@ const bindEvents = () => {
         handleAddComment(event);
         return;
       }
-      const objectTarget = target?.closest?.("[data-object-id]");
-      if (objectTarget?.dataset?.roomId && objectTarget?.dataset?.objectId) {
-        selectInteriorObject(
-          objectTarget.dataset.roomId,
-          objectTarget.dataset.objectId,
-        );
+      const objectTarget = getObjectTargetFromElement(target);
+      const objectIds = objectTarget
+        ? getObjectIdsFromTarget(objectTarget)
+        : null;
+      if (objectIds) {
+        selectInteriorObject(objectIds.roomId, objectIds.objectId);
         return;
       }
       const hit = getObjectHitTest(getFloorplanPoint(event), getActiveFloor());
@@ -12961,10 +13411,10 @@ const bindEvents = () => {
     }
     if (state.isExteriorMode) return;
     if (state.isArchitectMode && state.plannerMode === "interior") {
-      const handle = target?.closest?.("[data-object-handle]");
-      const objectTarget = target?.closest?.("[data-object-id]");
+      if (event.button !== 0) return;
+      const handle = getObjectHandleTargetFromElement(target);
+      const objectTarget = getObjectTargetFromElement(target);
       if (!objectTarget) return;
-      event.preventDefault();
       startInteriorDrag(event, objectTarget, handle);
       return;
     }
@@ -13004,6 +13454,25 @@ const bindEvents = () => {
   });
   elements.floorplan.addEventListener("contextmenu", (event) => {
     const target = event.target;
+    if (
+      state.isArchitectMode &&
+      state.plannerMode === "interior" &&
+      !state.isExteriorMode
+    ) {
+      const objectTarget = getObjectTargetFromElement(target);
+      const objectIds = objectTarget
+        ? getObjectIdsFromTarget(objectTarget)
+        : null;
+      if (objectIds) {
+        const object = getRoomObjectById(objectIds.roomId, objectIds.objectId);
+        if (object) {
+          event.preventDefault();
+          selectInteriorObject(objectIds.roomId, objectIds.objectId);
+          openObjectContextMenu(event, object, objectIds.roomId);
+          return;
+        }
+      }
+    }
     const marker = target?.closest?.(".comment-marker");
     if (marker) {
       const roomId = marker.dataset.roomId;
@@ -13101,6 +13570,16 @@ const bindEvents = () => {
     if (!action) return;
     handleCommentContextAction(action);
     closeCommentContextMenu();
+  });
+
+  elements.objectContextMenu?.addEventListener("click", (event) => {
+    const target = event.target;
+    const actionButton = target?.closest?.("button[data-action]");
+    if (!actionButton || actionButton.disabled) return;
+    const action = actionButton.dataset.action;
+    if (!action) return;
+    handleObjectContextAction(action);
+    closeObjectContextMenu();
   });
 
   elements.taskPlanMenu?.addEventListener("click", (event) => {
@@ -13375,6 +13854,9 @@ const bindEvents = () => {
     if (commentContextState.isOpen) {
       closeCommentContextMenu();
     }
+    if (objectContextState.isOpen) {
+      closeObjectContextMenu();
+    }
     if (taskPlanMenuState.isOpen) {
       closeTaskPlanMenu();
     }
@@ -13416,6 +13898,7 @@ const bindEvents = () => {
       event.preventDefault();
       updateSelectedObject(
         (object) => {
+          if (object.locked) return false;
           object.cy -= step;
           return true;
         },
@@ -13427,6 +13910,7 @@ const bindEvents = () => {
       event.preventDefault();
       updateSelectedObject(
         (object) => {
+          if (object.locked) return false;
           object.cy += step;
           return true;
         },
@@ -13438,6 +13922,7 @@ const bindEvents = () => {
       event.preventDefault();
       updateSelectedObject(
         (object) => {
+          if (object.locked) return false;
           object.cx -= step;
           return true;
         },
@@ -13449,6 +13934,7 @@ const bindEvents = () => {
       event.preventDefault();
       updateSelectedObject(
         (object) => {
+          if (object.locked) return false;
           object.cx += step;
           return true;
         },
@@ -13461,6 +13947,7 @@ const bindEvents = () => {
       const delta = event.shiftKey ? ROTATION_SNAP_DEG : 1;
       updateSelectedObject(
         (object) => {
+          if (object.locked) return false;
           const next = object.rotation + (key === "[" ? -delta : delta);
           object.rotation = normalizeRotation(next);
           return true;
@@ -13475,6 +13962,12 @@ const bindEvents = () => {
       !elements.commentContextMenu?.contains(event.target)
     ) {
       closeCommentContextMenu();
+    }
+    if (
+      objectContextState.isOpen &&
+      !elements.objectContextMenu?.contains(event.target)
+    ) {
+      closeObjectContextMenu();
     }
     if (
       taskPlanMenuState.isOpen &&
@@ -13498,9 +13991,11 @@ const bindEvents = () => {
     }
   });
   window.addEventListener("resize", closeCommentContextMenu);
+  window.addEventListener("resize", closeObjectContextMenu);
   window.addEventListener("resize", closeTaskPlanMenu);
   window.addEventListener("resize", scheduleGanttLinksUpdate);
   window.addEventListener("scroll", closeCommentContextMenu, true);
+  window.addEventListener("scroll", closeObjectContextMenu, true);
   window.addEventListener("scroll", closeTaskPlanMenu, true);
 
   elements.decisionForm?.addEventListener("submit", handleDecisionSubmit);
@@ -13687,10 +14182,13 @@ const bindEvents = () => {
       if (raw === "" || raw === null || raw === undefined) return;
       const value = Number(raw);
       if (!Number.isFinite(value)) return;
-      updateSelectedObject((object) => applyValue(object, value), {
-        commit,
-        refreshPanel: commit,
-      });
+      updateSelectedObject(
+        (object) => {
+          if (object.locked) return false;
+          return applyValue(object, value);
+        },
+        { commit, refreshPanel: commit },
+      );
     };
     input.addEventListener("input", () => apply(false));
     input.addEventListener("change", () => apply(true));
@@ -13698,12 +14196,26 @@ const bindEvents = () => {
 
   if (elements.objectNameInput) {
     const applyName = (commit) => {
+      const object = getSelectedRoomObject();
+      if (!object) return;
       const value = elements.objectNameInput.value.trim();
+      const next = value || "Objekt";
+      if (!isObjectNameUnique(next, object.id)) {
+        elements.objectNameInput.setCustomValidity(
+          "Objektname bereits vergeben.",
+        );
+        if (commit) {
+          elements.objectNameInput.reportValidity();
+          elements.objectNameInput.value = object.name || "";
+          elements.objectNameInput.setCustomValidity("");
+        }
+        return;
+      }
+      elements.objectNameInput.setCustomValidity("");
       updateSelectedObject(
-        (object) => {
-          const next = value || "Objekt";
-          if (next === object.name) return false;
-          object.name = next;
+        (item) => {
+          if (next === item.name) return false;
+          item.name = next;
           return true;
         },
         { commit, refreshPanel: commit },

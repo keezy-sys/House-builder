@@ -80,7 +80,10 @@ const assertOuterBounds = (floor, spec) => {
   const bounds = getBounds(rooms);
   const widthCm = pxToCm(bounds.maxX - bounds.minX);
   const heightCm = pxToCm(bounds.maxY - bounds.minY);
-  if (Number.isFinite(spec.outer?.width) && spec.outer?.enforceWidth !== false) {
+  if (
+    Number.isFinite(spec.outer?.width) &&
+    spec.outer?.enforceWidth !== false
+  ) {
     approxEqual(widthCm, spec.outer.width);
   }
   if (

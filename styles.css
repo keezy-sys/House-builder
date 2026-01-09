@@ -498,6 +498,24 @@ svg {
   pointer-events: stroke;
 }
 
+.dimension-layer {
+  pointer-events: none;
+}
+
+.dimension-label {
+  fill: #7b6a58;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  paint-order: stroke;
+  stroke: rgba(255, 250, 244, 0.9);
+  stroke-width: 3;
+}
+
+.dimension-label.dimension-door {
+  fill: #8b7460;
+}
+
 .comment-marker {
   fill: #ef4444;
   stroke: #b91c1c;
@@ -537,9 +555,10 @@ svg {
 }
 
 .opening-group .door-frame {
-  stroke: var(--opening-ink-soft);
-  stroke-width: 2.4;
-  stroke-linecap: round;
+  stroke: var(--wall-light);
+  stroke-width: 6;
+  stroke-linecap: square;
+  opacity: 0.9;
 }
 
 .opening-group .door-leaf {
@@ -565,16 +584,16 @@ svg {
 
 .opening-group .window-line {
   stroke: var(--opening-ink-soft);
-  stroke-width: 1.8;
+  stroke-width: 2.2;
   stroke-linecap: round;
-  opacity: 0.85;
+  opacity: 0.9;
 }
 
 .opening-group .window-cross {
   stroke: var(--opening-ink-light);
-  stroke-width: 1.2;
+  stroke-width: 1.4;
   stroke-linecap: round;
-  opacity: 0.45;
+  opacity: 0.55;
 }
 
 .opening-group .door-leaf,
@@ -622,7 +641,8 @@ svg {
 .room-object,
 .room-object-outline,
 .room-object-handle,
-.room-object-rotate-handle {
+.room-object-rotate-handle,
+.room-object-lock {
   pointer-events: none;
 }
 
@@ -661,6 +681,19 @@ svg {
   cursor: grab;
 }
 
+.room-object-lock-body {
+  fill: var(--interior-accent);
+  stroke: #fffaf4;
+  stroke-width: 1.1;
+}
+
+.room-object-lock-shackle {
+  fill: none;
+  stroke: #fffaf4;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+
 .room-object-handle[data-object-handle="nw"],
 .room-object-handle[data-object-handle="se"] {
   cursor: nwse-resize;
@@ -674,7 +707,8 @@ svg {
 .interior-mode .room-object,
 .interior-mode .room-object-outline,
 .interior-mode .room-object-handle,
-.interior-mode .room-object-rotate-handle {
+.interior-mode .room-object-rotate-handle,
+.interior-mode .room-object-lock {
   pointer-events: all;
 }
 
@@ -2063,6 +2097,7 @@ button {
 }
 
 .comment-context-menu,
+.object-context-menu,
 .task-plan-menu {
   position: fixed;
   min-width: 200px;
@@ -2077,11 +2112,13 @@ button {
 }
 
 .comment-context-menu[hidden],
+.object-context-menu[hidden],
 .task-plan-menu[hidden] {
   display: none;
 }
 
 .comment-context-menu button,
+.object-context-menu button,
 .task-plan-menu button {
   border: none;
   background: transparent;
@@ -2106,18 +2143,21 @@ button {
 }
 
 .comment-context-menu button:hover,
+.object-context-menu button:hover,
 .task-plan-menu button:hover {
   background: #f3e6d7;
 }
 
 .comment-context-menu button:disabled,
+.object-context-menu button:disabled,
 .task-plan-menu button:disabled {
   color: #b0a099;
   cursor: not-allowed;
   background: transparent;
 }
 
-.comment-context-menu .danger {
+.comment-context-menu .danger,
+.object-context-menu .danger {
   color: #b91c1c;
 }
 

@@ -15,44 +15,30 @@
       "width": 305,
       "height": 555,
       "label": "CAMERA/ZIMMER (west)",
-      "derivedFrom": [
-        "GF_P3_ROOM_BED_DIM_305",
-        "GF_P3_ROOM_BED_DIM_555"
-      ]
+      "derivedFrom": ["GF_P3_ROOM_BED_DIM_305", "GF_P3_ROOM_BED_DIM_555"]
     },
     "ground-living": {
       "width": 450,
       "height": 320,
       "label": "SOGGIORNO/WOHNRAUM",
-      "derivedFrom": [
-        "GF_P3_ROOM_LIVING_DIM_450",
-        "GF_P3_ROOM_LIVING_DIM_320"
-      ]
+      "derivedFrom": ["GF_P3_ROOM_LIVING_DIM_450", "GF_P3_ROOM_LIVING_DIM_320"]
     },
     "ground-bedroom-right": {
       "width": 535,
       "height": 320,
       "label": "ZIMMER/CAMERA (east)",
-      "derivedFrom": [
-        "GF_P4_ROOM_ZIMMER_DIM_535",
-        "GF_P4_ROOM_ZIMMER_DIM_320"
-      ]
+      "derivedFrom": ["GF_P4_ROOM_ZIMMER_DIM_535", "GF_P4_ROOM_ZIMMER_DIM_320"]
     },
     "ground-cellar": {
       "width": 310,
       "height": 330,
       "label": "KELLER",
-      "derivedFrom": [
-        "GF_P4_ROOM_KELLER_DIM_310",
-        "GF_P4_ROOM_KELLER_DIM_330"
-      ]
+      "derivedFrom": ["GF_P4_ROOM_KELLER_DIM_310", "GF_P4_ROOM_KELLER_DIM_330"]
     },
     "ground-bathroom": {
       "width": 220,
       "label": "DOCCIA (width only)",
-      "derivedFrom": [
-        "GF_P3_DOCCIA_DIM_220"
-      ]
+      "derivedFrom": ["GF_P3_DOCCIA_DIM_220"]
     },
     "ground-hallway": {
       "label": "ATRIO (layout-derived)"
@@ -87,10 +73,7 @@
       "width": 70,
       "height": 40,
       "label": "70/40",
-      "derivedFrom": [
-        "GF_P4_TOP_OPEN_70x40_w",
-        "GF_P4_TOP_OPEN_70x40_h"
-      ]
+      "derivedFrom": ["GF_P4_TOP_OPEN_70x40_w", "GF_P4_TOP_OPEN_70x40_h"]
     },
     "ground-bottom-door-190x211p4-right": {
       "width": 190,

@@ -1,0 +1,34 @@
+{
+  "source": "lugano_original_dimensionSpec.json",
+  "units": "cm",
+  "upper": {
+    "terrace": {
+      "width": 76,
+      "height": 115,
+      "offsetLeft": 12,
+      "anchor": "bottom-left",
+      "derivedFrom": [
+        "FF_P1_BOTTOM_SEG_12",
+        "FF_P1_BOTTOM_SEG_76",
+        "FF_P1_LEFT_SEG_115"
+      ]
+    },
+    "corridor": {
+      "height": 40,
+      "anchor": "bottom",
+      "note": "depth is not explicitly labeled in the source; keep legacy 40cm"
+    }
+  },
+  "ground": {
+    "terrace": {
+      "height": 80,
+      "anchor": "top",
+      "note": "depth is not explicitly labeled in the source; keep legacy 80cm"
+    },
+    "stairs": {
+      "height": 170,
+      "anchor": "right",
+      "note": "keeps legacy depth/height until explicit dimensions are provided"
+    }
+  }
+}
